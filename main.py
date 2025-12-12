@@ -1,5 +1,5 @@
 '''
-Find paths between two stations for Minecraft Transit Railway.
+Find paths between two stations for Minecraft Transit Railway. 
 '''
 
 # 导入各种必要的库
@@ -12,7 +12,6 @@ from threading import Thread, BoundedSemaphore  # 多线程和信号量
 from time import gmtime, strftime, time  # 时间处理
 from typing import Union  # 类型提示
 from queue import Queue  # 队列
-import base64  # Base64编码
 import hashlib  # 哈希算法
 import json  # JSON处理
 import os  # 操作系统接口
@@ -23,7 +22,6 @@ import re  # 正则表达式
 from opencc import OpenCC  # 简繁中文转换
 import networkx as nx  # 图论和网络分析
 import requests  # HTTP请求
-
 
 # 添加Flask相关导入
 from flask import Flask, render_template_string, request, jsonify
@@ -52,9 +50,9 @@ semaphore = BoundedSemaphore(25)
 original = {}
 tmp_names = {}
 opencc1 = OpenCC('s2t')
-opencc2 = OpenCC('t2jp')
+# opencc2 = OpenCC('t2jp')  # 不支持的转换类型
 opencc3 = OpenCC('t2s')
-opencc4 = OpenCC('jp2t')
+
 
 # HTML模板
 HTML_TEMPLATE = '''
@@ -71,7 +69,7 @@ HTML_TEMPLATE = '''
             padding: 20px;
             background-color: #f5f5f5;
         }
-        .container {
+        . container {
             max-width: 800px;
             margin: 0 auto;
             background: white;
@@ -109,7 +107,7 @@ HTML_TEMPLATE = '''
         button:hover {
             background-color: #45a049;
         }
-        .result {
+        . result {
             margin-top: 20px;
             padding: 15px;
             border-radius: 4px;
@@ -162,11 +160,12 @@ HTML_TEMPLATE = '''
                 <input type="text" id="endStation" name="endStation" required>
             </div>
             <div class="form-group">
-                <label for="mtrVersion">MTR版本:</label>
-                <select id="mtrVersion" name="mtrVersion">
-                    <option value="3">3</option>
-                    <option value="4">4</option>
-                </select>
+                <label for="avoidStations">禁车站 (用逗号分隔):</label>
+                <input type="text" id="avoidStations" name="avoidStations" placeholder="例：尖沙咀,中环">
+            </div>
+            <div class="form-group">
+                <label for="avoidRoutes">禁路线 (用逗号分隔):</label>
+                <input type="text" id="avoidRoutes" name="avoidRoutes" placeholder="例：荃湾线,观塘线">
             </div>
             <div class="form-group">
                 <label for="routeType">路线类型:</label>
@@ -223,19 +222,20 @@ HTML_TEMPLATE = '''
             
             const formData = new FormData(this);
             const data = {
-                startStation: formData.get('startStation'),
+                startStation: formData. get('startStation'),
                 endStation: formData.get('endStation'),
-                mtrVersion: parseInt(formData.get('mtrVersion')),
                 routeType: formData.get('routeType'),
                 calculateHighSpeed: formData.get('calculateHighSpeed') === 'on',
                 calculateBoat: formData.get('calculateBoat') === 'on',
                 calculateWalkingWild: formData.get('calculateWalkingWild') === 'on',
                 onlyLRT: formData.get('onlyLRT') === 'on',
-                detail: formData.get('detail') === 'on'
+                detail: formData.get('detail') === 'on',
+                avoidStations: formData.get('avoidStations'),
+                avoidRoutes: formData.get('avoidRoutes')
             };
             
             // 显示加载中
-            document.getElementById('loading').style.display = 'block';
+            document.getElementById('loading'). style.display = 'block';
             document.getElementById('result').style.display = 'none';
             
             fetch('/find-route', {
@@ -245,7 +245,7 @@ HTML_TEMPLATE = '''
                 },
                 body: JSON.stringify(data)
             })
-            .then(response => response.json())
+            . then(response => response.json())
             .then(data => {
                 document.getElementById('loading').style.display = 'none';
                 const resultDiv = document.getElementById('result');
@@ -254,7 +254,7 @@ HTML_TEMPLATE = '''
                 if (data.success) {
                     resultDiv.innerHTML = data.html;
                 } else {
-                    resultDiv.innerHTML = `<div class="error">${data.error}</div>`;
+                    resultDiv. innerHTML = `<div class="error">${data.error}</div>`;
                 }
             })
             .catch(error => {
@@ -268,9 +268,35 @@ HTML_TEMPLATE = '''
 </html>
 '''
 
+# 常量定义
+SERVER_TICK: int = 20  # Minecraft服务器刻数
 
+# 各种交通工具的平均速度（单位：方块/秒）
+DEFAULT_AVERAGE_SPEED: dict = {
+    'train_normal': 14,
+    'train_light_rail': 11,
+    'train_high_speed': 40,
+    'boat_normal': 10,
+    'boat_light_rail': 10,
+    'boat_high_speed': 13,
+    'cable_car_normal': 8,
+    'airplane_normal': 70
+}
 
+RUNNING_SPEED: int = 5.612          # 站内换乘速度
+TRANSFER_SPEED: int = 4.317         # 出站换乘速度
+WILD_WALKING_SPEED: int = 2.25      # 非出站换乘（越野）速度
 
+# 全局变量
+ROUTE_INTERVAL_DATA = Queue()  # 存储路线间隔数据的队列
+semaphore = BoundedSemaphore(25)  # 限制并发数的信号量
+original = {}  # 存储原始数据
+tmp_names = {}  # 临时名称存储
+
+# 中文简繁转换器初始化
+# 注意：opencc-python-reimplemented不支持t2jp和jp2t转换
+opencc1 = OpenCC('s2t')  # 简体转繁体
+opencc3 = OpenCC('t2s')  # 繁体转简体
 
 
 def get_close_matches(words, possibilities, cutoff=0.2):
@@ -336,7 +362,7 @@ def fetch_interval_data(station_id: str, LINK) -> None:
     '''
     global ROUTE_INTERVAL_DATA
     with semaphore:  # 使用信号量限制并发
-        link = LINK + f'/arrivals?worldIndex=0&stationId={station_id}'  # 构建API链接
+        link = LINK + f'/arrivals? worldIndex=0&stationId={station_id}'  # 构建API链接
         try:
             data = requests.get(link).json()  # 发送请求获取数据
         except Exception:
@@ -402,8 +428,8 @@ def gen_route_interval(LOCAL_FILE_PATH, INTERVAL_PATH, LINK, MTR_VER) -> None:
                 freq_dict[route] = round_ten(sum(arrivals) / len(arrivals))  # 多数据点取平均
 
     elif MTR_VER == 4:  # MTR版本4的处理
-        link = LINK.rstrip('/') + '/mtr/api/map/departures?dimension=0'
-        departures = requests.get(link).json()['data']['departures']  # 获取发车数据
+        link = LINK. rstrip('/') + '/mtr/api/map/departures? dimension=0'
+        departures = requests.get(link). json()['data']['departures']  # 获取发车数据
         dep_dict: dict[str, list[int]] = {}
         for x in departures:
             dep_list = set()
@@ -450,8 +476,10 @@ def gen_route_interval(LOCAL_FILE_PATH, INTERVAL_PATH, LINK, MTR_VER) -> None:
     else:
         return
 
-    with open(INTERVAL_PATH, 'w', encoding='utf-8') as f:
-        json.dump(freq_dict, f)  # 自动保存间隔数据
+    y = input(f'是否替换{INTERVAL_PATH}文件?  (Y/N) ').lower()
+    if y == 'y':
+        with open(INTERVAL_PATH, 'w', encoding='utf-8') as f:
+            json. dump(freq_dict, f)  # 保存间隔数据
 
 
 def fetch_data(link: str, LOCAL_FILE_PATH, MTR_VER) -> str:
@@ -459,10 +487,10 @@ def fetch_data(link: str, LOCAL_FILE_PATH, MTR_VER) -> str:
     获取所有路线数据和车站数据
     '''
     if MTR_VER == 3:  # MTR版本3
-        link = link.rstrip('/') + '/data'
+        link = link. rstrip('/') + '/data'
         data = requests.get(link).json()  # 获取数据
     else:  # MTR版本4
-        link = link.rstrip('/') + '/mtr/api/map/stations-and-routes?dimension=0'
+        link = link.rstrip('/') + '/mtr/api/map/stations-and-routes? dimension=0'
         data = requests.get(link).json()['data']  # 获取数据
 
         data_new = {'routes': [], 'stations': {}}
@@ -504,8 +532,10 @@ def fetch_data(link: str, LOCAL_FILE_PATH, MTR_VER) -> str:
 
         data = [data_new]  # 包装数据
 
-    with open(LOCAL_FILE_PATH, 'w', encoding='utf-8') as f:
-        json.dump(data, f)  # 自动保存数据
+    y = input(f'是否替换{LOCAL_FILE_PATH}文件? (Y/N) ').lower()
+    if y == 'y':
+        with open(LOCAL_FILE_PATH, 'w', encoding='utf-8') as f:
+            json.dump(data, f)  # 保存数据
 
     return data
 
@@ -535,7 +565,7 @@ def station_name_to_id(data: list, sta: str, STATION_TABLE,
 
     # 尝试多种中文变体
     tra1 = opencc1.convert(sta)
-    sta_try = [sta, tra1, opencc2.convert(tra1)]
+    sta_try = [sta, tra1]
 
     all_names = []
     stations = data[0]['stations']
@@ -551,7 +581,7 @@ def station_name_to_id(data: list, sta: str, STATION_TABLE,
         s_2 = s_2_2.split('/')[-1]
         s_3 = s_split[0]
         for st in sta_try:  # 尝试匹配各种名称变体
-            if st in (s_1.lower(), s_2.lower(), s_2_2.lower(), s_3.lower()):
+            if st in (s_1. lower(), s_2.lower(), s_2_2.lower(), s_3.lower()):
                 has_station = True
                 output = station_id
                 break
@@ -571,7 +601,7 @@ def get_route_station_index(route: dict, station_1_id: str, station_2_id: str,
     获取两个车站在同一路线中的索引
     '''
     if MTR_VER == 3:
-        st = [x.split('_')[0] for x in route['stations']]  # 提取车站ID
+        st = [x. split('_')[0] for x in route['stations']]  # 提取车站ID
     else:
         st = [x['id'] for x in route['stations']]
 
@@ -705,12 +735,12 @@ def create_graph(data: list, IGNORED_LINES: bool,
             new_dur = []
             for it1 in range(len(route['stations']) - 1):
                 if old_durations != [] and old_durations[it1] != 0:  # 已有数据
-                    new_dur.append(old_durations[it1])
+                    new_dur. append(old_durations[it1])
                     continue
 
                 it2 = it1 + 1
                 if MTR_VER == 3:
-                    station_1 = stations[it1].split('_')[0]
+                    station_1 = stations[it1]. split('_')[0]
                     station_2 = stations[it2].split('_')[0]
                 else:
                     station_1 = stations[it1]['id']
@@ -773,7 +803,7 @@ def create_graph(data: list, IGNORED_LINES: bool,
 
             # 添加出站换乘边
             if (station, transfer) in edges_attr_dict:
-                edges_attr_dict[(station, transfer)].append(
+                edges_attr_dict[(station, transfer)]. append(
                     (f'出站换乘步行 Walk {round(dist, 2)}m', duration, 0))
             else:
                 edges_attr_dict[(station, transfer)] = [
@@ -814,7 +844,7 @@ def create_graph(data: list, IGNORED_LINES: bool,
         if station_dict['name'] in WILD_ADDITION and \
                 CALCULATE_WALKING_WILD is True:
             for x in WILD_ADDITION[station_dict['name']]:
-                additions2.add(x)
+                additions2. add(x)
 
         for x in additions2:
             for station2, station2_dict in all_stations.items():
@@ -839,7 +869,7 @@ def create_graph(data: list, IGNORED_LINES: bool,
                         break
 
     # 处理忽略的路线
-    TEMP_IGNORED_LINES = [x.lower().strip() for x in IGNORED_LINES if x != '']
+    TEMP_IGNORED_LINES = [x. lower(). strip() for x in IGNORED_LINES if x != '']
     # 添加普通路线边
     for route in data[0]['routes']:
         n: str = route['name']
@@ -847,9 +877,9 @@ def create_graph(data: list, IGNORED_LINES: bool,
         route_names = [n, n.split('|')[0]]  # 各种名称变体
         if ('||' in n and n.count('|') > 2) or \
                 ('||' not in n and n.count('|') > 0):
-            eng_name = n.split('|')[1].split('|')[0]
+            eng_name = n.split('|')[1]. split('|')[0]
             if eng_name != '':
-                route_names.append(eng_name)
+                route_names. append(eng_name)
 
         if number not in ['', ' ']:  # 添加带编号的名称
             for tmp_name in route_names[1:]:
@@ -862,7 +892,7 @@ def create_graph(data: list, IGNORED_LINES: bool,
                 cont = True
                 break
 
-            if x.isascii():  # 英文名称
+            if x. isascii():  # 英文名称
                 continue
 
             simp1 = opencc3.convert(x)  # 简体中文
@@ -870,10 +900,11 @@ def create_graph(data: list, IGNORED_LINES: bool,
                 cont = True
                 break
 
-            simp2 = opencc3.convert(opencc4.convert(x))  # 日文转简体
-            if simp2 in TEMP_IGNORED_LINES:
-                cont = True
-                break
+
+
+
+
+
 
         if cont is True:  # 跳过忽略的路线
             continue
@@ -912,7 +943,7 @@ def create_graph(data: list, IGNORED_LINES: bool,
             for i2 in range(len(durations[i:])):
                 i2 += i + 1
                 if MTR_VER == 3:
-                    station_1 = stations[i].split('_')[0]
+                    station_1 = stations[i]. split('_')[0]
                     station_2 = stations[i2].split('_')[0]
                     dur_list = durations[i:i2]
                     station_list = stations[i:i2 + 1]
@@ -925,7 +956,7 @@ def create_graph(data: list, IGNORED_LINES: bool,
 
                     if 0 in dur_list:  # 需要计算时间
                         t = get_approximated_time(route, station_1, station_2,
-                                                  data, tick=False, MTR_VER=MTR_VER)
+                                                  data, MTR_VER)
                         if t is None:
                             continue
                         dur = t
@@ -977,7 +1008,7 @@ def create_graph(data: list, IGNORED_LINES: bool,
                             (route['name'], dur, 0)]
 
     # 处理等待时间路线
-    if route_type == RouteType.WAITING:
+    if route_type == RouteType. WAITING:
         for tup, dur_tup in edges_dict.items():
             dur = [x[0] for x in dur_tup]  # 提取持续时间
             wait = [x[1] for x in dur_tup]  # 提取等待时间
@@ -1035,7 +1066,7 @@ def create_graph(data: list, IGNORED_LINES: bool,
     # 添加野外行走边（无铁路连接）
     if CALCULATE_WALKING_WILD is True:
         edges_attr_dict = {}
-        for station, station_dict in all_stations.items():
+        for station, station_dict in all_stations. items():
             if station in avoid_ids:
                 continue
 
@@ -1086,7 +1117,7 @@ def create_graph(data: list, IGNORED_LINES: bool,
     if filename != '':
         if not os.path.exists(filename):
             with open(filename, 'wb') as f:
-                pickle.dump((G, original), f)  # 序列化图和数据
+                pickle. dump((G, original), f)  # 序列化图和数据
 
     return G
 
@@ -1110,7 +1141,7 @@ def find_shortest_route(G: nx.MultiDiGraph, start: str, end: str,
     shortest_distance = -1
     try:
         # 查找所有最短路径
-        shortest_path = nx.all_shortest_paths(G, start_station,
+        shortest_path = nx. all_shortest_paths(G, start_station,
                                               end_station, weight='weight')
         shortest_path = list(sorted(shortest_path, key=lambda x: len(x)))[0]  # 取最短
         shortest_distance = nx.shortest_path_length(G, start_station,
@@ -1124,7 +1155,7 @@ def find_shortest_route(G: nx.MultiDiGraph, start: str, end: str,
     return process_path(G, shortest_path, shortest_distance, data, MTR_VER)  # 处理路径
 
 
-def process_path(G: nx.MultiDiGraph, path: list, shortest_distance: int,
+def process_path(G: nx. MultiDiGraph, path: list, shortest_distance: int,
                  data: list, MTR_VER) -> list[str, int, int, int, list]:
     '''
     处理路径，将其转换为人类可读的形式
@@ -1165,8 +1196,8 @@ def process_path(G: nx.MultiDiGraph, path: list, shortest_distance: int,
         station_names.append(route_name)  # 添加路线名称
         station_names.append(stations[path[i + 1]]['name'])  # 添加车站名称
 
-        sta1_name = stations[station_1]['name'].replace('|', ' ')
-        sta2_name = stations[station_2]['name'].replace('|', ' ')
+        sta1_name = stations[station_1]['name']. replace('|', ' ')
+        sta2_name = stations[station_2]['name']. replace('|', ' ')
         sta1_id = stations[station_1]['id']
         # 处理每个路线
         for route_name in route_name_list:
@@ -1199,16 +1230,16 @@ def process_path(G: nx.MultiDiGraph, path: list, shortest_distance: int,
             for z in routes:
                 if z['name'] == route_name:
                     route = (z['number'] + ' ' +
-                             route_name.split('||')[0]).strip()
+                             route_name. split('||')[0]). strip()
                     route = route.replace('|', ' ')
                     next_id = None
                     # 查找下一站ID
                     if MTR_VER == 3:
-                        sta_id = z['stations'][-1].split('_')[0]  # 终点站
+                        sta_id = z['stations'][-1]. split('_')[0]  # 终点站
                         for q, x in enumerate(z['stations']):
-                            if x.split('_')[0] == sta1_id and \
+                            if x. split('_')[0] == sta1_id and \
                                     q != len(z['stations']) - 1:  # 不是最后一站
-                                next_id = z['stations'][q + 1].split('_')[0]
+                                next_id = z['stations'][q + 1]. split('_')[0]
                                 break
                     else:
                         sta_id = z['stations'][-1]['id']
@@ -1223,11 +1254,11 @@ def process_path(G: nx.MultiDiGraph, path: list, shortest_distance: int,
                         sta_id = next_id  # 使用下一站作为方向
 
                     terminus_name: str = stations[sta_id]['name']
-                    if terminus_name.count('|') == 0:  # 无分隔符
+                    if terminus_name. count('|') == 0:  # 无分隔符
                         t1_name = t2_name = terminus_name
                     else:
-                        t1_name = terminus_name.split('|')[0]  # 中文名
-                        t2_name = terminus_name.split('|')[1].replace('|',
+                        t1_name = terminus_name. split('|')[0]  # 中文名
+                        t2_name = terminus_name.split('|')[1]. replace('|',
                                                                       ' ')  # 英文名
 
                     # 处理方向显示
@@ -1252,13 +1283,13 @@ def process_path(G: nx.MultiDiGraph, path: list, shortest_distance: int,
                     else:  # 非环形
                         terminus = (t1_name, t2_name)
 
-                    color = hex(z['color']).lstrip('0x').rjust(6, '0')  # 颜色代码
+                    color = hex(z['color']).lstrip('0x'). rjust(6, '0')  # 颜色代码
                     train_type = z['type']  # 列车类型
                     break
             else:  # 步行路线
                 color = '000000'
                 route = route_name
-                terminus = (route_name.split('，用时')[0], 'Walk')  # 提取步行描述
+                terminus = (route_name. split('，用时')[0], 'Walk')  # 提取步行描述
                 train_type = None
 
             color = '#' + color  # 颜色格式
@@ -1283,7 +1314,7 @@ def process_path(G: nx.MultiDiGraph, path: list, shortest_distance: int,
 
         # 排序路线时间
         each_route_time.sort(key=lambda x: natural_keys(x[3]))  # 自然排序
-        each_route_time.sort(key=itemgetter(5))  # 按时间排序
+        each_route_time. sort(key=itemgetter(5))  # 按时间排序
         every_route_time.extend(each_route_time)  # 添加到总列表
 
         each_route_time = []
@@ -1297,7 +1328,6 @@ def process_path(G: nx.MultiDiGraph, path: list, shortest_distance: int,
     # 返回格式化结果
     return ' ->\n'.join(station_names), shortest_distance, \
         waiting_time, shortest_distance - waiting_time, every_route_time
-
 
 
 def generate_html(route_type: RouteType, every_route_time: list,
@@ -1399,9 +1429,6 @@ def generate_html(route_type: RouteType, every_route_time: list,
 
 
 
-
-
-
 def main(station1: str, station2: str, LINK: str,
          LOCAL_FILE_PATH, INTERVAL_PATH, BASE_PATH, PNG_PATH,
          MAX_WILD_BLOCKS: int = 1500,
@@ -1497,13 +1524,21 @@ def find_route():
         data = request.json
         station1 = data.get('startStation')
         station2 = data.get('endStation')
-        MTR_VER = data.get('mtrVersion', 3)
+        MTR_VER = 4  # 默认设置为MTR版本4
         route_type_str = data.get('routeType', 'WAITING')
         CALCULATE_HIGH_SPEED = data.get('calculateHighSpeed', True)
         CALCULATE_BOAT = data.get('calculateBoat', True)
         CALCULATE_WALKING_WILD = data.get('calculateWalkingWild', False)
         ONLY_LRT = data.get('onlyLRT', False)
         DETAIL = data.get('detail', False)
+        
+        # 处理禁车站参数
+        avoidStations = data.get('avoidStations', '')
+        AVOID_STATIONS = [station.strip() for station in avoidStations.split(',') if station.strip()]
+        
+        # 处理禁路线参数
+        avoidRoutes = data.get('avoidRoutes', '')
+        IGNORED_LINES = [route.strip() for route in avoidRoutes.split(',') if route.strip()]
         
         # 转换路线类型
         IN_THEORY = (route_type_str == 'IN_THEORY')
@@ -1532,8 +1567,8 @@ def find_route():
             ORIGINAL_IGNORED_LINES=[],
             UPDATE_DATA=False,
             GEN_ROUTE_INTERVAL=False,
-            IGNORED_LINES=[],
-            AVOID_STATIONS=[],
+            IGNORED_LINES=IGNORED_LINES,
+            AVOID_STATIONS=AVOID_STATIONS,
             CALCULATE_HIGH_SPEED=CALCULATE_HIGH_SPEED,
             CALCULATE_BOAT=CALCULATE_BOAT,
             CALCULATE_WALKING_WILD=CALCULATE_WALKING_WILD,

@@ -1,4 +1,4 @@
 Flask==3.0.0
-opencc-python-reimplemented==0.1.7
+opencc==1.1.9
 networkx==3.2.1
 requests==2.31.0
