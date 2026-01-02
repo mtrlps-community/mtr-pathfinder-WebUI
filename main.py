@@ -62,157 +62,624 @@ HTML_TEMPLATE = '''
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MTR路径查找器</title>
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
     <style>
-        body {
-            font-family: 'Microsoft YaHei', Arial, sans-serif;
+        /* 全局样式 */
+        * {
             margin: 0;
-            padding: 20px;
-            background-color: #f5f5f5;
-        }
-        . container {
-            max-width: 800px;
-            margin: 0 auto;
-            background: white;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        h1 {
-            text-align: center;
-            color: #333;
-        }
-        .form-group {
-            margin-bottom: 15px;
-        }
-        label {
-            display: block;
-            margin-bottom: 5px;
-            font-weight: bold;
-        }
-        input, select, button {
-            width: 100%;
-            padding: 8px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
+            padding: 0;
             box-sizing: border-box;
         }
-        button {
-            background-color: #4CAF50;
+        
+        :root {
+            --primary-color: #4a90e2;
+            --secondary-color: #50e3c2;
+            --accent-color: #f5a623;
+            --danger-color: #d0021b;
+            --success-color: #7ed321;
+            --light-gray: #f8f9fa;
+            --medium-gray: #e9ecef;
+            --dark-gray: #6c757d;
+            --text-color: #333;
+            --shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            --shadow-hover: 0 6px 20px rgba(0, 0, 0, 0.15);
+            --border-radius: 8px;
+            --transition: all 0.3s ease;
+        }
+        
+        body {
+            font-family: 'Segoe UI', 'Microsoft YaHei', Arial, sans-serif;
+            line-height: 1.6;
+            color: var(--text-color);
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        /* 容器 */
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+            overflow: hidden;
+            animation: fadeIn 0.5s ease;
+        }
+        
+        /* 头部 */
+        .header {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
             color: white;
-            border: none;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+        
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+        
+        /* 内容区 */
+        .content {
+            padding: 30px;
+        }
+        
+        /* 表单样式 */
+        .form-section {
+            margin-bottom: 25px;
+        }
+        
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+        
+        .form-group {
+            margin-bottom: 12px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 4px;
+            font-weight: 600;
+            color: var(--text-color);
+            font-size: 0.9rem;
+        }
+        
+        .form-group input[type="text"],
+        .form-group select {
+            width: 100%;
+            padding: 8px 12px;
+            border: 2px solid var(--medium-gray);
+            border-radius: 6px;
+            font-size: 0.95rem;
+            transition: var(--transition);
+            background: var(--light-gray);
+        }
+        
+        .form-group input[type="text"]:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            background: white;
+            box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.1);
+        }
+        
+        /* 复选框组 */
+        .checkbox-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 8px;
+        }
+        
+        .checkbox-item {
+            display: flex;
+            align-items: center;
             cursor: pointer;
-            font-size: 16px;
-            padding: 10px;
+            transition: var(--transition);
+            padding: 4px 8px;
+            border-radius: var(--border-radius);
+            background: var(--light-gray);
         }
-        button:hover {
-            background-color: #45a049;
+        
+        .checkbox-item:hover {
+            background: var(--medium-gray);
+            transform: translateY(-2px);
         }
-        . result {
-            margin-top: 20px;
-            padding: 15px;
-            border-radius: 4px;
-            background-color: #f9f9f9;
-            display: none;
+        
+        .checkbox-item input[type="checkbox"] {
+            margin-right: 8px;
+            transform: scale(1.2);
+            accent-color: var(--primary-color);
         }
-        .route-step {
-            margin: 10px 0;
-            padding: 10px;
-            border-left: 4px solid #4CAF50;
-            background-color: #f1f1f1;
+        
+        /* 按钮样式 */
+        .btn {
+            width: 100%;
+            padding: 14px;
+            border: none;
+            border-radius: var(--border-radius);
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            color: white;
+            box-shadow: var(--shadow);
         }
-        .station {
-            font-weight: bold;
-            color: #333;
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-hover);
         }
-        .route-info {
-            margin-left: 20px;
-            color: #666;
+        
+        .btn:active {
+            transform: translateY(0);
         }
-        .time-info {
-            margin-top: 15px;
-            padding: 10px;
-            background-color: #e7f3ff;
-            border-radius: 4px;
-        }
+        
+        /* 加载状态 */
         .loading {
             text-align: center;
+            padding: 30px;
             display: none;
+            background: var(--light-gray);
+            border-radius: var(--border-radius);
+            margin-top: 20px;
         }
+        
+        .loading::after {
+            content: "";
+            display: inline-block;
+            width: 30px;
+            height: 30px;
+            border: 3px solid var(--medium-gray);
+            border-top-color: var(--primary-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-left: 10px;
+            vertical-align: middle;
+        }
+        
+        /* 结果区域 */
+        .result {
+            margin-top: 25px;
+            padding: 25px;
+            border-radius: var(--border-radius);
+            background: var(--light-gray);
+            display: none;
+            animation: slideUp 0.5s ease;
+        }
+        
+        /* 时间信息 */
+        .time-info {
+            background: linear-gradient(135deg, #e3f2fd, #bbdefb);
+            padding: 10px 12px;
+            border-radius: 6px;
+            margin-bottom: 8px;
+            box-shadow: var(--shadow);
+        }
+        
+        .time-info h3 {
+            margin-bottom: 6px;
+            color: var(--primary-color);
+            font-size: 0.95rem;
+        }
+        
+        .time-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+            gap: 8px;
+        }
+        
+        .time-item {
+            text-align: center;
+        }
+        
+        .time-item strong {
+            display: block;
+            font-size: 1.2rem;
+            color: var(--primary-color);
+            margin-bottom: 1px;
+        }
+        
+        .time-item span {
+            color: var(--dark-gray);
+            font-size: 0.75rem;
+        }
+        
+        /* 路线步骤 */
+        .route-step {
+            background: white;
+            border-radius: var(--border-radius);
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: var(--shadow);
+            transition: var(--transition);
+            border-left: 4px solid var(--primary-color);
+        }
+        
+        .route-step:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-hover);
+        }
+        
+        .route-step.alternative {
+            margin-left: 30px;
+            border-left-color: var(--accent-color);
+        }
+        
+        .station {
+            font-weight: 700;
+            font-size: 1.2rem;
+            color: var(--text-color);
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+        }
+        
+        .station::before {
+            content: "🚉";
+            margin-right: 10px;
+            font-size: 1.4rem;
+        }
+        
+        .route-info {
+            background: var(--light-gray);
+            padding: 15px;
+            border-radius: var(--border-radius);
+            margin-bottom: 15px;
+        }
+        
+        .route-info div {
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+        }
+        
+        .route-info div:last-child {
+            margin-bottom: 0;
+        }
+        
+        .route-info strong {
+            min-width: 80px;
+            color: var(--dark-gray);
+            font-size: 0.9rem;
+        }
+        
+        /* 分隔线 */
+        .divider {
+            display: inline;
+            margin-right: 8px;
+            color: var(--dark-gray);
+            font-style: italic;
+            font-weight: 600;
+        }
+        
+        /* 错误信息 */
         .error {
-            color: #d32f2f;
+            color: var(--danger-color);
             background-color: #ffebee;
-            padding: 10px;
+            padding: 15px;
+            border-radius: var(--border-radius);
+            margin-top: 20px;
+            border-left: 4px solid var(--danger-color);
+            box-shadow: var(--shadow);
+        }
+        
+        /* 版本信息 */
+        .version-info {
+            margin-top: 25px;
+            padding: 15px;
+            background: var(--light-gray);
+            border-radius: var(--border-radius);
+            font-size: 0.9rem;
+            color: var(--dark-gray);
+            text-align: center;
+        }
+        
+        /* 动画 */
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+        
+        /* 响应式设计 */
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+            
+            .header {
+                padding: 20px;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .content {
+                padding: 20px;
+            }
+            
+            .form-row {
+                grid-template-columns: 1fr;
+                gap: 10px;
+            }
+            
+            .checkbox-group {
+                flex-direction: column;
+                gap: 6px;
+            }
+            
+            .checkbox-item {
+                width: 100%;
+            }
+            
+            .time-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .route-step.alternative {
+                margin-left: 15px;
+            }
+        }
+        
+        /* 交通类型图标样式 */
+        .transport-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: auto;
+            height: auto;
+            border-radius: 0;
+            margin-right: 4px;
+            font-size: 14px;
+            background: transparent !important;
+            color: inherit !important;
+        }
+        
+        /* 路线颜色指示器 */
+        .route-color-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 2px;
+            margin-right: 6px;
+            vertical-align: middle;
+        }
+        
+        /* 路线步骤连接线 */
+        .route-connector {
+            position: absolute;
+            left: 19px;
+            top: 24px;
+            bottom: -16px;
+            width: 2px;
+            background: #e0e0e0;
+            z-index: 0;
+        }
+        
+        .route-step {
+            position: relative;
+            background: white;
+            border-radius: 6px;
+            padding: 8px 12px;
+            margin-bottom: 4px;
+            box-shadow: var(--shadow);
+            transition: var(--transition);
+            border-left: 4px solid var(--primary-color);
+            z-index: 1;
+        }
+        
+        .route-step:hover {
+            transform: translateY(-1px);
+            box-shadow: var(--shadow-hover);
+        }
+        
+        .route-step.alternative {
+            margin-left: 24px;
+            border-left-color: var(--accent-color);
+        }
+        
+        .route-step .station {
+            position: relative;
+            font-weight: 600;
+            font-size: 1rem;
+            color: var(--text-color);
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            padding-left: 24px;
+        }
+        
+        .route-step .station::before {
+            content: "";
+            position: absolute;
+            left: 0;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            border: 2px solid #333;
+            background: white;
+            z-index: 2;
+        }
+        
+        .route-step:first-child .station::before,
+        .route-step.start-station .station::before {
+            border-color: var(--success-color);
+        }
+        
+        .route-step:last-child .station::before,
+        .route-step.end-station .station::before {
+            border-color: var(--danger-color);
+        }
+        
+        /* 路线标签 */
+        .route-tag {
+            display: inline-flex;
+            align-items: center;
+            padding: 3px 8px;
             border-radius: 4px;
-            margin-top: 10px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin-right: 6px;
+            margin-bottom: 6px;
+        }
+        
+        .route-tag .route-name {
+            margin-left: 4px;
+        }
+        
+        /* 时间详情卡片 */
+        .time-detail {
+            display: flex;
+            align-items: center;
+            padding: 2px 6px;
+            background: var(--light-gray);
+            border-radius: 4px;
+            margin-top: 2px;
+            font-size: 0.85rem;
+        }
+        
+        .time-detail .time-value {
+            font-weight: 600;
+            color: var(--primary-color);
+            margin-left: 4px;
+        }
+        
+        /* 方向指示 */
+        .direction-indicator {
+            display: flex;
+            align-items: center;
+            padding: 2px 6px;
+            background: linear-gradient(135deg, #e3f2fd, #bbdefb);
+            border-radius: 4px;
+            margin: 2px 0;
+            font-size: 0.85rem;
+            color: #1565c0;
+        }
+        
+        .direction-indicator::before {
+            content: "→";
+            margin-right: 4px;
+            font-size: 0.9rem;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>MTR路径查找器</h1>
-        <form id="routeForm">
-            <div class="form-group">
-                <label for="startStation">起点站:</label>
-                <input type="text" id="startStation" name="startStation" required>
-            </div>
-            <div class="form-group">
-                <label for="endStation">终点站:</label>
-                <input type="text" id="endStation" name="endStation" required>
-            </div>
-            <div class="form-group">
-                <label for="avoidStations">禁车站 (用逗号分隔):</label>
-                <input type="text" id="avoidStations" name="avoidStations" placeholder="例：尖沙咀,中环">
-            </div>
-            <div class="form-group">
-                <label for="avoidRoutes">禁路线 (用逗号分隔):</label>
-                <input type="text" id="avoidRoutes" name="avoidRoutes" placeholder="例：荃湾线,观塘线">
-            </div>
-            <div class="form-group">
-                <label for="routeType">路线类型:</label>
-                <select id="routeType" name="routeType">
-                    <option value="WAITING">实际路线（考虑等车时间）</option>
-                    <option value="IN_THEORY">理论路线（不考虑等车时间）</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label>
-                    <input type="checkbox" id="calculateHighSpeed" name="calculateHighSpeed" checked>
-                    允许高铁
-                </label>
-            </div>
-            <div class="form-group">
-                <label>
-                    <input type="checkbox" id="calculateBoat" name="calculateBoat" checked>
-                    允许船只
-                </label>
-            </div>
-            <div class="form-group">
-                <label>
-                    <input type="checkbox" id="calculateWalkingWild" name="calculateWalkingWild">
-                    允许野外步行
-                </label>
-            </div>
-            <div class="form-group">
-                <label>
-                    <input type="checkbox" id="onlyLRT" name="onlyLRT">
-                    仅轻轨
-                </label>
-            </div>
-            <div class="form-group">
-                <label>
-                    <input type="checkbox" id="detail" name="detail">
-                    显示详细信息
-                </label>
-            </div>
-            <button type="submit">查找路径</button>
-        </form>
-        
-        <div class="loading" id="loading">
-            正在计算路径，请稍候...
+        <div class="header">
+            <h1>MTR路径查找器</h1>
+            <p>为Minecraft Transit Railway打造的智能路径规划系统</p>
         </div>
         
-        <div class="result" id="result">
-            <!-- 结果将在这里动态显示 -->
+        <div class="content">
+            <form id="routeForm">
+                <div class="form-section">
+                    <h3>基本信息</h3>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="startStation">起点站</label>
+                            <input type="text" id="startStation" name="startStation" required placeholder="输入起点站名称">
+                        </div>
+                        <div class="form-group">
+                            <label for="endStation">终点站</label>
+                            <input type="text" id="endStation" name="endStation" required placeholder="输入终点站名称">
+                        </div>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="avoidStations">禁车站 (用逗号分隔)</label>
+                            <input type="text" id="avoidStations" name="avoidStations" placeholder="例：尖沙咀,中环">
+                        </div>
+                        <div class="form-group">
+                            <label for="avoidRoutes">禁路线 (用逗号分隔)</label>
+                            <input type="text" id="avoidRoutes" name="avoidRoutes" placeholder="例：荃湾线,观塘线">
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="form-section">
+                    <h3>路线设置</h3>
+                    <div class="form-group">
+                        <label for="routeType">路线类型</label>
+                        <select id="routeType" name="routeType">
+                            <option value="WAITING">实际路线（考虑等车时间）</option>
+                            <option value="IN_THEORY">理论路线（不考虑等车时间）</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="form-section">
+                    <h3>交通方式</h3>
+                    <div class="checkbox-group">
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="calculateHighSpeed" name="calculateHighSpeed" checked>
+                            <span>允许高铁</span>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="calculateBoat" name="calculateBoat" checked>
+                            <span>允许船只</span>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="calculateWalkingWild" name="calculateWalkingWild">
+                            <span>允许野外步行</span>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="onlyLRT" name="onlyLRT">
+                            <span>仅轻轨</span>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="detail" name="detail">
+                            <span>显示详细信息</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <button type="submit" class="btn">查找路径</button>
+            </form>
+            
+            <div class="loading" id="loading">
+                <span>正在计算路径，请稍候</span>
+            </div>
+            
+            <div class="result" id="result">
+                <!-- 结果将在这里动态显示 -->
+            </div>
         </div>
     </div>
 
@@ -245,7 +712,7 @@ HTML_TEMPLATE = '''
                 },
                 body: JSON.stringify(data)
             })
-            . then(response => response.json())
+            .then(response => response.json())
             .then(data => {
                 document.getElementById('loading').style.display = 'none';
                 const resultDiv = document.getElementById('result');
@@ -253,8 +720,13 @@ HTML_TEMPLATE = '''
                 
                 if (data.success) {
                     resultDiv.innerHTML = data.html;
+                    // 更新计算用时
+                    const calcTimeSpan = resultDiv.querySelector('.calc-time');
+                    if (calcTimeSpan && data.calcTime !== undefined) {
+                        calcTimeSpan.textContent = `用时: ${data.calcTime}ms`;
+                    }
                 } else {
-                    resultDiv. innerHTML = `<div class="error">${data.error}</div>`;
+                    resultDiv.innerHTML = `<div class="error">${data.error}</div>`;
                 }
             })
             .catch(error => {
@@ -1352,16 +1824,89 @@ def generate_html(route_type: RouteType, every_route_time: list,
     if int(travelling_time.split(':', maxsplit=1)[0]) == 0:
         travelling_time = ''.join(travelling_time.split(':', maxsplit=1)[1:])
     
+    def get_transport_icon(train_type):
+        """获取交通类型图标"""
+        if train_type is None:
+            return '<span class="transport-icon walk">🚶</span>'
+        elif 'high_speed' in train_type:
+            return '<span class="transport-icon high-speed">🚄</span>'
+        elif 'light_rail' in train_type:
+            return '<span class="transport-icon light-rail">🚈</span>'
+        elif 'boat' in train_type:
+            return '<span class="transport-icon boat">🚢</span>'
+        elif 'cable_car' in train_type:
+            return '<span class="transport-icon cable-car">🚡</span>'
+        elif 'airplane' in train_type:
+            return '<span class="transport-icon airplane">✈️</span>'
+        else:
+            return '<span class="transport-icon subway">🚇</span>'
+    
+    def get_transport_name(train_type):
+        """获取交通类型名称"""
+        if train_type is None:
+            return '步行'
+        elif 'high_speed' in train_type:
+            return '高铁'
+        elif 'light_rail' in train_type:
+            return '轻轨'
+        elif 'boat' in train_type:
+            return '船只'
+        elif 'cable_car' in train_type:
+            return '缆车'
+        elif 'airplane' in train_type:
+            return '飞机'
+        else:
+            return '列车'
+    
+    def get_route_style(color):
+        """获取路线样式和文字颜色"""
+        original_color = color
+        
+        if color == '#000000':
+            return 'background: linear-gradient(135deg, #9e9e9e, #757575);', 'white'
+        
+        # 解析十六进制颜色
+        color = color.lstrip('#')
+        r = int(color[0:2], 16)
+        g = int(color[2:4], 16)
+        b = int(color[4:6], 16)
+        
+        # 计算亮度 (luminance)
+        luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+        
+        # 根据亮度选择文字颜色
+        text_color = 'white' if luminance < 0.5 else 'black'
+        
+        return f'background: {original_color};', text_color
+    
     html_parts = []
     
     # 添加时间信息
     html_parts.append('<div class="time-info">')
-    if route_type == RouteType.IN_THEORY:
-        html_parts.append(f'<p><strong>总用时 Total Time:</strong> {full_time}</p>')
-    else:
-        html_parts.append(f'<p><strong>总用时 Total Time:</strong> {full_time}</p>')
-        html_parts.append(f'<p><strong>其中乘车时间 Travelling Time:</strong> {travelling_time}</p>')
-        html_parts.append(f'<p><strong>其中等车时间 Waiting Time:</strong> {waiting_time_str}</p>')
+    html_parts.append('<h3>路线概览</h3>')
+    html_parts.append('<div class="time-grid">')
+    html_parts.append(f'<div class="time-item">')
+    html_parts.append(f'<strong>{full_time}</strong>')
+    html_parts.append(f'<span>总用时</span>')
+    html_parts.append(f'</div>')
+    
+    if route_type != RouteType.IN_THEORY:
+        html_parts.append(f'<div class="time-item">')
+        html_parts.append(f'<strong>{travelling_time}</strong>')
+        html_parts.append(f'<span>乘车时间</span>')
+        html_parts.append(f'</div>')
+        
+        html_parts.append(f'<div class="time-item">')
+        html_parts.append(f'<strong>{waiting_time_str}</strong>')
+        html_parts.append(f'<span>等车时间</span>')
+        html_parts.append(f'</div>')
+    
+    html_parts.append('</div>')
+    html_parts.append(f'<div class="version-info" style="margin-top: 8px; padding: 6px 10px; font-size: 0.75rem;">')
+    html_parts.append(f'<span>车站数据版本: {version1}</span>')
+    html_parts.append(f'<span style="margin-left: 12px;">路线数据版本: {version2}</span>')
+    html_parts.append(f'<span style="margin-left: 12px;" class="calc-time">寻路用时: --ms</span>')
+    html_parts.append('</div>')
     html_parts.append('</div>')
     
     # 添加路线步骤
@@ -1384,29 +1929,55 @@ def generate_html(route_type: RouteType, every_route_time: list,
         
         # 如果是新起点站，显示车站
         if station_from != last_station:
-            html_parts.append(f'<div class="route-step">')
-            html_parts.append(f'<div class="station">🚉 {station_from}</div>')
+            is_first_station = (i == 0)
+            html_parts.append(f'<div class="route-step {"start-station" if is_first_station else ""}" style="border-left-color: {color};">')
+            html_parts.append(f'<div class="station">{station_from}</div>')
             last_station = station_from
         else:
-            html_parts.append(f'<div class="route-step" style="margin-left: 20px;">')
-            html_parts.append(f'<div style="margin-bottom: 5px;">或</div>')
+            html_parts.append(f'<div class="route-step alternative">')
+            html_parts.append(f'<span class="divider">或</span>')
         
         # 路线信息
         html_parts.append(f'<div class="route-info">')
-        html_parts.append(f'<div><strong>路线:</strong> {route_name}</div>')
+        
+        # 添加路线标签（包含颜色和图标）
+        route_bg_style, text_color = get_route_style(color)
+        html_parts.append(f'<div class="route-tag" style="{route_bg_style} color: {text_color};">')
+        html_parts.append(f'{get_transport_icon(train_type)}')
+        html_parts.append(f'<span class="route-name">{route_name}</span>')
+        html_parts.append(f'<span style="margin-left: 8px; opacity: 0.8;">({get_transport_name(train_type)})</span>')
+        html_parts.append(f'</div>')
         
         if train_type is not None:  # 不是步行
-            html_parts.append(f'<div><strong>方向:</strong> {terminus_display}</div>')
-            html_parts.append(f'<div><strong>乘车时间:</strong> {duration_str}</div>')
+            # 方向指示
+            html_parts.append(f'<div class="direction-indicator">{terminus_display}</div>')
+            
+            # 时间详情
+            html_parts.append(f'<div class="time-detail">')
+            html_parts.append(f'<span>🕐 乘车时间</span>')
+            html_parts.append(f'<span class="time-value">{duration_str}</span>')
+            html_parts.append(f'</div>')
             
             if DETAIL and route_type == RouteType.WAITING and sep_waiting is not None:
                 interval_str = str(strftime('%M:%S', gmtime(sep_waiting)))
-                html_parts.append(f'<div><strong>等车时间:</strong> {waiting_str}</div>')
-                html_parts.append(f'<div><strong>发车间隔:</strong> {interval_str}</div>')
+                html_parts.append(f'<div class="time-detail">')
+                html_parts.append(f'<span>⏳ 等车时间</span>')
+                html_parts.append(f'<span class="time-value">{waiting_str}</span>')
+                html_parts.append(f'</div>')
+                html_parts.append(f'<div class="time-detail">')
+                html_parts.append(f'<span>🔄 发车间隔</span>')
+                html_parts.append(f'<span class="time-value">{interval_str}</span>')
+                html_parts.append(f'</div>')
             elif DETAIL and route_type == RouteType.WAITING:
-                html_parts.append(f'<div><strong>等车时间:</strong> {waiting_str}</div>')
+                html_parts.append(f'<div class="time-detail">')
+                html_parts.append(f'<span>⏳ 等车时间</span>')
+                html_parts.append(f'<span class="time-value">{waiting_str}</span>')
+                html_parts.append(f'</div>')
         else:  # 步行
-            html_parts.append(f'<div><strong>步行时间:</strong> {duration_str}</div>')
+            html_parts.append(f'<div class="time-detail">')
+            html_parts.append(f'<span>⏱️ 步行时间</span>')
+            html_parts.append(f'<span class="time-value">{duration_str}</span>')
+            html_parts.append(f'</div>')
         
         html_parts.append('</div>')  # 结束route-info
         html_parts.append('</div>')  # 结束route-step
@@ -1414,15 +1985,9 @@ def generate_html(route_type: RouteType, every_route_time: list,
     # 添加终点站
     if every_route_time:
         last_route = every_route_time[-1]
-        html_parts.append(f'<div class="route-step">')
-        html_parts.append(f'<div class="station">🚉 {last_route[1]}</div>')
+        html_parts.append(f'<div class="route-step end-station" style="border-left-color: {last_route[2]};">')
+        html_parts.append(f'<div class="station">{last_route[1]}</div>')
         html_parts.append('</div>')
-    
-    # 添加版本信息
-    html_parts.append('<div style="margin-top: 20px; font-size: 12px; color: #666;">')
-    html_parts.append(f'<p>车站数据版本 Station data version: {version1}</p>')
-    html_parts.append(f'<p>路线数据版本 Route data version: {version2}</p>')
-    html_parts.append('</div>')
     
     return ''.join(html_parts)
 
@@ -1551,6 +2116,9 @@ def find_route():
         BASE_PATH = 'mtr_pathfinder_data'
         PNG_PATH = 'mtr_pathfinder_data'
         
+        # 开始计时
+        start_time = time()
+        
         # 调用主函数
         result = main(
             station1=station1,
@@ -1581,12 +2149,20 @@ def find_route():
             cache=True
         )
         
+        # 计算用时
+        calc_time = round((time() - start_time) * 1000, 1)  # 毫秒
+        
         if result is False:
             return jsonify({'success': False, 'error': '找不到路线'})
         elif result is None:
             return jsonify({'success': False, 'error': '车站名称错误，请重新输入'})
         else:
-            return jsonify({'success': True, 'html': result})
+            # result是(base64图片, HTML)或HTML字符串
+            if isinstance(result, tuple):
+                html_result = result[1]
+            else:
+                html_result = result
+            return jsonify({'success': True, 'html': html_result, 'calcTime': calc_time})
             
     except Exception as e:
         return jsonify({'success': False, 'error': f'发生错误: {str(e)}'})
