@@ -2,6 +2,15 @@
 Find paths between two stations for Minecraft Transit Railway. 
 '''
 
+# 禁用SSL验证 (Python 3.13+) - 必须在导入requests之前设置
+import os
+os.environ['CURL_CA_BUNDLE'] = ''
+os.environ['SSL_CERT_FILE'] = ''
+
+# 抑制SSL警告
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
 # 导入各种必要的库
 from difflib import SequenceMatcher  # 用于字符串相似度比较
 from enum import Enum  # 枚举类型
@@ -14,7 +23,6 @@ from typing import Union  # 类型提示
 from queue import Queue  # 队列
 import hashlib  # 哈希算法
 import json  # JSON处理
-import os  # 操作系统接口
 import pickle  # 对象序列化
 import re  # 正则表达式
 
@@ -24,10 +32,209 @@ import networkx as nx  # 图论和网络分析
 import requests  # HTTP请求
 
 # 添加Flask相关导入
-from flask import Flask, render_template_string, request, jsonify
+from flask import Flask, render_template_string, request, jsonify, session
 
 # 创建Flask应用
 app = Flask(__name__)
+app.secret_key = 'mtr-pathfinder-secret-key-2024'  # 用于session加密
+
+# ==================== 数据更新相关函数 ====================
+def fetch_data(link: str, LOCAL_FILE_PATH, MTR_VER) -> str:
+    '''
+    Fetch all the route data and station data.
+    '''
+    import urllib3
+    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+    
+    # 创建不验证SSL的HTTP连接池
+    http = urllib3.PoolManager(
+        cert_reqs='CERT_NONE',
+        ssl_version='PROTOCOL_TLS_CLIENT'
+    )
+    
+    if MTR_VER == 3:
+        link = link.rstrip('/') + '/data'
+        response = http.request('GET', link)
+        if response.status != 200:
+            raise Exception(f"获取数据失败，HTTP状态码: {response.status}")
+        data = json.loads(response.data.decode('utf-8'))
+        # MTR 3数据直接保存，不做转换
+        if not data or (isinstance(data, list) and len(data) == 0):
+            raise Exception("获取的数据为空")
+        if isinstance(data, list) and len(data) > 0 and 'stations' in data[0]:
+            with open(LOCAL_FILE_PATH, 'w', encoding='utf-8') as f:
+                json.dump(data, f, indent=4, ensure_ascii=False)
+            return LOCAL_FILE_PATH
+        else:
+            raise Exception("MTR 3数据格式不正确")
+    else:
+        link = link.rstrip('/') + \
+            '/mtr/api/map/stations-and-routes?dimension=0'
+        response = http.request('GET', link)
+        if response.status != 200:
+            raise Exception(f"获取数据失败，HTTP状态码: {response.status}")
+        response_data = json.loads(response.data.decode('utf-8'))
+        if 'data' not in response_data:
+            raise Exception("获取数据失败，返回数据中没有'data'字段")
+        data = response_data['data']
+
+        data_new = {'routes': [], 'stations': {}}
+        i = 0
+        for d in data['stations']:
+            d['station'] = hex(i)[2:]
+            data_new['stations'][d['id']] = d
+            i += 1
+
+        x_dict = {x['id']: [] for x in data['stations']}
+        z_dict = {x['id']: [] for x in data['stations']}
+        for route in data['routes']:
+            if route['circularState'] == 'CLOCKWISE':
+                route['circular'] = 'cw'
+            elif route['circularState'] == 'ANTICLOCKWISE':
+                route['circular'] = 'ccw'
+            else:
+                route['circular'] = ''
+
+            route['durations'] = [round(x / 1000) for x in route['durations']]
+            for station in route['stations']:
+                x_dict[station['id']] += [station['x']]
+                z_dict[station['id']] += [station['z']]
+
+            data_new['routes'].append(route)
+
+        for station_id, xs in x_dict.items():
+            zs = z_dict[station_id]
+            if len(xs) > 0:
+                data_new['stations'][station_id]['x'] = round(sum(xs) / len(xs))
+            else:
+                data_new['stations'][station_id]['x'] = 0
+            if len(zs) > 0:
+                data_new['stations'][station_id]['z'] = round(sum(zs) / len(zs))
+            else:
+                data_new['stations'][station_id]['z'] = 0
+
+        data = data_new
+
+    # 验证数据有效性
+    if not data or (isinstance(data, list) and len(data) == 0):
+        raise Exception("获取的数据为空")
+    if isinstance(data, dict) and 'stations' not in data:
+        raise Exception("获取的数据格式不正确，缺少'stations'字段")
+
+    # 保存数据
+    with open(LOCAL_FILE_PATH, 'w', encoding='utf-8') as f:
+        json.dump(data, f, indent=4, ensure_ascii=False)
+
+    return LOCAL_FILE_PATH
+
+
+def fetch_interval_data(station_id: str, LINK: str) -> None:
+    '''
+    Fetch interval data for a station.
+    '''
+    import urllib3
+    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+    
+    with semaphore:
+        link = f'{LINK.rstrip("/")}/mtr/api/station/timetable/{station_id}'
+        http = urllib3.PoolManager(cert_reqs='CERT_NONE')
+        while True:
+            try:
+                response = http.request('GET', link)
+                data = json.loads(response.data.decode('utf-8'))
+                if data['data'] is not None:
+                    ROUTE_INTERVAL_DATA.put((station_id, (data['data']['stationName'], data['data']['routes'])))
+                    break
+            except Exception:
+                pass
+
+
+def gen_route_interval(LOCAL_FILE_PATH, INTERVAL_PATH, LINK, MTR_VER) -> None:
+    '''
+    Generate all the interval data.
+    '''
+    with open(LOCAL_FILE_PATH, encoding='utf-8') as f:
+        data = json.load(f)
+
+    if MTR_VER == 3:
+        threads: list[Thread] = []
+        stations = data[0]['stations']
+        station_ids = list(stations.keys()) if isinstance(stations, dict) else stations
+        for station_id in station_ids:
+            t = Thread(target=fetch_interval_data, args=(station_id, LINK))
+            t.start()
+            threads.append(t)
+        for t in threads:
+            t.join()
+
+        interval_data_list = []
+        while not ROUTE_INTERVAL_DATA.empty():
+            interval_data_list.append(ROUTE_INTERVAL_DATA.get())
+
+        arrivals = dict(interval_data_list)
+        dep_dict_per_route: dict[str, list] = {}
+        dep_dict_per_route_: dict[str, list] = {}
+        for t, arrivals in arrivals.items():
+            dep_dict_per_station: dict[str, list] = {}
+            for arrival in arrivals[:-1]:
+                name = arrival['name']
+                if name in dep_dict_per_station:
+                    dep_dict_per_station[name] += [arrival['arrival']]
+                else:
+                    dep_dict_per_station[name] = [arrival['arrival']]
+
+            for route in arrival:
+                if route in dep_dict_per_route:
+                    dep_dict_per_route[route] += dep_dict_per_station[route]
+                else:
+                    dep_dict_per_route[route] = dep_dict_per_station[route]
+
+        for route, dep in dep_dict_per_route.items():
+            dep = sorted(dep)
+            dep_diffs = []
+            for i in range(len(dep) - 1):
+                dep_diffs.append(dep[i + 1] - dep[i])
+            if len(dep_diffs) > 0:
+                dep_dict_per_route_[route] = round(median_low(dep_diffs))
+            else:
+                dep_dict_per_route_[route] = 0
+
+        # 保存间隔数据
+        with open(INTERVAL_PATH, 'w', encoding='utf-8') as f:
+            json.dump(dep_dict_per_route_, f, indent=4, ensure_ascii=False)
+    else:
+        # MTR_VER == 4 的情况，创建空的间隔数据
+        with open(INTERVAL_PATH, 'w', encoding='utf-8') as f:
+            json.dump({}, f, indent=4, ensure_ascii=False)
+
+
+def update_mtr_data(LINK: str, MTR_VER: int, LOCAL_FILE_PATH: str, INTERVAL_PATH: str, BASE_PATH: str) -> bool:
+    '''
+    更新MTR数据（车站和线路数据）
+    '''
+    try:
+        os.makedirs(BASE_PATH, exist_ok=True)
+        
+        # 更新车站数据
+        fetch_data(LINK, LOCAL_FILE_PATH, MTR_VER)
+        
+        # 验证车站数据文件已创建
+        if not os.path.exists(LOCAL_FILE_PATH):
+            raise Exception(f"车站数据文件创建失败: {LOCAL_FILE_PATH}")
+        
+        # 更新线路间隔数据
+        gen_route_interval(LOCAL_FILE_PATH, INTERVAL_PATH, LINK, MTR_VER)
+        
+        # 验证间隔数据文件已创建
+        if not os.path.exists(INTERVAL_PATH):
+            raise Exception(f"路线间隔数据文件创建失败: {INTERVAL_PATH}")
+        
+        return True
+    except Exception as e:
+        print(f"数据更新错误: {e}")
+        return False
+
+# ==================== 数据更新函数结束 ====================
 
 SERVER_TICK: int = 20
 
@@ -190,6 +397,11 @@ HTML_TEMPLATE = '''
             padding: 4px 8px;
             border-radius: var(--border-radius);
             background: var(--light-gray);
+        }
+        
+        .checkbox-item:hover {
+            background: var(--medium-gray);
+            transform: translateY(-2px);
         }
         
         .checkbox-item:hover {
@@ -689,7 +901,7 @@ HTML_TEMPLATE = '''
             
             const formData = new FormData(this);
             const data = {
-                startStation: formData. get('startStation'),
+                startStation: formData.get('startStation'),
                 endStation: formData.get('endStation'),
                 routeType: formData.get('routeType'),
                 calculateHighSpeed: formData.get('calculateHighSpeed') === 'on',
@@ -850,9 +1062,15 @@ def gen_route_interval(LOCAL_FILE_PATH, INTERVAL_PATH, LINK, MTR_VER) -> None:
     with open(LOCAL_FILE_PATH, encoding='utf-8') as f:
         data = json.load(f)  # 加载本地数据
 
+    # MTR 3数据格式转换
+    if MTR_VER == 3 and isinstance(data, list) and len(data) > 0:
+        data = [data[0]]
+
     if MTR_VER == 3:  # MTR版本3的处理
         threads: list[Thread] = []
-        for station_id in data[0]['stations']:  # 为每个车站创建线程
+        stations = data[0].get('stations', {})
+        station_ids = list(stations.keys()) if isinstance(stations, dict) else []
+        for station_id in station_ids:  # 为每个车站创建线程
             t = Thread(target=fetch_interval_data, args=(station_id, LINK))
             t.start()
             threads.append(t)
@@ -948,10 +1166,8 @@ def gen_route_interval(LOCAL_FILE_PATH, INTERVAL_PATH, LINK, MTR_VER) -> None:
     else:
         return
 
-    y = input(f'是否替换{INTERVAL_PATH}文件?  (Y/N) ').lower()
-    if y == 'y':
-        with open(INTERVAL_PATH, 'w', encoding='utf-8') as f:
-            json. dump(freq_dict, f)  # 保存间隔数据
+    with open(INTERVAL_PATH, 'w', encoding='utf-8') as f:
+        json.dump(freq_dict, f)  # 直接保存间隔数据
 
 
 def fetch_data(link: str, LOCAL_FILE_PATH, MTR_VER) -> str:
@@ -1004,10 +1220,8 @@ def fetch_data(link: str, LOCAL_FILE_PATH, MTR_VER) -> str:
 
         data = [data_new]  # 包装数据
 
-    y = input(f'是否替换{LOCAL_FILE_PATH}文件? (Y/N) ').lower()
-    if y == 'y':
-        with open(LOCAL_FILE_PATH, 'w', encoding='utf-8') as f:
-            json.dump(data, f)  # 保存数据
+    with open(LOCAL_FILE_PATH, 'w', encoding='utf-8') as f:
+        json.dump(data, f)  # 直接保存数据
 
     return data
 
@@ -1073,7 +1287,7 @@ def get_route_station_index(route: dict, station_1_id: str, station_2_id: str,
     获取两个车站在同一路线中的索引
     '''
     if MTR_VER == 3:
-        st = [x. split('_')[0] for x in route['stations']]  # 提取车站ID
+        st = [x['id'] if isinstance(x, dict) else str(x).split('_')[0] for x in route['stations']]  # 提取车站ID
     else:
         st = [x['id'] for x in route['stations']]
 
@@ -1112,15 +1326,18 @@ def get_approximated_time(route: dict, station_1_id: str, station_2_id: str,
             station_2 = stations[i + 1]  # 下一站
         except IndexError:
             break
-
+        
+        station_1_id = station_1['id'] if isinstance(station_1, dict) else str(station_1).split('_')[0]
+        station_2_id = station_2['id'] if isinstance(station_2, dict) else str(station_2).split('_')[0]
+        
         station_1_check = False
         station_2_check = False
         for k, position_dict in data[0]['positions'].items():  # 查找坐标
-            if k == station_1:
+            if k == station_1_id:
                 station_1_position['x'] = position_dict['x']
                 station_1_position['z'] = position_dict['y']
                 station_1_check = True
-            elif k == station_2:
+            elif k == station_2_id:
                 station_2_position['x'] = position_dict['x']
                 station_2_position['z'] = position_dict['y']
                 station_2_check = True
@@ -1212,8 +1429,8 @@ def create_graph(data: list, IGNORED_LINES: bool,
 
                 it2 = it1 + 1
                 if MTR_VER == 3:
-                    station_1 = stations[it1]. split('_')[0]
-                    station_2 = stations[it2].split('_')[0]
+                    station_1 = stations[it1]['id'] if isinstance(stations[it1], dict) else str(stations[it1]).split('_')[0]
+                    station_2 = stations[it2]['id'] if isinstance(stations[it2], dict) else str(stations[it2]).split('_')[0]
                 else:
                     station_1 = stations[it1]['id']
                     station_2 = stations[it2]['id']
@@ -1415,13 +1632,14 @@ def create_graph(data: list, IGNORED_LINES: bool,
             for i2 in range(len(durations[i:])):
                 i2 += i + 1
                 if MTR_VER == 3:
-                    station_1 = stations[i]. split('_')[0]
-                    station_2 = stations[i2].split('_')[0]
+                    station_1 = stations[i]['id'] if isinstance(stations[i], dict) else str(stations[i]).split('_')[0]
+                    station_2 = stations[i2]['id'] if isinstance(stations[i2], dict) else str(stations[i2]).split('_')[0]
                     dur_list = durations[i:i2]
                     station_list = stations[i:i2 + 1]
                     c = False
                     for sta in station_list:  # 检查是否包含避开车站
-                        if sta.split('_')[0] in avoid_ids:
+                        sta_id = sta['id'] if isinstance(sta, dict) else str(sta).split('_')[0]
+                        if sta_id in avoid_ids:
                             c = True
                     if c is True:
                         continue
@@ -1670,7 +1888,7 @@ def process_path(G: nx. MultiDiGraph, path: list, shortest_distance: int,
 
         sta1_name = stations[station_1]['name']. replace('|', ' ')
         sta2_name = stations[station_2]['name']. replace('|', ' ')
-        sta1_id = stations[station_1]['id']
+        sta1_id = station_1  # MTR 3中station_1本身就是ID
         # 处理每个路线
         for route_name in route_name_list:
             # 查找持续时间
@@ -1707,11 +1925,12 @@ def process_path(G: nx. MultiDiGraph, path: list, shortest_distance: int,
                     next_id = None
                     # 查找下一站ID
                     if MTR_VER == 3:
-                        sta_id = z['stations'][-1]. split('_')[0]  # 终点站
+                        sta_id = z['stations'][-1]['id'] if isinstance(z['stations'][-1], dict) else str(z['stations'][-1]).split('_')[0]  # 终点站
                         for q, x in enumerate(z['stations']):
-                            if x. split('_')[0] == sta1_id and \
+                            x_id = x['id'] if isinstance(x, dict) else str(x).split('_')[0]
+                            if x_id == sta1_id and \
                                     q != len(z['stations']) - 1:  # 不是最后一站
-                                next_id = z['stations'][q + 1]. split('_')[0]
+                                next_id = z['stations'][q + 1]['id'] if isinstance(z['stations'][q + 1], dict) else str(z['stations'][q + 1]).split('_')[0]
                                 break
                     else:
                         sta_id = z['stations'][-1]['id']
@@ -2033,6 +2252,40 @@ def main(station1: str, station2: str, LINK: str,
         with open(LOCAL_FILE_PATH, encoding='utf-8') as f:
             data = json.load(f)  # 加载本地数据
 
+    # MTR 3数据格式转换
+    if MTR_VER == 3 and isinstance(data, list) and len(data) > 0:
+        # MTR 3数据是多个地图的列表，只使用第一个（主地图）
+        data = [data[0]]
+        raw_data = data[0]
+        if 'routes' in raw_data and 'stations' in raw_data:
+            stations = raw_data['stations']
+            if isinstance(stations, dict):
+                # 转换stations中的车站数据格式，确保有x和z字段
+                for station_id, station_data in stations.items():
+                    if isinstance(station_data, dict):
+                        if 'x' not in station_data:
+                            station_data['x'] = 0
+                        if 'z' not in station_data:
+                            station_data['z'] = 0
+            
+            # 转换routes中的stations为字典格式
+            for route in raw_data.get('routes', []):
+                new_stations = []
+                for station in route.get('stations', []):
+                    if isinstance(station, str):
+                        parts = station.rsplit('_', 1)
+                        station_id = parts[0]
+                        color = parts[1] if len(parts) > 1 else '0'
+                        new_stations.append({
+                            'id': station_id,
+                            'color': int(color) if color.isdigit() else 0,
+                            'x': 0,
+                            'z': 0
+                        })
+                    elif isinstance(station, dict):
+                        new_stations.append(station)
+                route['stations'] = new_stations
+
     # 生成路线间隔数据
     if GEN_ROUTE_INTERVAL is True or (not os.path.exists(INTERVAL_PATH)):
         if LINK == '':
@@ -2089,7 +2342,6 @@ def find_route():
         data = request.json
         station1 = data.get('startStation')
         station2 = data.get('endStation')
-        MTR_VER = 4  # 默认设置为MTR版本4
         route_type_str = data.get('routeType', 'WAITING')
         CALCULATE_HIGH_SPEED = data.get('calculateHighSpeed', True)
         CALCULATE_BOAT = data.get('calculateBoat', True)
@@ -2108,13 +2360,18 @@ def find_route():
         # 转换路线类型
         IN_THEORY = (route_type_str == 'IN_THEORY')
         
-        # 这里需要设置你的实际文件路径和其他参数
-        LINK = 'https://letsplay.minecrafttransitrailway.com/system-map'  # 设置为你的MTR地图链接
+        # 从配置中获取链接和版本
+        LINK = config['LINK']
+        MTR_VER = config.get('MTR_VER', 4)
         link_hash = hashlib.md5(LINK.encode('utf-8')).hexdigest()
         LOCAL_FILE_PATH = f'mtr-station-data-{link_hash}-{MTR_VER}.json'
         INTERVAL_PATH = f'mtr-route-data-{link_hash}-{MTR_VER}.json'
         BASE_PATH = 'mtr_pathfinder_data'
         PNG_PATH = 'mtr_pathfinder_data'
+        
+        # 检查数据文件是否存在
+        if not os.path.exists(LOCAL_FILE_PATH) or not os.path.exists(INTERVAL_PATH):
+            return jsonify({'success': False, 'error': '无车站或路线数据，请前往控制台更新数据'})
         
         # 开始计时
         start_time = time()
@@ -2168,13 +2425,630 @@ def find_route():
         return jsonify({'success': False, 'error': f'发生错误: {str(e)}'})
 
 
+# 全局配置
+ADMIN_PASSWORD = 'admin123'  # 控制台密码，可修改
+config = {
+    'LINK': 'https://letsplay.minecrafttransitrailway.com/system-map',
+    'MTR_VER': 4
+}
 
+# 控制台页面HTML
+ADMIN_HTML = '''
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MTR路径查找器 - 控制台</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', 'Microsoft YaHei', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #4a90e2, #50e3c2);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        .header h1 {
+            font-size: 1.5rem;
+            margin-bottom: 5px;
+        }
+        .content {
+            padding: 20px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #333;
+        }
+        .form-group input {
+            width: 100%;
+            padding: 10px 12px;
+            border: 2px solid #e9ecef;
+            border-radius: 6px;
+            font-size: 1rem;
+        }
+        .form-group input:focus {
+            outline: none;
+            border-color: #4a90e2;
+        }
+        .btn {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 6px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-bottom: 10px;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #4a90e2, #50e3c2);
+            color: white;
+        }
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(74, 144, 226, 0.3);
+        }
+        .btn-danger {
+            background: linear-gradient(135deg, #d0021b, #f5a623);
+            color: white;
+        }
+        .btn-danger:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(208, 2, 27, 0.3);
+        }
+        .info-box {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+        }
+        .info-box h3 {
+            margin-bottom: 10px;
+            color: #333;
+        }
+        .info-box p {
+            margin-bottom: 5px;
+            color: #666;
+        }
+        .current-config {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+        }
+        .current-config h4 {
+            margin-bottom: 10px;
+            color: #1565c0;
+        }
+        .current-config p {
+            margin-bottom: 5px;
+        }
+        .message {
+            padding: 10px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+        }
+        .message.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .message.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .back-link {
+            display: block;
+            text-align: center;
+            margin-top: 15px;
+            color: #4a90e2;
+            text-decoration: none;
+        }
+        .back-link:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>MTR路径查找器 控制台</h1>
+            <p>管理配置和数据更新</p>
+        </div>
+        <div class="content">
+            ''' + '''
+            {% if error %}
+            <div class="message error">{{ error }}</div>
+            {% endif %}
+            
+            <div class="current-config">
+                <h4>当前配置</h4>
+                <p><strong>地图链接:</strong> {{ config.LINK }}</p>
+                <p><strong>MTR版本:</strong> {{ config.MTR_VER }}</p>
+                <p><strong>车站数据:</strong> <span id="station-ver">检测中...</span></p>
+                <p><strong>路线数据:</strong> <span id="route-ver">检测中...</span></p>
+            </div>
+            
+            <script>
+            var linkHash = '{{ link_hash }}';
+            var mtrVer = {{ config.MTR_VER }};
+            
+            function getFileVersion(type) {
+                var filename = 'mtr-station-data-' + linkHash + '-' + mtrVer + '.json';
+                if (type === 'route') {
+                    filename = 'mtr-route-data-' + linkHash + '-' + mtrVer + '.json';
+                }
+                var xhr = new XMLHttpRequest();
+                xhr.open('GET', '/data/' + filename, true);
+                xhr.onload = function() {
+                    var verSpan = document.getElementById(type === 'station' ? 'station-ver' : 'route-ver');
+                    if (xhr.status === 200) {
+                        var date = xhr.getResponseHeader('Last-Modified');
+                        if (date && verSpan) {
+                            verSpan.textContent = new Date(date).toLocaleString();
+                        } else if (verSpan) {
+                            verSpan.textContent = '未知';
+                        }
+                    } else if (verSpan) {
+                        verSpan.textContent = '未检测到';
+                    }
+                };
+                xhr.onerror = function() {
+                    var verSpan = document.getElementById(type === 'station' ? 'station-ver' : 'route-ver');
+                    if (verSpan) {
+                        verSpan.textContent = '未检测到';
+                    }
+                };
+                xhr.send();
+            }
+            
+            window.onload = function() {
+                getFileVersion('station');
+                getFileVersion('route');
+            };
+            </script>
+            
+            <div class="info-box">
+                <h3>配置</h3>
+                <form id="config-form">
+                    <div class="form-group">
+                        <label for="link">地图链接 (LINK)</label>
+                        <input type="text" id="link" name="link" value="{{ config.LINK }}" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="mtr_ver">MTR版本 (MTR_VER)</label>
+                        <input type="number" id="mtr_ver" name="mtr_ver" value="{{ config.MTR_VER }}" min="1" max="10" required>
+                    </div>
+                    <button type="button" class="btn btn-primary" onclick="saveConfig()">保存配置</button>
+                    <div id="config-result" style="margin-top: 10px;"></div>
+                </form>
+            </div>
+            
+            <div class="info-box">
+                <h3>数据更新</h3>
+                <button type="button" class="btn btn-danger" id="update-btn" onclick="updateData()">更新车站和线路数据</button>
+                <div id="update-loading" style="display: none; margin-top: 15px; text-align: center;">
+                    <span id="update-status">正在更新车站数据... (1/2)</span>
+                </div>
+                <div id="update-result" style="margin-top: 10px;"></div>
+            </div>
+            
+            <script>
+            function saveConfig() {
+                var link = document.getElementById('link').value;
+                var mtr_ver = document.getElementById('mtr_ver').value;
+                var resultDiv = document.getElementById('config-result');
+                
+                var formData = new FormData();
+                formData.append('link', link);
+                formData.append('mtr_ver', mtr_ver);
+                
+                fetch('/admin/update-config-ajax', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        resultDiv.innerHTML = '<p style="color: green;">配置已保存</p>';
+                    } else {
+                        resultDiv.innerHTML = '<p style="color: red;">' + data.error + '</p>';
+                    }
+                })
+                .catch(error => {
+                    resultDiv.innerHTML = '<p style="color: red;">保存失败</p>';
+                });
+            }
+            
+            function updateData() {
+                var btn = document.getElementById('update-btn');
+                var loading = document.getElementById('update-loading');
+                var status = document.getElementById('update-status');
+                var resultDiv = document.getElementById('update-result');
+                
+                btn.disabled = true;
+                loading.style.display = 'block';
+                resultDiv.innerHTML = '';
+                
+                var startTime = Date.now();
+                var totalSteps = 2;
+                
+                function updateStatus(step) {
+                    if (step === 1) {
+                        status.textContent = '正在更新车站数据... (' + step + '/' + totalSteps + ')';
+                    } else if (step === 2) {
+                        status.textContent = '正在更新路线数据... (' + step + '/' + totalSteps + ')';
+                    }
+                }
+                
+                updateStatus(1);
+                
+                fetch('/admin/update-data-ajax', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({step: 1})
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        updateStatus(2);
+                        return fetch('/admin/update-data-ajax', {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({step: 2})
+                        });
+                    } else {
+                        throw new Error(data.error || '车站数据更新失败');
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    var endTime = Date.now();
+                    var duration = ((endTime - startTime) / 1000).toFixed(2);
+                    
+                    loading.style.display = 'none';
+                    btn.disabled = false;
+                    
+                    if (data.success) {
+                        resultDiv.innerHTML = '<p style="color: green;">✓ 数据更新成功！ 用时: ' + duration + '秒</p>';
+                    } else {
+                        throw new Error(data.error || '路线数据更新失败');
+                    }
+                })
+                .catch(error => {
+                    var endTime = Date.now();
+                    var duration = ((endTime - startTime) / 1000).toFixed(2);
+                    
+                    loading.style.display = 'none';
+                    btn.disabled = false;
+                    
+                    resultDiv.innerHTML = '<p style="color: red;">✗ 错误: ' + error + ' 用时: ' + duration + '秒</p>';
+                });
+            }
+            </script>
+            
+            <a href="/" class="back-link">← 返回首页</a>
+            <a href="/admin/logout" class="back-link">退出登录</a>
+        </div>
+    </div>
+</body>
+</html>
+'''
+
+# 登录页面HTML
+LOGIN_HTML = '''
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MTR路径查找器 - 登录</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', 'Microsoft YaHei', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .container {
+            width: 100%;
+            max-width: 400px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #4a90e2, #50e3c2);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        .header h1 {
+            font-size: 1.5rem;
+        }
+        .content {
+            padding: 30px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #333;
+        }
+        .form-group input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e9ecef;
+            border-radius: 6px;
+            font-size: 1rem;
+        }
+        .form-group input:focus {
+            outline: none;
+            border-color: #4a90e2;
+        }
+        .btn {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 6px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            background: linear-gradient(135deg, #4a90e2, #50e3c2);
+            color: white;
+            transition: all 0.3s ease;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(74, 144, 226, 0.3);
+        }
+        .message {
+            padding: 10px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+        .message.error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .back-link {
+            display: block;
+            text-align: center;
+            margin-top: 15px;
+            color: #4a90e2;
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>控制台登录</h1>
+        </div>
+        <div class="content">
+            {% if error %}
+            <div class="message error">{{ error }}</div>
+            {% endif %}
+            <form method="POST">
+                <div class="form-group">
+                    <label for="password">密码</label>
+                    <input type="password" id="password" name="password" required>
+                </div>
+                <button type="submit" class="btn">登录</button>
+            </form>
+            <a href="/" class="back-link">← 返回首页</a>
+        </div>
+    </div>
+</body>
+</html>
+'''
+
+
+@app.route('/data/<filename>')
+def serve_data_file(filename):
+    '''提供数据文件'''
+    if not filename.endswith('.json'):
+        return '', 404
+    if not os.path.exists(filename):
+        return '', 404
+    stat = os.stat(filename)
+    last_modified = strftime('%a, %d %b %Y %H:%M:%S GMT', gmtime(stat.st_mtime))
+    with open(filename, 'r', encoding='utf-8') as f:
+        return f.read(), 200, {'Content-Type': 'application/json', 'Last-Modified': last_modified}
+
+
+@app.route('/admin')
+def admin_page():
+    '''控制台页面'''
+    if not session.get('admin_logged_in'):
+        return render_template_string(LOGIN_HTML)
+    link_hash = hashlib.md5(config['LINK'].encode('utf-8')).hexdigest()
+    return render_template_string(ADMIN_HTML, config=config, link_hash=link_hash, error=None)
+
+
+@app.route('/admin', methods=['POST'])
+def admin_login():
+    '''处理登录'''
+    password = request.form.get('password', '')
+    if password == ADMIN_PASSWORD:
+        session['admin_logged_in'] = True
+        link_hash = hashlib.md5(config['LINK'].encode('utf-8')).hexdigest()
+        return render_template_string(ADMIN_HTML, config=config, link_hash=link_hash, error=None)
+    return render_template_string(LOGIN_HTML, error='密码错误')
+
+
+@app.route('/admin/logout')
+def admin_logout():
+    '''退出登录'''
+    session.pop('admin_logged_in', None)
+    return render_template_string(LOGIN_HTML, error=None)
+
+
+@app.route('/admin/update-config-ajax', methods=['POST'])
+def update_config_ajax():
+    '''AJAX更新配置'''
+    if not session.get('admin_logged_in'):
+        return jsonify({'success': False, 'error': '请先登录'})
+    
+    config['LINK'] = request.form.get('link', '')
+    config['MTR_VER'] = int(request.form.get('mtr_ver', 4))
+    
+    return jsonify({'success': True})
+
+
+@app.route('/admin/update-data-ajax', methods=['POST'])
+def update_data_ajax():
+    '''AJAX数据更新'''
+    if not session.get('admin_logged_in'):
+        return jsonify({'success': False, 'error': '请先登录'})
+    
+    try:
+        import subprocess
+        import sys
+        
+        LINK = config['LINK']
+        MTR_VER = config['MTR_VER']
+        link_hash = hashlib.md5(LINK.encode('utf-8')).hexdigest()
+        LOCAL_FILE = f'mtr-station-data-{link_hash}-{MTR_VER}.json'
+        INTERVAL_FILE = f'mtr-route-data-{link_hash}-{MTR_VER}.json'
+        
+        # 获取步骤参数
+        data = request.get_json()
+        step = data.get('step', 0) if data else 0
+        
+        if step == 1:
+            update_script = f'''
+import sys
+import io
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+
+import os
+os.environ['PYTHONIOENCODING'] = 'utf-8'
+
+work_dir = r'{os.getcwd()}'
+os.chdir(work_dir)
+
+try:
+    from main import fetch_data
+    
+    local_path = fetch_data('{LINK}', '{LOCAL_FILE}', {MTR_VER})
+    print("DEBUG:LOCAL_PATH=" + str(local_path))
+    
+    if os.path.exists('{LOCAL_FILE}'):
+        print("SUCCESS:TRUE")
+    else:
+        print("ERROR:文件未创建")
+except Exception as e:
+    print("ERROR:" + str(e))
+'''
+        elif step == 2:
+            update_script = f'''
+import sys
+import io
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+
+import os
+os.environ['PYTHONIOENCODING'] = 'utf-8'
+
+work_dir = r'{os.getcwd()}'
+os.chdir(work_dir)
+
+try:
+    from main import gen_route_interval
+    
+    gen_route_interval('{LOCAL_FILE}', '{INTERVAL_FILE}', '{LINK}', {MTR_VER})
+    
+    if os.path.exists('{INTERVAL_FILE}'):
+        print("SUCCESS:TRUE")
+    else:
+        print("ERROR:路线数据文件未创建")
+except Exception as e:
+    print("ERROR:" + str(e))
+'''
+        else:
+            return jsonify({'success': False, 'error': '无效的更新步骤'})
+        
+        proc = subprocess.run(
+            [sys.executable, '-c', update_script],
+            capture_output=True,
+            text=True,
+            timeout=180,
+            cwd=os.getcwd(),
+            encoding='utf-8',
+            errors='replace'
+        )
+        
+        all_output = proc.stdout + proc.stderr
+        all_output = all_output.strip()
+        
+        # 查找SUCCESS或ERROR标记
+        success_marker = "SUCCESS:TRUE"
+        error_marker = "ERROR:"
+        
+        if success_marker in all_output:
+            return jsonify({'success': True})
+        elif error_marker in all_output:
+            # 提取错误信息
+            idx = all_output.find(error_marker)
+            error_msg = all_output[idx + len(error_marker):].strip()
+            # 移除多余的行
+            error_msg = error_msg.split('\n')[0].strip()
+            return jsonify({'success': False, 'error': error_msg})
+        else:
+            # 没有找到标记，检查是否只有调试输出
+            if "DEBUG:" in all_output:
+                return jsonify({'success': True})
+            return jsonify({'success': False, 'error': '处理过程中出现未知错误'})
+    except subprocess.TimeoutExpired:
+        return jsonify({'success': False, 'error': '超时（超过3分钟）'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
 
 
 def run():
     '''运行Flask应用'''
     print("启动MTR路径查找器Web服务...")
     print("访问 http://localhost:5000 使用路径查找功能")
+    print(f"控制台: http://localhost:5000/admin (密码: {ADMIN_PASSWORD})")
     app.run(debug=True, host='0.0.0.0', port=5000)
 
 
