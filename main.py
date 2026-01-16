@@ -333,6 +333,30 @@ HTML_TEMPLATE = '''
             opacity: 0.9;
         }
         
+        .header-nav {
+            margin-top: 20px;
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+        
+        .header-nav a {
+            color: white;
+            text-decoration: none;
+            padding: 8px 20px;
+            border: 2px solid rgba(255, 255, 255, 0.5);
+            border-radius: 25px;
+            transition: all 0.3s ease;
+            font-weight: 500;
+            font-size: 0.95rem;
+        }
+        
+        .header-nav a:hover {
+            background: rgba(255, 255, 255, 0.2);
+            border-color: white;
+        }
+        
         /* 内容区 */
         .content {
             padding: 30px;
@@ -816,6 +840,11 @@ HTML_TEMPLATE = '''
         <div class="header">
             <h1>MTR路径查找器</h1>
             <p>为Minecraft Transit Railway打造的智能路径规划系统</p>
+            <div class="header-nav">
+                <a href="/stations">🚉 车站列表</a>
+                <a href="/routes">🛤️ 线路列表</a>
+                <a href="/admin">⚙️ 控制台</a>
+            </div>
         </div>
         
         <div class="content">
@@ -2335,6 +2364,176 @@ def index():
     '''显示主页面'''
     return render_template_string(HTML_TEMPLATE)
 
+
+@app.route('/stations')
+def stations_list():
+    '''显示车站列表'''
+    LINK = config.get('LINK', '')
+    MTR_VER = config.get('MTR_VER', 4)
+    link_hash = hashlib.md5(LINK.encode('utf-8')).hexdigest() if LINK else ''
+    LOCAL_FILE_PATH = f'mtr-station-data-{link_hash}-{MTR_VER}.json'
+    
+    stations = []
+    routes = []
+    
+    if os.path.exists(LOCAL_FILE_PATH):
+        try:
+            with open(LOCAL_FILE_PATH, encoding='utf-8') as f:
+                data = json.load(f)
+            
+            if isinstance(data, list) and len(data) > 0:
+                raw_data = data[0]
+                
+                # 提取车站
+                stations_raw = raw_data.get('stations', {})
+                if isinstance(stations_raw, dict):
+                    for station_id, station_info in stations_raw.items():
+                        station = {
+                            'id': station_id,
+                            'name': station_info.get('name', station_id) if isinstance(station_info, dict) else station_id,
+                            'color': station_info.get('color', 0) if isinstance(station_info, dict) else 0,
+                            'x': station_info.get('x', 0) if isinstance(station_info, dict) else 0,
+                            'z': station_info.get('z', 0) if isinstance(station_info, dict) else 0
+                        }
+                        stations.append(station)
+                elif isinstance(stations_raw, list):
+                    for station in stations_raw:
+                        if isinstance(station, dict):
+                            stations.append({
+                                'id': station.get('id', ''),
+                                'name': station.get('name', ''),
+                                'color': station.get('color', 0),
+                                'x': station.get('x', 0),
+                                'z': station.get('z', 0)
+                            })
+                
+                # 提取路线
+                routes_raw = raw_data.get('routes', [])
+                for route in routes_raw:
+                    if isinstance(route, dict):
+                        routes.append({
+                            'name': route.get('name', ''),
+                            'color': route.get('color', 0),
+                            'type': route.get('type', 'train_normal'),
+                            'number': route.get('number', ''),
+                            'station_count': len(route.get('stations', []))
+                        })
+        except Exception as e:
+            print(f"加载车站数据错误: {e}")
+    
+    stations.sort(key=lambda x: x['name'])
+    routes.sort(key=lambda x: x['name'])
+    
+    return render_template_string(STATIONS_TEMPLATE, stations=stations, routes=routes, count=len(stations))
+
+
+@app.route('/routes')
+def routes_list():
+    '''显示路线列表'''
+    LINK = config.get('LINK', '')
+    MTR_VER = config.get('MTR_VER', 4)
+    link_hash = hashlib.md5(LINK.encode('utf-8')).hexdigest() if LINK else ''
+    LOCAL_FILE_PATH = f'mtr-station-data-{link_hash}-{MTR_VER}.json'
+    
+    routes = []
+    route_groups = {}
+    stations_dict = {}
+    
+    if os.path.exists(LOCAL_FILE_PATH):
+        try:
+            with open(LOCAL_FILE_PATH, encoding='utf-8') as f:
+                data = json.load(f)
+            
+            if isinstance(data, list) and len(data) > 0:
+                raw_data = data[0]
+                
+                # 构建车站ID到名称的映射
+                stations_raw = raw_data.get('stations', {})
+                if isinstance(stations_raw, dict):
+                    for station_id, station_info in stations_raw.items():
+                        if isinstance(station_info, dict):
+                            stations_dict[station_id] = station_info.get('name', station_id)
+                        else:
+                            stations_dict[station_id] = str(station_info)
+                elif isinstance(stations_raw, list):
+                    for station in stations_raw:
+                        if isinstance(station, dict):
+                            sid = station.get('id', '')
+                            stations_dict[sid] = station.get('name', sid)
+                
+                # 提取路线，将车站ID转换为站名
+                routes_raw = raw_data.get('routes', [])
+                for route in routes_raw:
+                    if isinstance(route, dict):
+                        station_list = route.get('stations', [])
+                        station_names = []
+                        for station in station_list:
+                            if isinstance(station, dict):
+                                station_id = station.get('id', str(station))
+                            else:
+                                station_id = str(station)
+                            station_name = stations_dict.get(station_id, station_id)
+                            station_names.append(station_name)
+                        
+                        route_info = {
+                            'name': route.get('name', ''),
+                            'color': route.get('color', 0),
+                            'type': route.get('type', 'train_normal'),
+                            'number': route.get('number', ''),
+                            'circular': route.get('circular', ''),
+                            'stations': station_names,
+                            'durations': route.get('durations', [])
+                        }
+                        routes.append(route_info)
+                        
+                        # 分组同名线路
+                        base_name = extract_base_name(route.get('name', ''))
+                        if base_name not in route_groups:
+                            route_groups[base_name] = {
+                                'name': base_name,
+                                'directions': [],
+                                'color': route.get('color', 0),
+                                'type': route.get('type', 'train_normal')
+                            }
+                        
+                        # 生成方向描述
+                        direction = get_route_direction(station_names, route.get('circular', ''))
+                        route_groups[base_name]['directions'].append({
+                            'full_name': route.get('name', ''),
+                            'stations': station_names,
+                            'direction': direction,
+                            'color': route.get('color', 0),
+                            'circular': route.get('circular', '')
+                        })
+        except Exception as e:
+            print(f"加载路线数据错误: {e}")
+    
+    # 转换为列表并排序
+    route_groups_list = list(route_groups.values())
+    route_groups_list.sort(key=lambda x: x['name'])
+    
+    return render_template_string(ROUTES_TEMPLATE, route_groups=route_groups_list, routes=routes, count=len(routes))
+
+
+def extract_base_name(route_name):
+    '''提取线路基础名称（不含方向括号部分）'''
+    import re
+    # 移除 || 分隔符后的部分
+    base = route_name.split('||')[0].strip()
+    # 移除末尾的方向括号，如 "(方向)"
+    base = re.sub(r'\s*\([^)]*\)\s*$', '', base).strip()
+    return base
+
+
+def get_route_direction(stations, circular):
+    '''获取线路方向描述'''
+    if circular:
+        return f"环线 ({circular})"
+    if len(stations) >= 2:
+        return f"{stations[0]} → {stations[-1]}"
+    return f"{len(stations)}站"
+
+
 @app.route('/find-route', methods=['POST'])
 def find_route():
     '''处理路径查找请求'''
@@ -2756,6 +2955,712 @@ ADMIN_HTML = '''
             <a href="/admin/logout" class="back-link">退出登录</a>
         </div>
     </div>
+</body>
+</html>
+'''
+
+# 车站列表页面HTML
+STATIONS_TEMPLATE = '''
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>车站列表 - MTR路径查找器</title>
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            min-height: 100vh;
+            color: #e0e0e0;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        header {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            padding: 20px 0;
+            margin-bottom: 30px;
+            border-radius: 15px;
+        }
+        header h1 {
+            text-align: center;
+            font-size: 2em;
+            background: linear-gradient(90deg, #00d9ff, #00ff88);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        nav {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+        nav a {
+            color: #00d9ff;
+            text-decoration: none;
+            padding: 10px 25px;
+            border: 2px solid #00d9ff;
+            border-radius: 25px;
+            transition: all 0.3s ease;
+            font-weight: 500;
+        }
+        nav a:hover, nav a.active {
+            background: #00d9ff;
+            color: #1a1a2e;
+        }
+        .stats {
+            text-align: center;
+            margin: 20px 0;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+        }
+        .stats span {
+            margin: 0 15px;
+            font-size: 1.1em;
+        }
+        .stats .number {
+            color: #00ff88;
+            font-weight: bold;
+        }
+        .search-box {
+            max-width: 500px;
+            margin: 20px auto;
+            display: flex;
+            gap: 10px;
+        }
+        .search-box input {
+            flex: 1;
+            padding: 12px 20px;
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            border-radius: 25px;
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+            font-size: 16px;
+        }
+        .search-box input:focus {
+            outline: none;
+            border-color: #00d9ff;
+        }
+        .search-box input::placeholder {
+            color: rgba(255, 255, 255, 0.5);
+        }
+        .section-title {
+            text-align: center;
+            margin: 30px 0 20px;
+            font-size: 1.5em;
+            color: #00d9ff;
+        }
+        .list-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 15px;
+            padding: 20px 0;
+        }
+        .station-card {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 15px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        .station-card:hover {
+            transform: translateY(-3px);
+            background: rgba(255, 255, 255, 0.1);
+            border-color: #00d9ff;
+        }
+        .station-card .name {
+            font-size: 1.1em;
+            font-weight: 600;
+            color: #fff;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .station-card .color-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+        .station-card .info {
+            font-size: 0.85em;
+            color: rgba(255, 255, 255, 0.6);
+        }
+        .route-card {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 15px;
+            transition: all 0.3s ease;
+        }
+        .route-card:hover {
+            transform: translateY(-3px);
+            background: rgba(255, 255, 255, 0.1);
+        }
+        .route-card .name {
+            font-size: 1em;
+            font-weight: 600;
+            color: #fff;
+            margin-bottom: 5px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .route-card .info {
+            font-size: 0.85em;
+            color: rgba(255, 255, 255, 0.6);
+        }
+        .type-badge {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 0.75em;
+            background: rgba(0, 217, 255, 0.2);
+            color: #00d9ff;
+        }
+        .no-data {
+            text-align: center;
+            padding: 50px;
+            color: rgba(255, 255, 255, 0.5);
+        }
+        @media (max-width: 768px) {
+            .list-container {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>🚇 车站与线路列表</h1>
+        <nav>
+            <a href="/">🏠 首页</a>
+            <a href="/stations" class="active">🚉 车站</a>
+            <a href="/routes">🛤️ 线路</a>
+            <a href="/admin">⚙️ 控制台</a>
+        </nav>
+    </header>
+    
+    <div class="container">
+        <div class="stats">
+            <span>车站总数: <span class="number">{{ count }}</span></span>
+            <span>线路总数: <span class="number">{{ routes|length }}</span></span>
+        </div>
+        
+        <div class="search-box">
+            <input type="text" id="search" placeholder="搜索车站或线路..." oninput="filterItems()">
+        </div>
+        
+        <h2 class="section-title">🚉 车站列表</h2>
+        <div class="list-container" id="station-list">
+            {% for station in stations %}
+            <div class="station-card" data-name="{{ station.name|lower }}">
+                <div class="name">
+                    {% if station.color %}
+                    <span class="color-dot" style="background-color: #{{ '%06x'|format(station.color) }}"></span>
+                    {% endif %}
+                    {{ station.name }}
+                </div>
+                <div class="info">
+                    ID: {{ station.id }}<br>
+                    坐标: ({{ station.x }}, {{ station.z }})
+                </div>
+            </div>
+            {% else %}
+            <div class="no-data">暂无车站数据，请先更新数据</div>
+            {% endfor %}
+        </div>
+        
+        <h2 class="section-title">🛤️ 线路列表</h2>
+        <div class="list-container" id="route-list">
+            {% for route in routes %}
+            <div class="route-card" data-name="{{ route.name|lower }}">
+                <div class="name">
+                    {% if route.color %}
+                    <span style="color: #{{ '%06x'|format(route.color) }}">■</span>
+                    {% endif %}
+                    {{ route.name }}
+                </div>
+                <div class="info">
+                    <span class="type-badge">{{ route.type }}</span>
+                    {% if route.number %}
+                    <span style="margin-left: 10px;">编号: {{ route.number }}</span>
+                    {% endif %}
+                    <br>车站数: {{ route.station_count }}
+                </div>
+            </div>
+            {% else %}
+            <div class="no-data">暂无线路数据</div>
+            {% endfor %}
+        </div>
+    </div>
+    
+    <script>
+    function filterItems() {
+        const query = document.getElementById('search').value.toLowerCase();
+        
+        document.querySelectorAll('.station-card, .route-card').forEach(card => {
+            const name = card.dataset.name || '';
+            card.style.display = name.includes(query) ? '' : 'none';
+        });
+    }
+    </script>
+</body>
+</html>
+'''
+
+# 线路列表页面HTML
+ROUTES_TEMPLATE = '''
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>线路列表 - MTR路径查找器</title>
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            min-height: 100vh;
+            color: #e0e0e0;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        header {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            padding: 20px 0;
+            margin-bottom: 30px;
+            border-radius: 15px;
+        }
+        header h1 {
+            text-align: center;
+            font-size: 2em;
+            background: linear-gradient(90deg, #00d9ff, #00ff88);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        nav {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+        nav a {
+            color: #00d9ff;
+            text-decoration: none;
+            padding: 10px 25px;
+            border: 2px solid #00d9ff;
+            border-radius: 25px;
+            transition: all 0.3s ease;
+            font-weight: 500;
+        }
+        nav a:hover, nav a.active {
+            background: #00d9ff;
+            color: #1a1a2e;
+        }
+        .stats {
+            text-align: center;
+            margin: 20px 0;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+        }
+        .stats span {
+            margin: 0 15px;
+            font-size: 1.1em;
+        }
+        .stats .number {
+            color: #00ff88;
+            font-weight: bold;
+        }
+        .search-box {
+            max-width: 500px;
+            margin: 20px auto;
+        }
+        .search-box input {
+            width: 100%;
+            padding: 12px 20px;
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            border-radius: 25px;
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+            font-size: 16px;
+        }
+        .search-box input:focus {
+            outline: none;
+            border-color: #00d9ff;
+        }
+        .list-container {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            padding: 20px 0;
+        }
+        .route-card {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 15px 20px;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        .route-card:hover {
+            transform: translateX(5px);
+            background: rgba(255, 255, 255, 0.1);
+            border-color: #00d9ff;
+        }
+        .route-color {
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2em;
+            flex-shrink: 0;
+        }
+        .route-info {
+            flex: 1;
+            min-width: 0;
+        }
+        .route-name {
+            font-size: 1.1em;
+            font-weight: 600;
+            color: #fff;
+            margin-bottom: 5px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .route-meta {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .type-badge {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 0.8em;
+            background: rgba(0, 217, 255, 0.2);
+            color: #00d9ff;
+        }
+        .circular-badge {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 0.8em;
+            background: rgba(255, 193, 7, 0.2);
+            color: #ffc107;
+        }
+        .station-count {
+            font-size: 0.85em;
+            color: rgba(255, 255, 255, 0.6);
+        }
+        .route-stations {
+            flex: 2;
+            min-width: 200px;
+            overflow-x: auto;
+            padding: 5px 0;
+        }
+        .station-list {
+            display: flex;
+            flex-wrap: nowrap;
+            gap: 6px;
+        }
+        .station-tag {
+            padding: 4px 10px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            font-size: 0.85em;
+            color: rgba(255, 255, 255, 0.8);
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+        .station-tag.more {
+            background: rgba(0, 217, 255, 0.2);
+            color: #00d9ff;
+        }
+        .route-group {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            margin-bottom: 12px;
+            transition: all 0.3s ease;
+        }
+        .route-group:hover {
+            border-color: #00d9ff;
+        }
+        .route-header {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            padding: 15px 20px;
+            cursor: pointer;
+        }
+        .route-header:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+        .route-color {
+            width: 45px;
+            height: 45px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.3em;
+            flex-shrink: 0;
+        }
+        .route-info {
+            flex: 1;
+            min-width: 0;
+        }
+        .route-name {
+            font-size: 1.1em;
+            font-weight: 600;
+            color: #fff;
+            margin-bottom: 5px;
+        }
+        .route-selector {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .route-select {
+            flex: 1;
+            max-width: 250px;
+            padding: 8px 12px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 6px;
+            color: #fff;
+            font-size: 0.9em;
+            cursor: pointer;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%23fff' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10l-5 5z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 10px center;
+        }
+        .route-select:focus {
+            outline: none;
+            border-color: #00d9ff;
+        }
+        .route-select option {
+            background: #1a1a2e;
+            color: #fff;
+            padding: 10px;
+        }
+        .expand-btn {
+            width: 36px;
+            height: 36px;
+            border: none;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+            flex-shrink: 0;
+        }
+        .expand-btn:hover {
+            background: rgba(0, 217, 255, 0.2);
+        }
+        .expand-btn svg {
+            width: 20px;
+            height: 20px;
+            fill: #fff;
+            transition: transform 0.3s ease;
+        }
+        .route-group.expanded .expand-btn svg {
+            transform: rotate(180deg);
+        }
+        .direction-stations {
+            display: none;
+            padding: 0 20px 20px;
+        }
+        .route-group.expanded .direction-stations {
+            display: block;
+        }
+        .station-list {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .station-tag {
+            padding: 8px 15px;
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 8px;
+            font-size: 0.9em;
+            color: rgba(255, 255, 255, 0.85);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .station-tag::before {
+            content: "";
+            width: 8px;
+            height: 8px;
+            background: rgba(0, 217, 255, 0.5);
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+        .station-tag:last-child::before {
+            background: rgba(0, 255, 136, 0.5);
+        }
+        .station-tag.more {
+            background: rgba(0, 217, 255, 0.15);
+            color: #00d9ff;
+            justify-content: center;
+        }
+        .station-tag.more::before {
+            display: none;
+        }
+        .no-data {
+            text-align: center;
+            padding: 50px;
+            color: rgba(255, 255, 255, 0.5);
+        }
+        @media (max-width: 768px) {
+            .route-header {
+                flex-wrap: wrap;
+            }
+            .route-selector {
+                width: 100%;
+                margin-top: 10px;
+            }
+            .route-select {
+                max-width: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>🛤️ 线路列表</h1>
+        <nav>
+            <a href="/">🏠 首页</a>
+            <a href="/stations">🚉 车站</a>
+            <a href="/routes" class="active">🛤️ 线路</a>
+            <a href="/admin">⚙️ 控制台</a>
+        </nav>
+    </header>
+    
+    <div class="container">
+        <div class="stats">
+            <span>线路总数: <span class="number">{{ count }}</span></span>
+        </div>
+        
+        <div class="search-box">
+            <input type="text" id="search" placeholder="搜索线路..." oninput="filterItems()">
+        </div>
+        
+        <div class="list-container" id="route-list">
+            {% for group in route_groups %}
+            <div class="route-group" data-name="{{ group.name|lower }}" onclick="toggleGroup(this)">
+                <div class="route-header">
+                    {% if group.color %}
+                    <div class="route-color" style="background-color: #{{ '%06x'|format(group.color) }}">
+                        {% if group.type == 'train_high_speed' %}🚄
+                        {% elif group.type == 'train_light_rail' %}🚃
+                        {% else %}🚇{% endif %}
+                    </div>
+                    {% else %}
+                    <div class="route-color" style="background: rgba(255,255,255,0.1)">🚇</div>
+                    {% endif %}
+                    <div class="route-info">
+                        <div class="route-name">{{ group.name }}</div>
+                        <div class="route-selector">
+                            <select class="route-select" onclick="event.stopPropagation()" onchange="updateStations(this, '{{ loop.index }}')">
+                                {% for direction in group.directions %}
+                                <option value="{{ loop.index0 }}" 
+                                        data-stations="{{ direction.stations|join(',') }}"
+                                        data-color="{{ direction.color }}">
+                                    {{ direction.direction }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <button class="expand-btn" onclick="event.stopPropagation(); toggleGroup(this.closest('.route-group'))">
+                        <svg viewBox="0 0 24 24"><path d="M7 10l5 5 5-5z"/></svg>
+                    </button>
+                </div>
+                <div class="direction-stations">
+                    <div class="station-list" id="stations-{{ loop.index }}">
+                        {% set first_dir = group.directions[0] %}
+                        {% for station in first_dir.stations %}
+                        <span class="station-tag">{{ station }}</span>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            {% else %}
+            <div class="no-data">暂无线路数据，请先更新数据</div>
+            {% endfor %}
+        </div>
+    </div>
+    
+    <script>
+    function filterItems() {
+        const query = document.getElementById('search').value.toLowerCase();
+        
+        document.querySelectorAll('.route-group').forEach(card => {
+            const name = card.dataset.name || '';
+            card.style.display = name.includes(query) ? '' : 'none';
+        });
+    }
+    
+    function toggleGroup(element) {
+        element.classList.toggle('expanded');
+    }
+    
+    function updateStations(select, index) {
+        const option = select.options[select.selectedIndex];
+        const stations = option.dataset.stations.split(',');
+        const stationList = document.getElementById('stations-' + index);
+        
+        let html = '';
+        for (let i = 0; i < Math.min(stations.length, 15); i++) {
+            html += '<span class="station-tag">' + stations[i] + '</span>';
+        }
+        if (stations.length > 15) {
+            html += '<span class="station-tag more">+' + (stations.length - 15) + '站</span>';
+        }
+        
+        stationList.innerHTML = html;
+    }
+    </script>
 </body>
 </html>
 '''
