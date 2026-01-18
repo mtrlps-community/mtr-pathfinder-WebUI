@@ -1,99 +1,94 @@
-'''   
-Minecraft Transit Railway寻路程序
+'''
 Find paths between two stations for Minecraft Transit Railway. 
 '''
 
-#禁用SSL验证 (Python 3.13+) - 必须在导入requests之前设置
-import os   #操作系统功能模块
-os.environ['CURL_CA_BUNDLE'] = ''   #禁用CURL证书验证
-os.environ['SSL_CERT_FILE'] = ''   #禁用SSL证书文件验证
+# 禁用SSL验证 (Python 3.13+) - 必须在导入requests之前设置
+import os
+os.environ['CURL_CA_BUNDLE'] = ''
+os.environ['SSL_CERT_FILE'] = ''
 
-#导入各种必要的库
-from difflib import SequenceMatcher   #用于字符串相似度比较
-from enum import Enum   #枚举类型定义
-from math import gcd, sqrt   #数学函数：最大公约数、平方根
-from operator import itemgetter   #用于排序操作
-from statistics import median_low   #统计学中位数计算
-from threading import Thread, BoundedSemaphore   #多线程和信号量控制
-from time import gmtime, strftime, time   #时间处理函数
-from typing import Union   #类型提示支持
-from queue import Queue   #队列数据结构
-import hashlib   #哈希算法库
-import json   #JSON数据处理
-import pickle   #Python对象序列化
-import re   #正则表达式处理
+# 导入各种必要的库
+from difflib import SequenceMatcher  # 用于字符串相似度比较
+from enum import Enum  # 枚举类型
+from math import gcd, sqrt  # 数学函数：最大公约数、平方根
+from operator import itemgetter  # 用于排序
+from statistics import median_low  # 统计学中位数计算
+from threading import Thread, BoundedSemaphore  # 多线程和信号量
+from time import gmtime, strftime, time  # 时间处理
+from typing import Union  # 类型提示
+from queue import Queue  # 队列
+import hashlib  # 哈希算法
+import json  # JSON处理
+import pickle  # 对象序列化
+import re  # 正则表达式
 
-#第三方库导入
-from opencc import OpenCC   #简繁中文转换工具
-import networkx as nx   #图论和网络分析库
-import requests   #HTTP请求库
+# 第三方库导入
+from opencc import OpenCC  # 简繁中文转换
+import networkx as nx  # 图论和网络分析
+import requests  # HTTP请求
 
-#添加Flask相关导入
-from flask import Flask, render_template_string, request, jsonify, session   #Flask Web框架组件
+# 添加Flask相关导入
+from flask import Flask, render_template_string, request, jsonify, session
 
-#创建Flask应用实例
+# 创建Flask应用
 app = Flask(__name__)
-app.secret_key = 'mtr-pathfinder-secret-key-2024'   #用于session加密的密钥
+app.secret_key = 'mtr-pathfinder-secret-key-2024'  # 用于session加密
 
-#=================== 数据更新相关函数 ====================
+# ==================== 数据更新相关函数 ====================
 def update_mtr_data(LINK: str, MTR_VER: int, LOCAL_FILE_PATH: str, INTERVAL_PATH: str, BASE_PATH: str) -> bool:
-   '''   
-   更新MTR数据（车站和线路数据）
-   '''
-   try:
-      os.makedirs(BASE_PATH, exist_ok=True)   #创建基础目录
-      
-      #   #更新车站数据
-      fetch_data(LINK, LOCAL_FILE_PATH, MTR_VER)   #获取车站和线路数据
-      
-      #   #验证车站数据文件已创建
-      if not os.path.exists(LOCAL_FILE_PATH):
-         raise Exception(f"车站数据文件创建失败: {LOCAL_FILE_PATH}")
-      
-      #   #更新线路间隔数据
-      gen_route_interval(LOCAL_FILE_PATH, INTERVAL_PATH, LINK, MTR_VER)   #生成路线间隔数据
-      
-      #   #验证间隔数据文件已创建
-      if not os.path.exists(INTERVAL_PATH):
-         raise Exception(f"路线间隔数据文件创建失败: {INTERVAL_PATH}")
-      
-      return True   #更新成功
-   except Exception as e:
-      print(f"数据更新错误: {e}")   #打印错误信息
-      return False   #更新失败
+    '''
+    更新MTR数据（车站和线路数据）
+    '''
+    try:
+        os.makedirs(BASE_PATH, exist_ok=True)
+        
+        # 更新车站数据
+        fetch_data(LINK, LOCAL_FILE_PATH, MTR_VER)
+        
+        # 验证车站数据文件已创建
+        if not os.path.exists(LOCAL_FILE_PATH):
+            raise Exception(f"车站数据文件创建失败: {LOCAL_FILE_PATH}")
+        
+        # 更新线路间隔数据
+        gen_route_interval(LOCAL_FILE_PATH, INTERVAL_PATH, LINK, MTR_VER)
+        
+        # 验证间隔数据文件已创建
+        if not os.path.exists(INTERVAL_PATH):
+            raise Exception(f"路线间隔数据文件创建失败: {INTERVAL_PATH}")
+        
+        return True
+    except Exception as e:
+        print(f"数据更新错误: {e}")
+        return False
 
-#=================== 数据更新函数结束 ====================
+# ==================== 数据更新函数结束 ====================
 
-SERVER_TICK: int = 20   #服务器游戏刻速率（每秒20刻）
+SERVER_TICK: int = 20
 
-DEFAULT_AVERAGE_SPEED: dict = {   #默认平均速度配置
-   'train_normal': 14,   #普通列车平均速度
-   'train_light_rail': 11,   #轻轨列车平均速度
-   'train_high_speed': 40,   #高速列车平均速度
-   'boat_normal': 10,   #普通船只平均速度
-   'boat_light_rail': 10,   #轻轨船只平均速度
-   'boat_high_speed': 13,   #高速船只平均速度
-   'cable_car_normal': 8,   #缆车平均速度
-   'airplane_normal': 70   #飞机平均速度
+DEFAULT_AVERAGE_SPEED: dict = {
+    'train_normal': 14,
+    'train_light_rail': 11,
+    'train_high_speed': 40,
+    'boat_normal': 10,
+    'boat_light_rail': 10,
+    'boat_high_speed': 13,
+    'cable_car_normal': 8,
+    'airplane_normal': 70
 }
-RUNNING_SPEED: int = 5.612   #列车运行速度（格/刻）
-TRANSFER_SPEED: int = 4.317   #换乘步行速度（格/刻）
-WILD_WALKING_SPEED: int = 2.25   #野外步行速度（格/刻）
+RUNNING_SPEED: int = 5.612
+TRANSFER_SPEED: int = 4.317
+WILD_WALKING_SPEED: int = 2.25
 
-ROUTE_INTERVAL_DATA = Queue()   #路线间隔数据队列
-semaphore = BoundedSemaphore(25)   #限制并发数的信号量
-original = {}   #存储原始路线数据
-tmp_names = {}   #临时名称映射
-opencc1 = OpenCC('s2t')   #简体中文转繁体中文
-try:
-    opencc2 = OpenCC('t2jp')   #繁体中文转日文汉字
-    OPENCC2_AVAILABLE = True   #标记opencc2是否可用
-except Exception:
-    OPENCC2_AVAILABLE = False   #opencc-python-reimplemented不支持t2jp转换
-opencc3 = OpenCC('t2s')   #繁体中文转简体中文
+ROUTE_INTERVAL_DATA = Queue()
+semaphore = BoundedSemaphore(25)
+original = {}
+tmp_names = {}
+opencc1 = OpenCC('s2t')
+opencc2 = OpenCC('t2jp')
+opencc3 = OpenCC('t2s')
 
 
-#   #HTML模板定义
+# HTML模板
 HTML_TEMPLATE = '''
 <!DOCTYPE html>
 <html lang="zh-CN">
@@ -1185,6 +1180,11 @@ ROUTE_INTERVAL_DATA = Queue()  # 存储路线间隔数据的队列
 semaphore = BoundedSemaphore(25)  # 限制并发数的信号量
 original = {}  # 存储原始数据
 tmp_names = {}  # 临时名称存储
+
+# 中文简繁转换器初始化
+# 注意：opencc-python-reimplemented不支持t2jp和jp2t转换
+opencc1 = OpenCC('s2t')  # 简体转繁体
+opencc3 = OpenCC('t2s')  # 繁体转简体
 
 
 def get_close_matches(words, possibilities, cutoff=0.2):
