@@ -92,9 +92,11 @@ def stations():
     if os.path.exists(config['LOCAL_FILE_PATH']):
         with open(config['LOCAL_FILE_PATH'], 'r', encoding='utf-8') as f:
             data = json.load(f)
-            if config['MTR_VER'] == 3:
+            # 统一处理，无论MTR_VER版本，都使用列表格式
+            if isinstance(data, list) and len(data) > 0:
                 stations_data = list(data[0]['stations'].values())
-            else:
+            elif isinstance(data, dict):
+                # 如果是字典格式，将其转换为列表格式
                 stations_data = list(data['stations'].values())
     return render_template('stations.html', stations=stations_data)
 
@@ -105,9 +107,11 @@ def routes():
     if os.path.exists(config['LOCAL_FILE_PATH']):
         with open(config['LOCAL_FILE_PATH'], 'r', encoding='utf-8') as f:
             data = json.load(f)
-            if config['MTR_VER'] == 3:
+            # 统一处理，无论MTR_VER版本，都使用列表格式
+            if isinstance(data, list) and len(data) > 0:
                 routes_data = data[0]['routes']
-            else:
+            elif isinstance(data, dict):
+                # 如果是字典格式，将其转换为列表格式
                 routes_data = list(data['routes'].values())
     return render_template('routes.html', routes=routes_data)
 
@@ -185,36 +189,41 @@ def api_find_route():
                     config['MTR_VER'],
                     True
                 )
-            else:
-                # v4版本的寻路逻辑
-                # 确保station_data是正确的v4版本数据结构
-                if isinstance(station_data, list):
-                    # 如果已经是列表格式，提取第一个元素
-                    station_data_v4 = station_data[0]
-                else:
-                    # 否则直接使用
-                    station_data_v4 = station_data
-                
-                G = create_graph(
-                    station_data_v4,
-                    data.get('ignored_lines', []),
-                    not data.get('disable_high_speed', False),
-                    not data.get('disable_boat', False),
-                    data.get('enable_wild', False),
-                    data.get('only_lrt', False),
-                    data.get('avoid_stations', []),
-                    RouteType.WAITING if algorithm == 'default' else RouteType.IN_THEORY,
-                    config['ORIGINAL_IGNORED_LINES'],
-                    config['INTERVAL_PATH'],
-                    '', '',
-                    config['LOCAL_FILE_PATH'],
-                    config['STATION_TABLE'],
-                    config['WILD_ADDITION'],
-                    config['TRANSFER_ADDITION'],
-                    config['MAX_WILD_BLOCKS'],
-                    config['MTR_VER'],
-                    True
-                )
+            # 统一处理所有版本的数据格式
+            # 确保station_data是列表格式，与源程序兼容
+            if isinstance(station_data, dict):
+                # 如果是字典格式，包装成列表格式
+                fixed_data = [{
+                    'stations': station_data['stations'],
+                    'routes': list(station_data['routes'].values())
+                }]
+                station_data = fixed_data
+            elif not isinstance(station_data, list):
+                # 其他情况，返回错误
+                return jsonify({'error': '无效的数据格式'}), 400
+            
+            # 使用完整的station_data列表（而非单个元素）调用create_graph
+            # create_graph函数期望第一个参数是列表格式
+            G = create_graph(
+                station_data,
+                data.get('ignored_lines', []),
+                not data.get('disable_high_speed', False),
+                not data.get('disable_boat', False),
+                data.get('enable_wild', False),
+                data.get('only_lrt', False),
+                data.get('avoid_stations', []),
+                RouteType.WAITING if algorithm == 'default' else RouteType.IN_THEORY,
+                config['ORIGINAL_IGNORED_LINES'],
+                config['INTERVAL_PATH'],
+                '', '',
+                config['LOCAL_FILE_PATH'],
+                config['STATION_TABLE'],
+                config['WILD_ADDITION'],
+                config['TRANSFER_ADDITION'],
+                config['MAX_WILD_BLOCKS'],
+                config['MTR_VER'],
+                True
+            )
             
             result = find_shortest_route(
                 G, data['start'], data['end'],
@@ -260,10 +269,15 @@ def api_search_stations():
         data = json.load(f)
     
     stations = []
-    if config['MTR_VER'] == 3:
+    # 统一处理，无论MTR_VER版本，数据都是列表格式
+    if isinstance(data, list) and len(data) > 0:
         stations = data[0]['stations'].values()
-    else:
+    elif isinstance(data, dict):
+        # 兼容旧格式，直接访问
         stations = data['stations'].values()
+    else:
+        # 无效格式，返回空列表
+        return jsonify([])
     
     results = []
     for station in stations:
@@ -297,6 +311,12 @@ def api_update_data():
     try:
         import sys
         from io import StringIO
+        import json
+        import os
+        
+        # 直接从源程序导入函数，确保数据格式一致
+        from mtr_pathfinder import fetch_data as original_fetch_data
+        from mtr_pathfinder import gen_route_interval as original_gen_route_interval
         
         # 保存原始stdin
         original_stdin = sys.stdin
@@ -305,31 +325,29 @@ def api_update_data():
         sys.stdin = mock_stdin
         
         try:
-            if config['MTR_VER'] == 3:
-                fetch_data_v3(
-                    config['LINK'],
-                    config['LOCAL_FILE_PATH'],
-                    config['MTR_VER']
-                )
-            else:
-                fetch_data_v4(
-                    config['LINK'],
-                    config['LOCAL_FILE_PATH'],
-                    config['MAX_WILD_BLOCKS']
-                )
+            # 对于所有版本，统一使用mtr_pathfinder.py中的fetch_data函数
+            # 这确保生成的数据格式与源程序完全相同
+            original_fetch_data(
+                config['LINK'],
+                config['LOCAL_FILE_PATH'],
+                config['MTR_VER']
+            )
             
-            # 生成间隔数据文件
-            gen_route_interval(
+            # 生成间隔数据文件，使用源程序的函数
+            original_gen_route_interval(
                 config['LOCAL_FILE_PATH'],
                 config['INTERVAL_PATH'],
                 config['LINK'],
                 config['MTR_VER']
             )
             
-            gen_departure(
-                config['LINK'],
-                config['DEP_PATH']
-            )
+            # 生成发车数据
+            if config['MTR_VER'] == 4:
+                from mtr_pathfinder_v4 import gen_departure as original_gen_departure
+                original_gen_departure(
+                    config['LINK'],
+                    config['DEP_PATH']
+                )
         finally:
             # 恢复原始stdin
             sys.stdin = original_stdin

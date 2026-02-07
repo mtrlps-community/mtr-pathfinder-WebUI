@@ -45,9 +45,14 @@ def process_path(*args, **kwargs):
         data = args[3]
         
         # 修复数据结构
+        # 检查routes是否已经是列表，如果是则直接使用，否则调用.values()
+        routes_data = data['routes']
+        if isinstance(routes_data, dict):
+            routes_data = list(routes_data.values())
+        
         fixed_data = [{
             'stations': data['stations'],
-            'routes': list(data['routes'].values())
+            'routes': routes_data
         }]
         
         # 创建新的参数列表，替换第三个参数
@@ -97,9 +102,14 @@ def create_graph(*args, **kwargs):
         data = args[0]
         
         # 修复数据结构
+        # 检查routes是否已经是列表，如果是则直接使用，否则调用.values()
+        routes_data = data['routes']
+        if isinstance(routes_data, dict):
+            routes_data = list(routes_data.values())
+        
         fixed_data = [{
             'stations': data['stations'],
-            'routes': list(data['routes'].values())
+            'routes': routes_data
         }]
         
         # 创建新的参数列表，替换第一个参数
@@ -128,9 +138,14 @@ def find_shortest_route(*args, **kwargs):
         data = args[2]
         
         # 修复数据结构
+        # 检查routes是否已经是列表，如果是则直接使用，否则调用.values()
+        routes_data = data['routes']
+        if isinstance(routes_data, dict):
+            routes_data = list(routes_data.values())
+        
         fixed_data = [{
             'stations': data['stations'],
-            'routes': list(data['routes'].values())
+            'routes': routes_data
         }]
         
         # 创建新的参数列表，替换第三个参数
@@ -233,7 +248,7 @@ from mtr_pathfinder_v4 import (
     gen_timetable,
     load_tt,
     CSA,
-    process_path,
+    process_path as process_path_v4,
     RouteType as RouteTypeV4
 )
 
@@ -252,7 +267,7 @@ def fetch_data_v3(link, local_file_path, mtr_ver):
         # 恢复原始stdin
         sys.stdin = original_stdin
 
-# 重新定义fetch_data_v4，自动确认输入
+# 重新定义fetch_data_v4，自动确认输入并修复数据格式
 def fetch_data_v4(link, local_file_path, max_wild_blocks):
     print("DEBUG: Calling wrapped fetch_data_v4")
     # 保存原始stdin
@@ -262,7 +277,26 @@ def fetch_data_v4(link, local_file_path, max_wild_blocks):
     sys.stdin = mock_stdin
     try:
         # 调用原函数
-        return original_fetch_data_v4(link, local_file_path, max_wild_blocks)
+        result = original_fetch_data_v4(link, local_file_path, max_wild_blocks)
+        
+        # 修复数据格式，确保与源程序兼容
+        if os.path.exists(local_file_path):
+            with open(local_file_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            
+            # 检查数据格式，如果是v4特有的字典格式，转换为源程序兼容的列表格式
+            if isinstance(data, dict) and 'stations' in data and 'routes' in data:
+                # 转换为列表格式，与源程序一致
+                fixed_data = [{
+                    'stations': data['stations'],
+                    'routes': list(data['routes'].values())
+                }]
+                
+                # 写入转换后的数据
+                with open(local_file_path, 'w', encoding='utf-8') as f:
+                    json.dump(fixed_data, f)
+        
+        return result
     finally:
         # 恢复原始stdin
         sys.stdin = original_stdin
@@ -491,6 +525,8 @@ def fixed_main(*args, **kwargs):
     """
     import sys
     from io import StringIO
+    import json
+    import os
     
     # 保存原始stdin
     original_stdin = sys.stdin
@@ -499,9 +535,106 @@ def fixed_main(*args, **kwargs):
     sys.stdin = mock_stdin
     
     try:
-        # 调用原函数
-        result = original_main(*args, **kwargs)
-        return result
+        # 解析参数 - 优先使用关键字参数，然后使用位置参数作为备选
+        station1 = kwargs.get('station1', args[0] if len(args) > 0 else '')
+        station2 = kwargs.get('station2', args[1] if len(args) > 1 else '')
+        LINK = kwargs.get('LINK', args[2] if len(args) > 2 else '')
+        LOCAL_FILE_PATH = kwargs.get('LOCAL_FILE_PATH', args[3] if len(args) > 3 else '')
+        INTERVAL_PATH = kwargs.get('INTERVAL_PATH', args[4] if len(args) > 4 else '')
+        BASE_PATH = kwargs.get('BASE_PATH', args[5] if len(args) > 5 else 'mtr_pathfinder_data')
+        PNG_PATH = kwargs.get('PNG_PATH', args[6] if len(args) > 6 else 'mtr_pathfinder_data')
+        MAX_WILD_BLOCKS = kwargs.get('MAX_WILD_BLOCKS', args[7] if len(args) > 7 else 1500)
+        TRANSFER_ADDITION = kwargs.get('TRANSFER_ADDITION', args[8] if len(args) > 8 else {})
+        WILD_ADDITION = kwargs.get('WILD_ADDITION', args[9] if len(args) > 9 else {})
+        STATION_TABLE = kwargs.get('STATION_TABLE', args[10] if len(args) > 10 else {})
+        ORIGINAL_IGNORED_LINES = kwargs.get('ORIGINAL_IGNORED_LINES', args[11] if len(args) > 11 else [])
+        UPDATE_DATA = kwargs.get('UPDATE_DATA', args[12] if len(args) > 12 else False)
+        GEN_ROUTE_INTERVAL = kwargs.get('GEN_ROUTE_INTERVAL', args[13] if len(args) > 13 else False)
+        IGNORED_LINES = kwargs.get('IGNORED_LINES', args[14] if len(args) > 14 else [])
+        AVOID_STATIONS = kwargs.get('AVOID_STATIONS', args[15] if len(args) > 15 else [])
+        CALCULATE_HIGH_SPEED = kwargs.get('CALCULATE_HIGH_SPEED', args[16] if len(args) > 16 else True)
+        CALCULATE_BOAT = kwargs.get('CALCULATE_BOAT', args[17] if len(args) > 17 else True)
+        CALCULATE_WALKING_WILD = kwargs.get('CALCULATE_WALKING_WILD', args[18] if len(args) > 18 else False)
+        ONLY_LRT = kwargs.get('ONLY_LRT', args[19] if len(args) > 19 else False)
+        IN_THEORY = kwargs.get('IN_THEORY', args[20] if len(args) > 20 else False)
+        DETAIL = kwargs.get('DETAIL', args[21] if len(args) > 21 else False)
+        MTR_VER = kwargs.get('MTR_VER', args[22] if len(args) > 22 else 3)
+        G = kwargs.get('G', args[23] if len(args) > 23 else None)
+        gen_image = kwargs.get('gen_image', args[24] if len(args) > 24 else True)
+        show = kwargs.get('show', args[25] if len(args) > 25 else False)
+        cache = kwargs.get('cache', args[26] if len(args) > 26 else True)
+        
+        # 检查文件是否存在，如果不存在则更新数据
+        if UPDATE_DATA or not os.path.exists(LOCAL_FILE_PATH):
+            # 调用原函数的fetch_data部分
+            data = original_fetch_data_v3(LINK, LOCAL_FILE_PATH, MTR_VER) if MTR_VER == 3 else original_fetch_data_v4(LINK, LOCAL_FILE_PATH, MAX_WILD_BLOCKS)
+        else:
+            # 直接从文件读取数据
+            with open(LOCAL_FILE_PATH, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+        
+        # 修复数据结构，确保data是列表格式
+        if MTR_VER == 4 and isinstance(data, dict) and 'stations' in data and 'routes' in data:
+            # v4版本的数据结构，需要包装成列表格式
+            data = [{
+                'stations': data['stations'],
+                'routes': list(data['routes'].values())
+            }]
+        
+        # 检查间隔数据文件是否存在，如果不存在则生成
+        if GEN_ROUTE_INTERVAL or not os.path.exists(INTERVAL_PATH):
+            original_gen_route_interval(LOCAL_FILE_PATH, INTERVAL_PATH, LINK, MTR_VER)
+        
+        # 现在数据结构已经修复，可以继续执行原函数的其余部分
+        from mtr_pathfinder import RouteType
+        
+        # 处理参数
+        IGNORED_LINES += ORIGINAL_IGNORED_LINES
+        STATION_TABLE = {x.lower(): y.lower() for x, y in STATION_TABLE.items()}
+        if LINK.endswith('/index.html'):
+            LINK = LINK.rstrip('/index.html')
+        
+        # 选择路线类型
+        if IN_THEORY:
+            route_type = RouteType.IN_THEORY
+        else:
+            route_type = RouteType.WAITING
+        
+        # 创建图
+        if G is None:
+            from mtr_pathfinder import create_graph
+            from mtr_pathfinder import strftime, gmtime
+            
+            version1 = strftime('%Y%m%d-%H%M', gmtime(os.path.getmtime(LOCAL_FILE_PATH)))
+            version2 = strftime('%Y%m%d-%H%M', gmtime(os.path.getmtime(INTERVAL_PATH)))
+            
+            G = create_graph(
+                data, IGNORED_LINES, CALCULATE_HIGH_SPEED,
+                CALCULATE_BOAT, CALCULATE_WALKING_WILD, ONLY_LRT,
+                AVOID_STATIONS, route_type, ORIGINAL_IGNORED_LINES,
+                INTERVAL_PATH, version1, version2, LOCAL_FILE_PATH,
+                STATION_TABLE, WILD_ADDITION, TRANSFER_ADDITION,
+                MAX_WILD_BLOCKS, MTR_VER, cache
+            )
+        
+        # 查找最短路线
+        from mtr_pathfinder import find_shortest_route
+        shortest_path, shortest_distance, waiting_time, riding_time, ert = find_shortest_route(G, station1, station2, data, STATION_TABLE, MTR_VER)
+        
+        if gen_image is False:
+            return ert, shortest_distance
+        
+        if shortest_path in [False, None]:
+            return shortest_path
+        
+        # 生成图片
+        from mtr_pathfinder import save_image
+        return save_image(route_type, ert, shortest_distance, riding_time, waiting_time, BASE_PATH, version1, version2, DETAIL, PNG_PATH, show)
+    except Exception as e:
+        print(f"fixed_main函数出错: {e}")
+        import traceback
+        traceback.print_exc()
+        raise
     finally:
         # 恢复原始stdin
         sys.stdin = original_stdin

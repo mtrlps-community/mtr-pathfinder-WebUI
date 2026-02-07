@@ -107,6 +107,96 @@
             flex: 1;
             margin: 0 0.5rem;
         }
+        /* 路线步骤样式 */
+        .route-step {
+            position: relative;
+            background: white;
+            border-radius: 0.375rem;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+            transition: all 0.2s ease;
+            border-left: 4px solid #3b82f6;
+        }
+        .route-step:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+        .route-step.start-station::before {
+            border-color: #10b981;
+        }
+        .route-step.end-station::before {
+            border-color: #ef4444;
+        }
+        /* 车站名称样式 */
+        .station {
+            font-weight: 700;
+            font-size: 1.125rem;
+            color: #1f2937;
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            position: relative;
+            padding-left: 1.5rem;
+        }
+        .station::before {
+            content: "";
+            position: absolute;
+            left: 0;
+            width: 1rem;
+            height: 1rem;
+            border-radius: 50%;
+            border: 2px solid #374151;
+            background: white;
+            z-index: 2;
+        }
+        /* 路线信息样式 */
+        .route-info {
+            background: #f3f4f6;
+            padding: 0.75rem;
+            border-radius: 0.375rem;
+            margin-bottom: 0.5rem;
+        }
+        /* 路线标签样式 */
+        .route-tag {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.25rem 0.75rem;
+            border-radius: 0.25rem;
+            font-size: 0.875rem;
+            font-weight: 600;
+            margin-right: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+        /* 路线颜色指示器 */
+        .route-color-indicator {
+            display: inline-block;
+            width: 0.625rem;
+            height: 0.625rem;
+            border-radius: 0.125rem;
+            margin-right: 0.375rem;
+            vertical-align: middle;
+        }
+        /* 路线名称 */
+        .route-name {
+            margin-left: 0.25rem;
+        }
+        /* 方向指示器 */
+        .direction-indicator {
+            display: flex;
+            align-items: center;
+            padding: 0.125rem 0.5rem;
+            background: linear-gradient(135deg, #dbeafe, #bfdbfe);
+            border-radius: 0.25rem;
+            margin-top: 0.125rem;
+            font-size: 0.875rem;
+            color: #1e40af;
+        }
+        .direction-indicator::before {
+            content: "→";
+            margin-right: 0.25rem;
+            font-size: 0.9375rem;
+        }
     </style>
 </head>
 <body class="bg-gray-100 min-h-screen">

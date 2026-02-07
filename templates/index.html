@@ -303,28 +303,81 @@
     function displayResult(routeResult) {
         result.classList.remove('hidden');
         
-        // 简化示例，实际需要根据API返回的结果结构进行调整
-        document.getElementById('route-overview').textContent = `从 ${routeResult[0]} 到 ${routeResult[1]} 的路径`;
-        document.getElementById('total-duration').textContent = `${routeResult[2]} 秒`;
+        // 解析路径结果
+        const stationNames = routeResult[4]; // 包含车站名和路线名的列表
+        const totalDuration = routeResult[2]; // 总时长
+        const startStation = stationNames[0];
+        const endStation = stationNames[stationNames.length - 1];
+        
+        // 更新概览信息
+        document.getElementById('route-overview').textContent = `从 ${startStation} 到 ${endStation} 的路径`;
+        document.getElementById('total-duration').textContent = `${Math.round(totalDuration / 1000)} 秒`;
         
         // 清空现有内容
         const detailsContainer = document.getElementById('route-details');
         detailsContainer.innerHTML = '';
         
-        // 示例：添加路径步骤
-        const step = document.createElement('div');
-        step.className = 'bg-white border border-gray-200 rounded-lg p-4 shadow-sm';
-        step.innerHTML = `
-            <div class="flex items-center">
-                <div class="station-node">1</div>
-                <div class="route-line" style="background-color: #${routeResult[3]}"></div>
-                <div class="station-node">2</div>
-            </div>
-            <div class="mt-3 text-sm text-gray-600">
-                <p>${routeResult[4][0]}</p>
-            </div>
-        `;
-        detailsContainer.appendChild(step);
+        // 创建路线步骤容器
+        const routeStepsContainer = document.createElement('div');
+        routeStepsContainer.className = 'space-y-4';
+        
+        // 遍历路径，创建每个步骤
+        let currentStep = 0;
+        for (let i = 0; i < stationNames.length - 1; i += 2) {
+            const currentStation = stationNames[i];
+            const routeInfo = stationNames[i + 1];
+            const nextStation = stationNames[i + 2] || endStation;
+            
+            currentStep++;
+            
+            // 创建路线步骤元素
+            const routeStep = document.createElement('div');
+            routeStep.className = `route-step ${currentStep === 1 ? 'start-station' : ''} ${i + 2 >= stationNames.length ? 'end-station' : ''}`;
+            
+            // 创建车站标题
+            const stationTitle = document.createElement('div');
+            stationTitle.className = 'station';
+            stationTitle.textContent = currentStation;
+            
+            // 创建路线信息
+            const routeDetails = document.createElement('div');
+            routeDetails.className = 'route-info';
+            
+            // 路线名称标签
+            const routeTag = document.createElement('div');
+            routeTag.className = 'route-tag bg-blue-100 text-blue-800';
+            routeTag.innerHTML = `<span class="route-color-indicator" style="background-color: #3b82f6;"></span><span class="route-name">${routeInfo}</span>`;
+            routeDetails.appendChild(routeTag);
+            
+            // 方向指示器
+            const directionIndicator = document.createElement('div');
+            directionIndicator.className = 'direction-indicator';
+            directionIndicator.textContent = `前往 ${nextStation}`;
+            routeDetails.appendChild(directionIndicator);
+            
+            // 将元素添加到路线步骤
+            routeStep.appendChild(stationTitle);
+            routeStep.appendChild(routeDetails);
+            
+            // 将路线步骤添加到容器
+            routeStepsContainer.appendChild(routeStep);
+        }
+        
+        // 添加最后的终点站
+        if (stationNames.length > 1) {
+            const finalStationStep = document.createElement('div');
+            finalStationStep.className = 'route-step end-station';
+            
+            const finalStationTitle = document.createElement('div');
+            finalStationTitle.className = 'station';
+            finalStationTitle.textContent = endStation;
+            
+            finalStationStep.appendChild(finalStationTitle);
+            routeStepsContainer.appendChild(finalStationStep);
+        }
+        
+        // 将路线步骤容器添加到详细信息区域
+        detailsContainer.appendChild(routeStepsContainer);
     }
 </script>
 {% endblock %}
