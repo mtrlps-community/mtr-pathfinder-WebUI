@@ -1,0 +1,273 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <!-- 左侧：配置设置 -->
+    <div class="lg:col-span-1 space-y-6">
+        <!-- 地图链接设置 -->
+        <div class="card">
+            <h2 class="text-2xl font-bold mb-6">地图链接设置</h2>
+            
+            <div class="mb-4">
+                <label class="block text-gray-700 font-medium mb-2" for="link-input">
+                    <i class="fa fa-link mr-1"></i> 地图链接 (LINK)
+                </label>
+                <input type="text" id="link-input" value="{{ config['LINK'] }}" 
+                       class="form-input" placeholder="输入MTR地图链接">
+            </div>
+            
+            <button id="save-link" class="btn-primary">
+                <i class="fa fa-save mr-2"></i> 保存链接
+            </button>
+            <div class="mt-2 text-sm text-gray-500">
+                <p>地图链接用于获取车站和线路数据</p>
+            </div>
+        </div>
+        
+        <!-- MTR版本设置 -->
+        <div class="card">
+            <h2 class="text-2xl font-bold mb-6">MTR版本设置</h2>
+            
+            <div class="mb-4">
+                <label class="block text-gray-700 font-medium mb-2" for="mtr-ver-select">
+                    <i class="fa fa-code-fork mr-1"></i> MTR版本 (MTR_VER)
+                </label>
+                <select id="mtr-ver-select" class="form-input">
+                    <option value="3" {% if config['MTR_VER'] == 3 %}selected{% endif %}>版本 3</option>
+                    <option value="4" {% if config['MTR_VER'] == 4 %}selected{% endif %}>版本 4</option>
+                </select>
+            </div>
+            
+            <button id="save-mtr-ver" class="btn-primary">
+                <i class="fa fa-save mr-2"></i> 保存版本
+            </button>
+            <div class="mt-2 text-sm text-gray-500">
+                <p>选择MTR插件的版本，不同版本的数据格式不同</p>
+            </div>
+        </div>
+        
+        <!-- 数据更新 -->
+        <div class="card">
+            <h2 class="text-2xl font-bold mb-6">数据更新</h2>
+            
+            <div class="mb-4">
+                <p class="text-gray-600 mb-4">点击下方按钮从地图链接更新车站和线路数据</p>
+                <div class="flex space-x-3">
+                    <button id="update-data" class="btn-primary">
+                        <i class="fa fa-refresh mr-2"></i> 更新数据
+                    </button>
+                    <button id="update-departure" class="btn-secondary">
+                        <i class="fa fa-clock-o mr-2"></i> 更新发车数据
+                    </button>
+                </div>
+            </div>
+            
+            <div id="update-status" class="mt-4 p-4 rounded-lg hidden"></div>
+        </div>
+    </div>
+    
+    <!-- 右侧：系统信息 -->
+    <div class="lg:col-span-1">
+        <div class="card">
+            <h2 class="text-2xl font-bold mb-6">系统配置信息</h2>
+            
+            <div class="space-y-4">
+                <!-- 当前链接 -->
+                <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <div>
+                        <h3 class="font-medium text-gray-700">当前地图链接</h3>
+                        <p class="text-sm text-gray-500 mt-1">用于获取数据的地图链接</p>
+                    </div>
+                    <div class="text-right">
+                        <p class="font-medium" id="current-link">{{ config['LINK'] or '未设置' }}</p>
+                    </div>
+                </div>
+                
+                <!-- 当前版本 -->
+                <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <div>
+                        <h3 class="font-medium text-gray-700">当前MTR版本</h3>
+                        <p class="text-sm text-gray-500 mt-1">MTR插件版本</p>
+                    </div>
+                    <div class="text-right">
+                        <p class="font-medium" id="current-mtr-ver">{{ config['MTR_VER'] }}</p>
+                    </div>
+                </div>
+                
+                <!-- 数据文件 -->
+                <div class="p-3 bg-gray-50 rounded-lg">
+                    <h3 class="font-medium text-gray-700 mb-3">数据文件</h3>
+                    <div class="space-y-2">
+                        <div class="flex justify-between">
+                            <span class="text-sm text-gray-600">车站数据文件</span>
+                            <span class="text-sm font-medium">{{ config['LOCAL_FILE_PATH'] }}</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-sm text-gray-600">线路数据文件</span>
+                            <span class="text-sm font-medium">{{ config['DEP_PATH'] }}</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-sm text-gray-600">区间数据文件</span>
+                            <span class="text-sm font-medium">{{ config['INTERVAL_PATH'] }}</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 数据版本 -->
+                <div class="p-3 bg-gray-50 rounded-lg">
+                    <h3 class="font-medium text-gray-700 mb-3">数据版本</h3>
+                    <div class="space-y-2">
+                        <div class="flex justify-between">
+                            <span class="text-sm text-gray-600">车站数据版本</span>
+                            <span class="text-sm font-medium" id="station-version">{{ station_version or '未生成' }}</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-sm text-gray-600">线路数据版本</span>
+                            <span class="text-sm font-medium" id="route-version">{{ route_version or '未生成' }}</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-sm text-gray-600">发车数据版本</span>
+                            <span class="text-sm font-medium" id="interval-version">{{ interval_version or '未生成' }}</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 其他配置 -->
+                <div class="p-3 bg-gray-50 rounded-lg">
+                    <h3 class="font-medium text-gray-700 mb-3">其他配置</h3>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <span class="text-sm text-gray-600 block mb-1">最大越野距离</span>
+                            <span class="text-sm font-medium">{{ config['MAX_WILD_BLOCKS'] }} blocks</span>
+                        </div>
+                        <div>
+                            <span class="text-sm text-gray-600 block mb-1">原始禁路线</span>
+                            <span class="text-sm font-medium">{{ config['ORIGINAL_IGNORED_LINES']|length }} 条</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // 显示状态消息
+    function showStatus(message, isSuccess = true) {
+        const statusDiv = document.getElementById('update-status');
+        statusDiv.className = `mt-4 p-4 rounded-lg ${isSuccess ? 'bg-green-50 border border-green-200 text-green-700' : 'bg-red-50 border border-red-200 text-red-700'}`;
+        statusDiv.innerHTML = `
+            <i class="fa fa-${isSuccess ? 'check-circle' : 'exclamation-circle'} mr-2"></i>
+            ${message}
+        `;
+        statusDiv.classList.remove('hidden');
+    }
+    
+    // 保存地图链接
+    document.getElementById('save-link').addEventListener('click', async () => {
+        const link = document.getElementById('link-input').value;
+        
+        try {
+            const response = await fetch('/api/update_config', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ link })
+            });
+            
+            const result = await response.json();
+            if (response.ok && result.success) {
+                document.getElementById('current-link').textContent = link;
+                showStatus('地图链接保存成功');
+            } else {
+                showStatus('保存失败', false);
+            }
+        } catch (error) {
+            showStatus('保存失败，请稍后重试', false);
+            console.error('保存链接错误:', error);
+        }
+    });
+    
+    // 保存MTR版本
+    document.getElementById('save-mtr-ver').addEventListener('click', async () => {
+        const mtrVer = document.getElementById('mtr-ver-select').value;
+        
+        try {
+            const response = await fetch('/api/update_config', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ mtr_ver: mtrVer })
+            });
+            
+            const result = await response.json();
+            if (response.ok && result.success) {
+                document.getElementById('current-mtr-ver').textContent = mtrVer;
+                showStatus('MTR版本保存成功');
+            } else {
+                showStatus('保存失败', false);
+            }
+        } catch (error) {
+            showStatus('保存失败，请稍后重试', false);
+            console.error('保存版本错误:', error);
+        }
+    });
+    
+    // 更新数据
+    document.getElementById('update-data').addEventListener('click', async () => {
+        const btn = document.getElementById('update-data');
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '<i class="fa fa-spinner fa-spin mr-2"></i> 更新中...';
+        btn.disabled = true;
+        
+        try {
+            const response = await fetch('/api/update_data', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            const result = await response.json();
+            if (response.ok && result.success) {
+                showStatus('数据更新成功');
+                // 刷新页面以显示最新数据版本
+                setTimeout(() => {
+                    location.reload();
+                }, 1500);
+            } else {
+                showStatus(result.error || '更新失败', false);
+            }
+        } catch (error) {
+            showStatus('更新失败，请检查链接是否正确', false);
+            console.error('更新数据错误:', error);
+        } finally {
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+        }
+    });
+    
+    // 更新发车数据
+    document.getElementById('update-departure').addEventListener('click', async () => {
+        const btn = document.getElementById('update-departure');
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '<i class="fa fa-spinner fa-spin mr-2"></i> 更新中...';
+        btn.disabled = true;
+        
+        try {
+            // 这里可以添加单独更新发车数据的逻辑
+            showStatus('发车数据更新功能开发中');
+        } catch (error) {
+            showStatus('更新失败，请稍后重试', false);
+            console.error('更新发车数据错误:', error);
+        } finally {
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+        }
+    });
+</script>
+{% endblock %}

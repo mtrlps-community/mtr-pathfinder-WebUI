@@ -1,0 +1,301 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <!-- 左侧：搜索表单 -->
+    <div class="lg:col-span-1">
+        <div class="card">
+            <h2 class="text-2xl font-bold mb-6">时刻表查询</h2>
+            
+            <!-- 搜索类型选择 -->
+            <div class="mb-6">
+                <div class="flex space-x-2 border-b border-gray-200">
+                    <button id="search-by-station" class="px-4 py-2 text-blue-500 border-b-2 border-blue-500 font-medium">
+                        按车站查询
+                    </button>
+                    <button id="search-by-train" class="px-4 py-2 text-gray-500 hover:text-blue-500">
+                        按列车查询
+                    </button>
+                </div>
+            </div>
+            
+            <!-- 车站搜索表单 -->
+            <form id="station-timetable-form" class="mb-6">
+                <div class="mb-4">
+                    <label class="block text-gray-700 font-medium mb-2" for="station-name">
+                        <i class="fa fa-map-marker mr-1"></i> 车站名称
+                    </label>
+                    <div class="relative">
+                        <input type="text" id="station-name" name="station" 
+                               class="form-input" placeholder="输入车站名称" required>
+                        <div id="station-suggestions" class="absolute z-10 w-full bg-white border border-gray-300 rounded-md shadow-lg mt-1 hidden"></div>
+                    </div>
+                </div>
+                
+                <button type="submit" class="btn-primary w-full">
+                    <i class="fa fa-search mr-2"></i> 查询时刻表
+                </button>
+            </form>
+            
+            <!-- 列车搜索表单 -->
+            <form id="train-timetable-form" class="mb-6 hidden">
+                <div class="mb-4">
+                    <label class="block text-gray-700 font-medium mb-2" for="train-id">
+                        <i class="fa fa-train mr-1"></i> 列车编号
+                    </label>
+                    <input type="number" id="train-id" name="train_id" 
+                           class="form-input" placeholder="输入列车编号" required>
+                </div>
+                
+                <div class="mb-4">
+                    <label class="block text-gray-700 font-medium mb-2" for="train-station">
+                        <i class="fa fa-map-marker mr-1"></i> 车站名称
+                    </label>
+                    <div class="relative">
+                        <input type="text" id="train-station" name="station" 
+                               class="form-input" placeholder="输入车站名称" required>
+                        <div id="train-station-suggestions" class="absolute z-10 w-full bg-white border border-gray-300 rounded-md shadow-lg mt-1 hidden"></div>
+                    </div>
+                </div>
+                
+                <button type="submit" class="btn-primary w-full">
+                    <i class="fa fa-search mr-2"></i> 查询列车时刻表
+                </button>
+            </form>
+            
+            <!-- 导出按钮 -->
+            <div class="hidden" id="export-section">
+                <button id="export-pdf" class="btn-secondary w-full mb-2">
+                    <i class="fa fa-file-pdf-o mr-2"></i> 导出PDF
+                </button>
+                <button id="export-csv" class="btn-secondary w-full">
+                    <i class="fa fa-file-excel-o mr-2"></i> 导出CSV
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 右侧：时刻表结果 -->
+    <div class="lg:col-span-2">
+        <div class="card">
+            <h2 class="text-2xl font-bold mb-6">时刻表结果</h2>
+            
+            <!-- 加载状态 -->
+            <div id="timetable-loading" class="hidden text-center py-12">
+                <div class="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+                <p class="mt-4 text-gray-600">正在加载时刻表...</p>
+            </div>
+            
+            <!-- 错误信息 -->
+            <div id="timetable-error" class="hidden bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4"></div>
+            
+            <!-- 结果区域 -->
+            <div id="timetable-result" class="hidden">
+                <!-- 结果标题 -->
+                <div class="mb-6 p-4 bg-blue-50 rounded-lg">
+                    <h3 class="text-lg font-semibold mb-1" id="result-title"></h3>
+                    <p id="result-subtitle" class="text-gray-600"></p>
+                </div>
+                
+                <!-- 时刻表内容 -->
+                <div id="timetable-content" class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+                    <!-- 时刻表表格将动态生成 -->
+                </div>
+            </div>
+            
+            <!-- 无结果状态 -->
+            <div id="timetable-no-result" class="hidden text-center py-12">
+                <i class="fa fa-clock-o text-6xl text-gray-300 mb-4"></i>
+                <h3 class="text-xl font-semibold text-gray-600 mb-2">未找到时刻表</h3>
+                <p class="text-gray-500">请检查输入参数或尝试其他查询方式</p>
+            </div>
+            
+            <!-- 初始状态 -->
+            <div id="timetable-initial" class="text-center py-12">
+                <i class="fa fa-search text-6xl text-gray-300 mb-4"></i>
+                <h3 class="text-xl font-semibold text-gray-600 mb-2">请选择查询方式</h3>
+                <p class="text-gray-500">使用左侧表单按车站或列车查询时刻表</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // 搜索类型切换
+    document.getElementById('search-by-station').addEventListener('click', () => {
+        document.getElementById('search-by-station').className = 'px-4 py-2 text-blue-500 border-b-2 border-blue-500 font-medium';
+        document.getElementById('search-by-train').className = 'px-4 py-2 text-gray-500 hover:text-blue-500';
+        document.getElementById('station-timetable-form').classList.remove('hidden');
+        document.getElementById('train-timetable-form').classList.add('hidden');
+    });
+    
+    document.getElementById('search-by-train').addEventListener('click', () => {
+        document.getElementById('search-by-train').className = 'px-4 py-2 text-blue-500 border-b-2 border-blue-500 font-medium';
+        document.getElementById('search-by-station').className = 'px-4 py-2 text-gray-500 hover:text-blue-500';
+        document.getElementById('train-timetable-form').classList.remove('hidden');
+        document.getElementById('station-timetable-form').classList.add('hidden');
+    });
+    
+    // 车站模糊搜索
+    function setupStationSearch(inputId, suggestionsId) {
+        const input = document.getElementById(inputId);
+        const suggestions = document.getElementById(suggestionsId);
+        
+        input.addEventListener('input', async function() {
+            const query = this.value.trim();
+            if (query.length < 1) {
+                suggestions.classList.add('hidden');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/search_stations?q=${encodeURIComponent(query)}`);
+                const data = await response.json();
+                
+                suggestions.innerHTML = '';
+                if (data.length > 0) {
+                    data.forEach(station => {
+                        const div = document.createElement('div');
+                        div.className = 'px-4 py-2 hover:bg-gray-100 cursor-pointer';
+                        div.textContent = station;
+                        div.addEventListener('click', () => {
+                            input.value = station;
+                            suggestions.classList.add('hidden');
+                        });
+                        suggestions.appendChild(div);
+                    });
+                    suggestions.classList.remove('hidden');
+                } else {
+                    suggestions.classList.add('hidden');
+                }
+            } catch (error) {
+                console.error('搜索失败:', error);
+                suggestions.classList.add('hidden');
+            }
+        });
+        
+        // 点击外部关闭建议列表
+        document.addEventListener('click', (e) => {
+            if (!input.contains(e.target) && !suggestions.contains(e.target)) {
+                suggestions.classList.add('hidden');
+            }
+        });
+    }
+    
+    setupStationSearch('station-name', 'station-suggestions');
+    setupStationSearch('train-station', 'train-station-suggestions');
+    
+    // 车站时刻表查询
+    document.getElementById('station-timetable-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        await fetchTimetable('station');
+    });
+    
+    // 列车时刻表查询
+    document.getElementById('train-timetable-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        await fetchTimetable('train');
+    });
+    
+    // 获取时刻表
+    async function fetchTimetable(type) {
+        // 显示加载状态
+        document.getElementById('timetable-loading').classList.remove('hidden');
+        document.getElementById('timetable-error').classList.add('hidden');
+        document.getElementById('timetable-result').classList.add('hidden');
+        document.getElementById('timetable-no-result').classList.add('hidden');
+        document.getElementById('timetable-initial').classList.add('hidden');
+        
+        let formData, data;
+        
+        if (type === 'station') {
+            formData = new FormData(document.getElementById('station-timetable-form'));
+            data = {
+                type: 'station',
+                station: formData.get('station')
+            };
+        } else {
+            formData = new FormData(document.getElementById('train-timetable-form'));
+            data = {
+                type: 'train',
+                station: formData.get('station'),
+                train_id: parseInt(formData.get('train_id'))
+            };
+        }
+        
+        try {
+            const response = await fetch('/api/get_timetable', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(data)
+            });
+            
+            const resultData = await response.json();
+            
+            if (response.ok) {
+                if (resultData.timetable) {
+                    // 显示结果
+                    displayTimetable(resultData.timetable, type, data);
+                    document.getElementById('export-section').classList.remove('hidden');
+                } else {
+                    // 无结果
+                    document.getElementById('timetable-no-result').classList.remove('hidden');
+                    document.getElementById('export-section').classList.add('hidden');
+                }
+            } else {
+                // 显示错误
+                document.getElementById('timetable-error').textContent = resultData.error || '查询失败';
+                document.getElementById('timetable-error').classList.remove('hidden');
+                document.getElementById('export-section').classList.add('hidden');
+            }
+        } catch (err) {
+            // 显示错误
+            document.getElementById('timetable-error').textContent = '网络错误，请稍后重试';
+            document.getElementById('timetable-error').classList.remove('hidden');
+            document.getElementById('export-section').classList.add('hidden');
+            console.error('查询错误:', err);
+        } finally {
+            // 隐藏加载状态
+            document.getElementById('timetable-loading').classList.add('hidden');
+        }
+    }
+    
+    // 显示时刻表
+    function displayTimetable(timetable, type, data) {
+        document.getElementById('timetable-result').classList.remove('hidden');
+        
+        // 设置标题
+        if (type === 'station') {
+            document.getElementById('result-title').textContent = `${data.station} 站时刻表`;
+            document.getElementById('result-subtitle').textContent = `显示 ${data.station} 站的所有列车发车时间`;
+        } else {
+            document.getElementById('result-title').textContent = `列车 ${data.train_id} 时刻表`;
+            document.getElementById('result-subtitle').textContent = `显示列车 ${data.train_id} 在 ${data.station} 站的运行时刻表`;
+        }
+        
+        // 生成时刻表表格
+        const content = document.getElementById('timetable-content');
+        
+        // 简化示例，实际需要根据API返回的结果结构进行调整
+        content.innerHTML = `
+            <div class="p-4 bg-gray-50 border-b">
+                <h4 class="font-medium">时刻表内容</h4>
+                <pre class="mt-2 text-sm bg-white p-3 rounded border border-gray-200 overflow-x-auto">${timetable}</pre>
+            </div>
+        `;
+    }
+    
+    // 导出功能
+    document.getElementById('export-pdf').addEventListener('click', () => {
+        alert('PDF导出功能开发中');
+    });
+    
+    document.getElementById('export-csv').addEventListener('click', () => {
+        alert('CSV导出功能开发中');
+    });
+</script>
+{% endblock %}

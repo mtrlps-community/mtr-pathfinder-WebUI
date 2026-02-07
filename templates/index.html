@@ -1,0 +1,330 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <!-- 左侧：寻路表单 -->
+    <div class="lg:col-span-1">
+        <div class="card">
+            <h2 class="text-2xl font-bold mb-6">路径查找</h2>
+            
+            <form id="route-form">
+                <!-- 起点站 -->
+                <div class="mb-4">
+                    <label class="block text-gray-700 font-medium mb-2" for="start-station">
+                        <i class="fa fa-map-marker mr-1"></i> 起点站
+                    </label>
+                    <div class="relative">
+                        <input type="text" id="start-station" name="start" 
+                               class="form-input" placeholder="输入起点站名称" required>
+                        <div id="start-suggestions" class="absolute z-10 w-full bg-white border border-gray-300 rounded-md shadow-lg mt-1 hidden"></div>
+                    </div>
+                </div>
+                
+                <!-- 终点站 -->
+                <div class="mb-4">
+                    <label class="block text-gray-700 font-medium mb-2" for="end-station">
+                        <i class="fa fa-flag mr-1"></i> 终点站
+                    </label>
+                    <div class="relative">
+                        <input type="text" id="end-station" name="end" 
+                               class="form-input" placeholder="输入终点站名称" required>
+                        <div id="end-suggestions" class="absolute z-10 w-full bg-white border border-gray-300 rounded-md shadow-lg mt-1 hidden"></div>
+                    </div>
+                </div>
+                
+                <!-- 禁路线 -->
+                <div class="mb-4">
+                    <label class="block text-gray-700 font-medium mb-2" for="ignored-lines">
+                        <i class="fa fa-ban mr-1"></i> 禁路线（逗号分隔）
+                    </label>
+                    <input type="text" id="ignored-lines" name="ignored_lines" 
+                           class="form-input" placeholder="输入要禁止的路线，以逗号分隔">
+                </div>
+                
+                <!-- 禁车站 -->
+                <div class="mb-4">
+                    <label class="block text-gray-700 font-medium mb-2" for="avoid-stations">
+                        <i class="fa fa-ban mr-1"></i> 禁车站（逗号分隔）
+                    </label>
+                    <input type="text" id="avoid-stations" name="avoid_stations" 
+                           class="form-input" placeholder="输入要避开的车站，以逗号分隔">
+                </div>
+                
+                <!-- 寻路设置 -->
+                <div class="mb-6">
+                    <h3 class="text-lg font-semibold mb-3">寻路设置</h3>
+                    
+                    <div class="space-y-2">
+                        <label class="flex items-center">
+                            <input type="checkbox" id="disable-high-speed" name="disable_high_speed" class="form-checkbox">
+                            <span class="ml-2 text-gray-700">禁高铁</span>
+                        </label>
+                        
+                        <label class="flex items-center">
+                            <input type="checkbox" id="disable-boat" name="disable_boat" class="form-checkbox">
+                            <span class="ml-2 text-gray-700">禁船</span>
+                        </label>
+                        
+                        <label class="flex items-center">
+                            <input type="checkbox" id="enable-wild" name="enable_wild" class="form-checkbox">
+                            <span class="ml-2 text-gray-700">越野</span>
+                        </label>
+                        
+                        <label class="flex items-center">
+                            <input type="checkbox" id="only-lrt" name="only_lrt" class="form-checkbox">
+                            <span class="ml-2 text-gray-700">仅轻轨</span>
+                        </label>
+                    </div>
+                </div>
+                
+                <!-- 寻路算法选择 -->
+                <div class="mb-6">
+                    <h3 class="text-lg font-semibold mb-3">寻路算法</h3>
+                    
+                    <div class="slider-container">
+                        <input type="range" id="algorithm-slider" min="0" max="3" value="0" class="slider">
+                        <div class="flex justify-between mt-2 text-sm text-gray-600">
+                            <span>默认</span>
+                            <span>理论</span>
+                            <span>实时</span>
+                            <span>实时[v4]</span>
+                        </div>
+                        <div class="mt-2 text-center font-medium text-blue-500" id="algorithm-display">默认（考虑等车时间）</div>
+                        <input type="hidden" id="algorithm" name="algorithm" value="default">
+                    </div>
+                </div>
+                
+                <!-- 查找按钮 -->
+                <div class="flex space-x-3">
+                    <button type="submit" class="btn-primary flex-1">
+                        <i class="fa fa-search mr-2"></i> 查找路径
+                    </button>
+                    <button type="reset" class="btn-secondary">
+                        <i class="fa fa-refresh mr-2"></i> 重置
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- 右侧：结果展示 -->
+    <div class="lg:col-span-2">
+        <div class="card">
+            <h2 class="text-2xl font-bold mb-6">路径结果</h2>
+            
+            <!-- 加载状态 -->
+            <div id="loading" class="hidden text-center py-12">
+                <div class="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+                <p class="mt-4 text-gray-600">正在计算路径...</p>
+            </div>
+            
+            <!-- 错误信息 -->
+            <div id="error" class="hidden bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4"></div>
+            
+            <!-- 结果区域 -->
+            <div id="result" class="hidden">
+                <!-- 路径概览 -->
+                <div class="mb-6 p-4 bg-blue-50 rounded-lg">
+                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center">
+                        <div>
+                            <h3 class="text-lg font-semibold mb-1">路径概览</h3>
+                            <p id="route-overview" class="text-gray-600"></p>
+                        </div>
+                        <div class="mt-2 md:mt-0">
+                            <span class="inline-block px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
+                                总时长: <span id="total-duration"></span>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 详细路径 -->
+                <div id="route-details" class="space-y-4">
+                    <!-- 路径步骤将动态生成 -->
+                </div>
+                
+                <!-- 结果图像 -->
+                <div class="mt-6">
+                    <h3 class="text-lg font-semibold mb-3">路径图像</h3>
+                    <div id="route-image" class="border border-gray-300 rounded-lg p-4 bg-white">
+                        <p class="text-gray-500 text-center">路径图像将显示在这里</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 无结果状态 -->
+            <div id="no-result" class="hidden text-center py-12">
+                <i class="fa fa-route text-6xl text-gray-300 mb-4"></i>
+                <h3 class="text-xl font-semibold text-gray-600 mb-2">未找到路径</h3>
+                <p class="text-gray-500">请检查输入参数或尝试其他算法</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // 算法映射
+    const algorithmMap = [
+        { value: 'default', label: '默认（考虑等车时间）' },
+        { value: 'theory', label: '理论（不考虑等车时间）' },
+        { value: 'real', label: '实时' },
+        { value: 'real_v4', label: '实时[v4]（CSA算法）' }
+    ];
+    
+    // 算法滑块处理
+    const algorithmSlider = document.getElementById('algorithm-slider');
+    const algorithmDisplay = document.getElementById('algorithm-display');
+    const algorithmInput = document.getElementById('algorithm');
+    
+    algorithmSlider.addEventListener('input', function() {
+        const index = parseInt(this.value);
+        algorithmDisplay.textContent = algorithmMap[index].label;
+        algorithmInput.value = algorithmMap[index].value;
+    });
+    
+    // 车站模糊搜索
+    function setupStationSearch(inputId, suggestionsId) {
+        const input = document.getElementById(inputId);
+        const suggestions = document.getElementById(suggestionsId);
+        
+        input.addEventListener('input', async function() {
+            const query = this.value.trim();
+            if (query.length < 1) {
+                suggestions.classList.add('hidden');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/search_stations?q=${encodeURIComponent(query)}`);
+                const data = await response.json();
+                
+                suggestions.innerHTML = '';
+                if (data.length > 0) {
+                    data.forEach(station => {
+                        const div = document.createElement('div');
+                        div.className = 'px-4 py-2 hover:bg-gray-100 cursor-pointer';
+                        div.textContent = station;
+                        div.addEventListener('click', () => {
+                            input.value = station;
+                            suggestions.classList.add('hidden');
+                        });
+                        suggestions.appendChild(div);
+                    });
+                    suggestions.classList.remove('hidden');
+                } else {
+                    suggestions.classList.add('hidden');
+                }
+            } catch (error) {
+                console.error('搜索失败:', error);
+                suggestions.classList.add('hidden');
+            }
+        });
+        
+        // 点击外部关闭建议列表
+        document.addEventListener('click', (e) => {
+            if (!input.contains(e.target) && !suggestions.contains(e.target)) {
+                suggestions.classList.add('hidden');
+            }
+        });
+    }
+    
+    setupStationSearch('start-station', 'start-suggestions');
+    setupStationSearch('end-station', 'end-suggestions');
+    
+    // 表单提交处理
+    const routeForm = document.getElementById('route-form');
+    const loading = document.getElementById('loading');
+    const error = document.getElementById('error');
+    const result = document.getElementById('result');
+    const noResult = document.getElementById('no-result');
+    
+    routeForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        // 显示加载状态
+        loading.classList.remove('hidden');
+        error.classList.add('hidden');
+        result.classList.add('hidden');
+        noResult.classList.add('hidden');
+        
+        // 收集表单数据
+        const formData = new FormData(routeForm);
+        const data = {
+            start: formData.get('start'),
+            end: formData.get('end'),
+            ignored_lines: formData.get('ignored_lines').split(',').map(s => s.trim()).filter(Boolean),
+            avoid_stations: formData.get('avoid_stations').split(',').map(s => s.trim()).filter(Boolean),
+            disable_high_speed: formData.get('disable_high_speed') === 'on',
+            disable_boat: formData.get('disable_boat') === 'on',
+            enable_wild: formData.get('enable_wild') === 'on',
+            only_lrt: formData.get('only_lrt') === 'on',
+            algorithm: formData.get('algorithm')
+        };
+        
+        try {
+            // 发送请求
+            const response = await fetch('/api/find_route', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(data)
+            });
+            
+            const resultData = await response.json();
+            
+            if (response.ok) {
+                if (resultData.result) {
+                    // 显示结果
+                    displayResult(resultData.result);
+                } else {
+                    // 无结果
+                    noResult.classList.remove('hidden');
+                }
+            } else {
+                // 显示错误
+                error.textContent = resultData.error || '寻路失败';
+                error.classList.remove('hidden');
+            }
+        } catch (err) {
+            // 显示错误
+            error.textContent = '网络错误，请稍后重试';
+            error.classList.remove('hidden');
+            console.error('寻路错误:', err);
+        } finally {
+            // 隐藏加载状态
+            loading.classList.add('hidden');
+        }
+    });
+    
+    // 显示结果
+    function displayResult(routeResult) {
+        result.classList.remove('hidden');
+        
+        // 简化示例，实际需要根据API返回的结果结构进行调整
+        document.getElementById('route-overview').textContent = `从 ${routeResult[0]} 到 ${routeResult[1]} 的路径`;
+        document.getElementById('total-duration').textContent = `${routeResult[2]} 秒`;
+        
+        // 清空现有内容
+        const detailsContainer = document.getElementById('route-details');
+        detailsContainer.innerHTML = '';
+        
+        // 示例：添加路径步骤
+        const step = document.createElement('div');
+        step.className = 'bg-white border border-gray-200 rounded-lg p-4 shadow-sm';
+        step.innerHTML = `
+            <div class="flex items-center">
+                <div class="station-node">1</div>
+                <div class="route-line" style="background-color: #${routeResult[3]}"></div>
+                <div class="station-node">2</div>
+            </div>
+            <div class="mt-3 text-sm text-gray-600">
+                <p>${routeResult[4][0]}</p>
+            </div>
+        `;
+        detailsContainer.appendChild(step);
+    }
+</script>
+{% endblock %}
