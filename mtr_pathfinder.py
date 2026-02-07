@@ -335,12 +335,8 @@ def gen_route_interval(LOCAL_FILE_PATH, INTERVAL_PATH, LINK, MTR_VER) -> None:
             if len(stats) == 0:
                 continue
 
-            # For MTR_VER 4, data structure is different
-            route_found = False
-            for route_stats_id, route_stats in data['routes'].items():
-                if route_stats_id == route_id:
-                    route_name = route_stats['name']
-                    route_found = True
+            for route_stats in data[0]['routes']:
+                if route_stats['id'] == route_id:
                     break
             else:
                 print(f'Route {route_id} not found')
@@ -360,9 +356,8 @@ def gen_route_interval(LOCAL_FILE_PATH, INTERVAL_PATH, LINK, MTR_VER) -> None:
                 freq = dep_2 - dep_1
                 freq_list.append(freq)
 
-            if freq_list:
-                median_freq = median_low(freq_list)
-                freq_dict[route_name] = round_ten(median_freq)
+            median_freq = median_low(freq_list)
+            freq_dict[route_name] = round_ten(median_freq)
 
     else:
         return

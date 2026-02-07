@@ -162,27 +162,59 @@ def api_find_route():
     
     try:
         if algorithm in ['default', 'theory', 'real']:
-            # 使用mtr_pathfinder.py的NetworkX算法
-            G = create_graph(
-                station_data,
-                data.get('ignored_lines', []),
-                not data.get('disable_high_speed', False),
-                not data.get('disable_boat', False),
-                data.get('enable_wild', False),
-                data.get('only_lrt', False),
-                data.get('avoid_stations', []),
-                RouteType.WAITING if algorithm == 'default' else RouteType.IN_THEORY,
-                config['ORIGINAL_IGNORED_LINES'],
-                config['INTERVAL_PATH'],
-                '', '',
-                config['LOCAL_FILE_PATH'],
-                config['STATION_TABLE'],
-                config['WILD_ADDITION'],
-                config['TRANSFER_ADDITION'],
-                config['MAX_WILD_BLOCKS'],
-                config['MTR_VER'],
-                True
-            )
+            # 根据MTR_VER选择对应的寻路逻辑
+            if config['MTR_VER'] == 3:
+                # v3版本的寻路逻辑
+                G = create_graph(
+                    station_data,
+                    data.get('ignored_lines', []),
+                    not data.get('disable_high_speed', False),
+                    not data.get('disable_boat', False),
+                    data.get('enable_wild', False),
+                    data.get('only_lrt', False),
+                    data.get('avoid_stations', []),
+                    RouteType.WAITING if algorithm == 'default' else RouteType.IN_THEORY,
+                    config['ORIGINAL_IGNORED_LINES'],
+                    config['INTERVAL_PATH'],
+                    '', '',
+                    config['LOCAL_FILE_PATH'],
+                    config['STATION_TABLE'],
+                    config['WILD_ADDITION'],
+                    config['TRANSFER_ADDITION'],
+                    config['MAX_WILD_BLOCKS'],
+                    config['MTR_VER'],
+                    True
+                )
+            else:
+                # v4版本的寻路逻辑
+                # 确保station_data是正确的v4版本数据结构
+                if isinstance(station_data, list):
+                    # 如果已经是列表格式，提取第一个元素
+                    station_data_v4 = station_data[0]
+                else:
+                    # 否则直接使用
+                    station_data_v4 = station_data
+                
+                G = create_graph(
+                    station_data_v4,
+                    data.get('ignored_lines', []),
+                    not data.get('disable_high_speed', False),
+                    not data.get('disable_boat', False),
+                    data.get('enable_wild', False),
+                    data.get('only_lrt', False),
+                    data.get('avoid_stations', []),
+                    RouteType.WAITING if algorithm == 'default' else RouteType.IN_THEORY,
+                    config['ORIGINAL_IGNORED_LINES'],
+                    config['INTERVAL_PATH'],
+                    '', '',
+                    config['LOCAL_FILE_PATH'],
+                    config['STATION_TABLE'],
+                    config['WILD_ADDITION'],
+                    config['TRANSFER_ADDITION'],
+                    config['MAX_WILD_BLOCKS'],
+                    config['MTR_VER'],
+                    True
+                )
             
             result = find_shortest_route(
                 G, data['start'], data['end'],
@@ -190,7 +222,16 @@ def api_find_route():
                 config['MTR_VER']
             )
             
-            return jsonify({'result': result})
+            # 检查寻路结果
+            if all(item is None for item in result):
+                # 所有结果都是None，说明车站名称不正确
+                return jsonify({'error': '车站名称不正确，请检查输入'}), 400
+            elif result[0] is False:
+                # 找不到路线
+                return jsonify({'error': '找不到路线，请尝试调整选项'}), 400
+            else:
+                # 返回正常的寻路结果
+                return jsonify({'result': result})
         elif algorithm == 'real_v4':
             # 使用mtr_pathfinder_v4.py的CSA算法
             # 这里需要实现完整的CSA算法调用逻辑
@@ -198,7 +239,14 @@ def api_find_route():
         else:
             return jsonify({'error': '无效的算法选择'}), 400
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        import traceback
+        import logging
+        logging.basicConfig(level=logging.ERROR)
+        logger = logging.getLogger(__name__)
+        
+        error_detail = traceback.format_exc()
+        logger.error(f"寻路错误: {error_detail}")
+        return jsonify({'error': str(e), 'detail': error_detail}), 500
 
 @app.route('/api/search_stations', methods=['GET'])
 def api_search_stations():
