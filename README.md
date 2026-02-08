@@ -1,5 +1,5 @@
 ```bash
-$ pip3 install -U networkx requests flask opencc-python-reimplemented
+pip3 install -U networkx requests flask opencc-python-reimplemented
 ```
 
 | 配置项 | 环境变量 | 默认值 |
