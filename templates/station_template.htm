@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<!-- 模板来源：NAVITIME -->
+<title>{{station_name}} | {{route_name}} | {{direction_1}}方向 时刻表</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='station_base.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='station_index.css') }}">
+</head>
+<body>
+<header>
+<div class="body-2pain">
+<div class="body-2pain__container">
+<div id="body-left" class="body-2pain__container__left">
+<div class="title-header-area">
+<h1 class="main_title">
+<span>{{station_name}}站 ({{short_id}})&nbsp;{{route_name}}&nbsp;时刻表</span>
+</h1>
+</div>
+<div class="title-border"></div>
+<div class="station-frame">
+<div class="line-frame">
+<span class="other-line-link">
+<a href="../">返回选择其他路线</a>
+</span>
+</div>
+<h2 class="station-name">
+<ruby>
+<rb>{{station_name}}</rb>
+<rp>(</rp>
+<rt>{{eng_name}}</rt>
+<rp>)</rp>
+</ruby>
+</h2>
+<div style="border-color:#{{route_color}}" class="line-border"></div>
+<h3 class="line-name">
+{{route_name}}</h3>
+</div>
+<ul class="direction">
+<li class="active split" data-updown="0" data-color="#{{route_color}}" style="background-color:#{{route_color}}">
+<h4 class="text"><span>{{direction_1}}方向</span></h4>
+</li>
+<!-- <li class="split" data-updown="1" data-color="#{{route_color}}">
+<span class="text"><span>{{direction_2}}方向</span></span>
+</li> -->
+</ul>
+<div class="clear"></div>
+<div class="time-tables">
+<div id="weekday-0" class="time-table-frame">
+<div class="diagram-frame">
+{{template}}
+</div>
+<ul class="train-type-note">
+{{type_table}}
+</ul>
+<ul class="dest-note">
+{{last_sta_table}}
+</ul>
+</div>
+<input type="hidden" id="selected-day-of-week" value="weekday">
+<input type="hidden" id="selected-updown" value="0">
+</body></html>

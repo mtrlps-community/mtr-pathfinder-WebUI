@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<!-- 模板来源：NAVITIME -->
+<title>ＪＲ中央線快速(新宿05:33发  高尾（東京都）行)の停車駅/时刻表</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='train_base.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='train_list.css') }}">
+</head>
+<body>
+<div id="left_pane" class="left wide-page-mode">
+<div id="stoplist-matrix">
+<div class="head">
+<h2 class="head-txt">{{route_name}}</h2>
+<div class="head-txt-sub">{{time_now}}</div>
+</div>
+<ul class="stops-area">
+<li class="stops-list {{focus_1}}">
+<dl class="stops">
+<dt class="station-name">
+<a href="" class="station-name-link">{{origin}}</a>
+</dt>
+<dd class="time">{{depart_time}}发</dd>
+<dd class="diagram-link"><a href="/timetable/station/{{id_1}}">[时刻表]</a>
+</dd>
+</dl>
+</li>
+{{template}}
+<li class="stops-list {{focus_2}}">
+<dl class="stops">
+<dt class="station-name">
+<a href="" class="station-name-link">{{destination}}</a>
+</dt>
+<dd class="time">{{arrive_time}}到</dd>
+</dd>
+<dd class="diagram-link"><a href="/timetable/station/{{id_2}}">[时刻表]</a>
+</dd>
+</dl>
+</li>
+</ul>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</body></html>

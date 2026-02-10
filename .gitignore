@@ -1,0 +1,5 @@
+/__pycache__/
+/mtr_pathfinder_temp
+/*.json
+/*.dat
+/test_*.py

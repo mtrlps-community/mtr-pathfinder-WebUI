@@ -2,6 +2,7 @@ from flask import Flask, render_template, request, jsonify, session
 import os
 import json
 import hashlib
+import pickle
 from datetime import datetime
 
 # 从包装模块导入，避免opencc初始化错误
@@ -134,6 +135,159 @@ def routes():
 @app.route('/timetable')
 def timetable():
     return render_template('timetable.html')
+
+@app.route('/timetable/station/<station_short_id>', methods=['GET'])
+def station_directions(station_short_id=None):
+    """获取车站方向信息"""
+    if not station_short_id:
+        return jsonify({'error': '请输入车站短代码'})
+    
+    try:
+        station_short_id = int(station_short_id)
+    except ValueError:
+        return jsonify({'error': '车站短代码格式错误'})
+    
+    if not os.path.exists(config['LOCAL_FILE_PATH']):
+        return jsonify({'error': '车站数据不存在'}), 400
+    
+    with open(config['LOCAL_FILE_PATH'], encoding='utf-8') as f:
+        data_v4 = json.load(f)
+    
+    # 从样本代码中导入函数
+    from mtr_timetable import station_short_id_to_id, main_get_sta_directions
+    
+    sta_id = station_short_id_to_id(data_v4, station_short_id)
+    if sta_id is None:
+        return jsonify({'error': '车站短代码错误'})
+    
+    all_stations = data_v4['stations']
+    station_name = all_stations[sta_id]['name']
+    
+    # 使用样本目录中的模板文件
+    template_path = os.path.join('templates', 'directions_template.htm')
+    if not os.path.exists(template_path):
+        return jsonify({'error': '模板文件不存在'}), 500
+    
+    html = main_get_sta_directions(
+        config['LOCAL_FILE_PATH'],
+        station_name,
+        template_path
+    )
+    
+    if html is None or html is False:
+        return jsonify({'error': '未找到该车站信息'})
+    
+    return html[0]
+
+@app.route('/timetable/station/<station_short_id>/<direction>', methods=['GET'])
+def station_timetable(station_short_id=None, direction=None):
+    """获取车站时刻表"""
+    if not station_short_id or not direction:
+        return jsonify({'error': '请输入车站短代码和方向'})
+    
+    try:
+        station_short_id = int(station_short_id)
+        direction = int(direction)
+    except ValueError:
+        return jsonify({'error': '车站短代码或方向格式错误'})
+    
+    if not os.path.exists(config['LOCAL_FILE_PATH']):
+        return jsonify({'error': '车站数据不存在'}), 400
+    
+    with open(config['LOCAL_FILE_PATH'], encoding='utf-8') as f:
+        data_v4 = json.load(f)
+    
+    # 从样本代码中导入函数
+    from mtr_timetable import station_short_id_to_id, main_get_sta_directions, main_sta_timetable
+    
+    sta_id = station_short_id_to_id(data_v4, station_short_id)
+    if sta_id is None:
+        return jsonify({'error': '车站短代码错误'})
+    
+    all_stations = data_v4['stations']
+    station_name = all_stations[sta_id]['name']
+    
+    # 使用样本目录中的模板文件
+    directions_template = os.path.join('templates', 'directions_template.htm')
+    station_template = os.path.join('templates', 'station_template.htm')
+    
+    if not os.path.exists(directions_template) or not os.path.exists(station_template):
+        return jsonify({'error': '模板文件不存在'}), 500
+    
+    # 获取车站方向信息
+    directions_html = main_get_sta_directions(
+        config['LOCAL_FILE_PATH'],
+        station_name,
+        directions_template
+    )
+    
+    if directions_html is None:
+        return jsonify({'error': '未找到该车站方向信息'})
+    
+    try:
+        route_names = directions_html[2][direction]
+    except (Exception, KeyError):
+        return jsonify({'error': '路线编号错误'})
+    
+    # 获取车站时刻表
+    html = main_sta_timetable(
+        config['LOCAL_FILE_PATH'],
+        config['LOCAL_FILE_PATH'],
+        station_template,
+        '',
+        station_name, route_names
+    )
+    
+    if html is None or html is False:
+        return jsonify({'error': '未找到该车站时刻表信息'})
+    
+    return html[0]
+
+@app.route('/timetable/train/<station_short_id>/<train_id>', methods=['GET'])
+def train_timetable(station_short_id=None, train_id=None):
+    """获取列车时刻表"""
+    if not station_short_id or not train_id:
+        return jsonify({'error': '请输入车站短代码和列车ID'})
+    
+    try:
+        station_short_id = int(station_short_id)
+        train_id = int(train_id)
+    except ValueError:
+        return jsonify({'error': '车站短代码或列车ID格式错误'})
+    
+    if not os.path.exists(config['LOCAL_FILE_PATH']):
+        return jsonify({'error': '车站数据不存在'}), 400
+    
+    with open(config['LOCAL_FILE_PATH'], encoding='utf-8') as f:
+        data_v4 = json.load(f)
+    
+    # 从样本代码中导入函数
+    from mtr_timetable import station_short_id_to_id, main_train
+    
+    sta_id = station_short_id_to_id(data_v4, station_short_id)
+    if sta_id is None:
+        return jsonify({'error': '车站短代码错误'})
+    
+    all_stations = data_v4['stations']
+    station_name = all_stations[sta_id]['name']
+    
+    # 使用样本目录中的模板文件
+    timetable_template = os.path.join('templates', 'timetable_template.htm')
+    
+    if not os.path.exists(timetable_template):
+        return jsonify({'error': '模板文件不存在'}), 500
+    
+    # 获取列车时刻表
+    html = main_train(
+        config['LOCAL_FILE_PATH'], '', '',
+        timetable_template,
+        station_name, train_id
+    )
+    
+    if html is None or html is False:
+        return jsonify({'error': '未找到该列车信息'})
+    
+    return html[0]
 
 @app.route('/admin')
 def admin():
@@ -321,6 +475,121 @@ def api_update_config():
     save_config(config)
     return jsonify({'success': True})
 
+def gen_departure_data(data, DEP_PATH, IGNORED_LINES,  # 路线全名
+                       filename1='station_timetable_data.dat',
+                       filename2='train_timetable_data.dat'):
+    with open(DEP_PATH, 'r', encoding='utf-8') as f:
+        dep_data: dict[str, list[int]] = json.load(f)
+
+    station_route_dep: dict[str, dict[str, list[int]]] = {}
+    all_route_dep: dict[str, dict[str, list[int]]] = {}
+    trains: dict[str, list] = {}
+    station_train_id = {}
+    for route_id, departures in dep_data.items():
+        if route_id not in data['routes']:
+            continue
+
+        route = data['routes'][route_id]
+        n: str = route['name']
+        if n in IGNORED_LINES:
+            continue
+
+        try:
+            eng_name = n.split('|')[1].split('|')[0]
+            if eng_name == '':
+                eng_name = n.split('|')[0]
+        except IndexError:
+            eng_name = n.split('|')[0]
+
+        durations = route['durations']
+        if durations == []:
+            continue
+
+        if route_id not in trains:
+            trains[route_id] = []
+
+        station_ids = [data['stations'][x['id']]['station']
+                       for x in route['stations']]
+        if len(station_ids) - 1 < len(durations):
+            durations = durations[:len(station_ids) - 1]
+
+        if len(station_ids) - 1 > len(durations):
+            continue
+
+        departures_new = []
+        for x in departures:
+            if x < 0:
+                x += 86400
+            elif x >= 86400:
+                x -= 86400
+            departures_new.append(x)
+
+        real_ids = [x['id'] for x in route['stations']]
+        dwells = [x['dwellTime'] for x in route['stations']]
+        if len(dwells) > 0:
+            dep = -round(dwells[-1] / 1000)
+        else:
+            dep = 0
+
+        timetable = []
+        for i in range(len(station_ids) - 1, 0, -1):
+            station1 = station_ids[i - 1]
+            station2 = station_ids[i]
+            _station1 = real_ids[i - 1]
+            _station2 = real_ids[i]
+            dur = round(durations[i - 1] / 1000)
+            arr_time = dep
+            dep_time = dep - dur
+            dwell = round(dwells[i - 1] / 1000)
+            dep -= dur
+            dep -= dwell
+            if station1 == station2:
+                continue
+
+            timetable.insert(0, arr_time)
+            timetable.insert(0, dep_time)
+
+            if _station1 not in station_train_id:
+                station_train_id[_station1] = 1
+
+            if _station1 not in station_route_dep:
+                station_route_dep[_station1] = {}
+
+            if eng_name not in station_route_dep[_station1]:
+                station_route_dep[_station1][eng_name] = []
+
+            if _station1 not in all_route_dep:
+                all_route_dep[_station1] = {}
+
+            for i, x in enumerate(departures_new):
+                new_dep = (dep_time + x + 8 * 60 * 60) % 86400
+                train_id = station_train_id[_station1]
+                station_route_dep[_station1][eng_name].append(
+                    (route_id, new_dep, (i, train_id)))
+                all_route_dep[_station1][train_id] = \
+                    (route_id, i, new_dep)
+                station_train_id[_station1] += 1
+
+            station_route_dep[_station1][eng_name].sort()
+
+        if timetable == []:
+            continue
+
+        for x in departures_new:
+            new_timetable = [y + x + 8 * 60 * 60 for y in timetable]
+            trains[route_id].append(new_timetable)
+
+    if filename1 is not None:
+        with open(filename1, 'wb') as f:
+            pickle.dump(all_route_dep, f)
+
+    if filename2 is not None:
+        with open(filename2, 'wb') as f:
+            pickle.dump(trains, f)
+
+    return station_route_dep, trains, all_route_dep
+
+
 @app.route('/api/update_data', methods=['POST'])
 def api_update_data():
     # 更新数据
@@ -371,6 +640,28 @@ def api_update_data():
             # 恢复原始stdin
             sys.stdin = original_stdin
         
+        # 生成时刻表所需的.dat文件
+        try:
+            # 读取车站数据
+            with open(config['LOCAL_FILE_PATH'], 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            
+            # 确保数据格式正确
+            if isinstance(data, list) and len(data) > 0:
+                data = data[0]
+            
+            # 调用生成.dat文件的函数
+            gen_departure_data(
+                data,
+                config['DEP_PATH'],
+                config['ORIGINAL_IGNORED_LINES'],
+                'station_timetable_data.dat',
+                'train_timetable_data.dat'
+            )
+        except Exception as e:
+            # 如果生成.dat文件失败，记录错误但不影响主流程
+            print(f"生成.dat文件失败: {str(e)}")
+        
         return jsonify({'success': True})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -387,13 +678,37 @@ def api_get_timetable():
         station_data = json.load(f)
     
     try:
+        # 统一处理所有版本的数据格式
+        # 确保station_data是字典格式，与get_text_timetable和get_train函数兼容
+        if isinstance(station_data, list) and len(station_data) > 0:
+            # 如果是列表格式，提取第一个元素
+            station_data = station_data[0]
+        elif not isinstance(station_data, dict):
+            # 其他情况，返回错误
+            return jsonify({'error': '无效的数据格式'}), 400
+        
+        # 加载时刻表数据文件
+        station_tt = {}
+        train_tt = {}
+        
+        try:
+            if os.path.exists('station_timetable_data.dat'):
+                with open('station_timetable_data.dat', 'rb') as f:
+                    station_tt = pickle.load(f)
+            
+            if os.path.exists('train_timetable_data.dat'):
+                with open('train_timetable_data.dat', 'rb') as f:
+                    train_tt = pickle.load(f)
+        except Exception as e:
+            print(f"加载.dat文件失败: {str(e)}")
+        
         if data['type'] == 'station':
             # 按车站获取时刻表
             timetable = get_text_timetable(
                 station_data,
                 data['station'],
                 int(datetime.now().timestamp()),
-                {}  # 这里需要传入station_tt参数
+                station_tt  # 传入加载的station_tt数据
             )
             return jsonify({'timetable': timetable})
         elif data['type'] == 'train':
@@ -402,13 +717,15 @@ def api_get_timetable():
                 station_data,
                 data['station'],
                 data['train_id'],
-                {},  # station_tt
-                {}   # train_tt
+                station_tt,  # 传入加载的station_tt数据
+                train_tt     # 传入加载的train_tt数据
             )
             return jsonify({'timetable': timetable})
         else:
             return jsonify({'error': '无效的时刻表类型'}), 400
     except Exception as e:
+        import traceback
+        print(f"获取时刻表错误: {traceback.format_exc()}")
         return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':

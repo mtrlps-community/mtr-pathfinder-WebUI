@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<!-- 模板来源：NAVITIME -->
+<title>{{station}} 时刻表 路线一览</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='direction_base.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='direction_header.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='direction_routelist.css') }}">
+<body>
+<div class="main_frame t_left wide-page-mode">
+<div class="body_container center">
+<div id="left_pane" class="left wide-page-mode">
+<ul class="crumb">
+</ul>
+<div class="clear"></div>
+<h1 class="main_title">{{station}}
+时刻表 路线一览</h1>
+<dl class="line-list border-list">
+</dl>
+
+{{template}}
+
+</div>
+</body></html>
