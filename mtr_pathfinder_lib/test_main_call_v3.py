@@ -1,15 +1,15 @@
-from mtr_pathfinder_v4 import main
+from mtr_pathfinder import main
 import hashlib
 
 # 出发、到达车站
-station1 = 'Spawn'
-station2 = 'Sundogs'
+station1 = ""
+station2 = ""
 
 # 地图设置
+# MTR模组版本（3/4），默认值为3
+MTR_VER: int = 4
 # 在线线路图网址，结尾删除"/"
-LINK: str = "https://letsplay.minecrafttransitrailway.com/system-map"
-# 旅途的最长时间，默认值为3
-MAX_HOUR: int = 3
+LINK: str = 'https://letsplay.minecrafttransitrailway.com/system-map'
 # 从A站到B站，非出站换乘（越野）的最远步行距离，默认值为1500
 MAX_WILD_BLOCKS: int = 1500
 # 手动增加出站换乘
@@ -24,17 +24,17 @@ STATION_TABLE: dict[str, str] = {}
 # 禁止乘坐的路线（未开通的路线）
 ORIGINAL_IGNORED_LINES: list = []
 
-# 文件设置
 link_hash = hashlib.md5(LINK.encode('utf-8')).hexdigest()
-LOCAL_FILE_PATH = f'mtr-station-data-{link_hash}.json'
-DEP_PATH = f'mtr-route-data-{link_hash}.json'
+# 文件设置
+LOCAL_FILE_PATH = f'mtr-station-data-{link_hash}-mtr{MTR_VER}-v3.json'
+INTERVAL_PATH = f'mtr-route-interval-data-{link_hash}-mtr{MTR_VER}-v3.json'
 BASE_PATH = 'mtr_pathfinder_data'
 PNG_PATH = 'mtr_pathfinder_data'
 
 # 是否更新车站数据
 UPDATE_DATA: bool = False
 # 是否更新路线数据
-GEN_DEPARTURE: bool = False
+GEN_ROUTE_INTERVAL: bool = False
 
 # 寻路设置
 # 避开的路线
@@ -49,10 +49,10 @@ CALCULATE_BOAT: bool = True
 CALCULATE_WALKING_WILD: bool = False
 # 仅允许轻轨，默认值为False
 ONLY_LRT: bool = False
-# 出发时间（秒，0-86400），默认值为None，即当前时间后10秒
-DEP_TIME = None
+# 计算理论最快路线，不考虑等车时间，默认值为False
+IN_THEORY: bool = False
 
-# 输出的图片中是否显示详细信息（每站的到站、出发时间）
+# 输出的图片中是否显示详细信息，默认值为False
 DETAIL: bool = False
 
-main(station1, station2, LINK, LOCAL_FILE_PATH, DEP_PATH, BASE_PATH, PNG_PATH, MAX_WILD_BLOCKS, TRANSFER_ADDITION, WILD_ADDITION, STATION_TABLE, ORIGINAL_IGNORED_LINES, UPDATE_DATA, GEN_DEPARTURE, IGNORED_LINES, AVOID_STATIONS, CALCULATE_HIGH_SPEED, CALCULATE_BOAT, CALCULATE_WALKING_WILD, ONLY_LRT, DETAIL, MAX_HOUR, show=True, departure_time=DEP_TIME)
+main(station1, station2, LINK, LOCAL_FILE_PATH, INTERVAL_PATH, BASE_PATH, PNG_PATH, MAX_WILD_BLOCKS, TRANSFER_ADDITION, WILD_ADDITION, STATION_TABLE, ORIGINAL_IGNORED_LINES, UPDATE_DATA, GEN_ROUTE_INTERVAL, IGNORED_LINES, AVOID_STATIONS, CALCULATE_HIGH_SPEED, CALCULATE_BOAT, CALCULATE_WALKING_WILD, ONLY_LRT, IN_THEORY, DETAIL, MTR_VER, show=True)
