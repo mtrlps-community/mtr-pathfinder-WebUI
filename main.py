@@ -3,15 +3,19 @@ import os
 import json
 import hashlib
 from datetime import datetime
-from opencc import OpenCC
 
 from mtr_pathfinder_lib.mtr_pathfinder import (
     fetch_data as fetch_data_v3,
     gen_route_interval as gen_route_interval_v3,
-    RouteType,
+    create_graph as create_graph_v3,
+    find_shortest_route as find_shortest_route_v3,
+    RouteType as RouteTypeV3,
 )
 
-#from mtr_pathfinder_lib.mtr_pathfinder_v4 import ()
+from mtr_pathfinder_lib.mtr_pathfinder_v4 import (
+    main as mtr_main_v4,
+    gen_departure as gen_departure_v4
+)
 
 app = Flask(__name__)
 app.secret_key = 'your-secret-key'
@@ -33,10 +37,17 @@ default_config = {
 
 # 加载配置
 def load_config():
+    # 先加载默认配置
+    config = default_config.copy()
+    
+    # 如果配置文件存在，使用配置文件的内容更新默认配置
     if os.path.exists(CONFIG_PATH):
         with open(CONFIG_PATH, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    return default_config.copy()
+            config_file = json.load(f)
+            # 使用配置文件的内容更新默认配置，确保所有默认字段都存在
+            config.update(config_file)
+    
+    return config
 
 # 保存配置
 def save_config(config):
@@ -50,9 +61,16 @@ config = load_config()
 def update_file_paths():
     if config['LINK']:
         link_hash = hashlib.md5(config['LINK'].encode('utf-8')).hexdigest()
-        config['LOCAL_FILE_PATH'] = f'mtr-station-data-{link_hash}-mtr{config["MTR_VER"]}-v3.json'
-        config['DEP_PATH'] = f'mtr-departure-data-{link_hash}-mtr{config["MTR_VER"]}-v3.json'
-        config['INTERVAL_PATH'] = f'mtr-route-interval-data-{link_hash}-mtr{config["MTR_VER"]}-v3.json'
+        # 为v3和v4版本分别生成不同的文件路径
+        config['LOCAL_FILE_PATH_V3'] = f'mtr-station-data-{link_hash}-mtr{config["MTR_VER"]}-v3.json'
+        config['LOCAL_FILE_PATH_V4'] = f'mtr-station-data-{link_hash}-mtr4-v4.json'
+        config['DEP_PATH_V3'] = f'mtr-departure-data-{link_hash}-mtr{config["MTR_VER"]}-v3.json'
+        config['DEP_PATH_V4'] = f'mtr-route-departure-data-{link_hash}-mtr4-v4.json'
+        config['INTERVAL_PATH_V3'] = f'mtr-route-interval-data-{link_hash}-mtr{config["MTR_VER"]}-v3.json'
+        # 兼容现有代码，保持旧的键名
+        config['LOCAL_FILE_PATH'] = config['LOCAL_FILE_PATH_V3']
+        config['DEP_PATH'] = config['DEP_PATH_V3']
+        config['INTERVAL_PATH'] = config['INTERVAL_PATH_V3']
     save_config(config)
 
 update_file_paths()
@@ -67,8 +85,10 @@ def index():
 def stations():
     # 读取车站数据
     stations_data = []
-    if os.path.exists(config['LOCAL_FILE_PATH']):
-        with open(config['LOCAL_FILE_PATH'], 'r', encoding='utf-8') as f:
+    # 优先使用v3版本的数据文件，因为它包含更多信息
+    data_file_path = config['LOCAL_FILE_PATH_V3']
+    if os.path.exists(data_file_path):
+        with open(data_file_path, 'r', encoding='utf-8') as f:
             data = json.load(f)
             # 统一处理，无论MTR_VER版本，都使用列表格式
             if isinstance(data, list) and len(data) > 0:
@@ -88,8 +108,10 @@ def stations():
 def routes():
     # 读取线路数据
     routes_data = []
-    if os.path.exists(config['LOCAL_FILE_PATH']):
-        with open(config['LOCAL_FILE_PATH'], 'r', encoding='utf-8') as f:
+    # 优先使用v3版本的数据文件，因为它包含更多信息
+    data_file_path = config['LOCAL_FILE_PATH_V3']
+    if os.path.exists(data_file_path):
+        with open(data_file_path, 'r', encoding='utf-8') as f:
             data = json.load(f)
             # 统一处理，无论MTR_VER版本，都使用列表格式
             if isinstance(data, list) and len(data) > 0:
@@ -115,26 +137,32 @@ def routes():
 def admin():
     # 获取文件版本信息
     station_version = ""
-    route_version = ""
+    station_version_v4 = ""
+    route_version_v4 = ""
     interval_version = ""
     
-    if os.path.exists(config['LOCAL_FILE_PATH']):
+    if os.path.exists(config['LOCAL_FILE_PATH_V3']):
         station_version = datetime.fromtimestamp(
-            os.path.getmtime(config['LOCAL_FILE_PATH'])
+            os.path.getmtime(config['LOCAL_FILE_PATH_V3'])
         ).strftime('%Y%m%d-%H%M')
-    if os.path.exists(config['DEP_PATH']):
-        route_version = datetime.fromtimestamp(
-            os.path.getmtime(config['DEP_PATH'])
+    if os.path.exists(config['LOCAL_FILE_PATH_V4']):
+        station_version_v4 = datetime.fromtimestamp(
+            os.path.getmtime(config['LOCAL_FILE_PATH_V4'])
         ).strftime('%Y%m%d-%H%M')
-    if os.path.exists(config['INTERVAL_PATH']):
+    if os.path.exists(config['DEP_PATH_V4']):
+        route_version_v4 = datetime.fromtimestamp(
+            os.path.getmtime(config['DEP_PATH_V4'])
+        ).strftime('%Y%m%d-%H%M')
+    if os.path.exists(config['INTERVAL_PATH_V3']):
         interval_version = datetime.fromtimestamp(
-            os.path.getmtime(config['INTERVAL_PATH'])
+            os.path.getmtime(config['INTERVAL_PATH_V3'])
         ).strftime('%Y%m%d-%H%M')
     
     return render_template('admin.html', 
                            config=config, 
                            station_version=station_version,
-                           route_version=route_version,
+                           station_version_v4=station_version_v4,
+                           route_version_v4=route_version_v4,
                            interval_version=interval_version)
 
 @app.route('/api/find_route', methods=['POST'])
@@ -146,46 +174,132 @@ def api_find_route():
     if not all(key in data for key in ['start', 'end']):
         return jsonify({'error': '缺少必要参数'}), 400
     
-    # 读取车站数据
-    if not os.path.exists(config['LOCAL_FILE_PATH']):
-        return jsonify({'error': '车站数据不存在，请先更新数据'}), 400
-    
-    with open(config['LOCAL_FILE_PATH'], 'r', encoding='utf-8') as f:
-        station_data = json.load(f)
-    
-    # 选择寻路算法
+    # 准备参数
     algorithm = data.get('algorithm', 'default')
     
+    # 检查数据文件是否存在
+    if algorithm == 'real':
+        # 对于实时寻路，检查v4版本的数据文件
+        if not os.path.exists(config['LOCAL_FILE_PATH_V4']):
+            return jsonify({'error': '车站数据不存在，请先更新数据'}), 400
+        if not os.path.exists(config['DEP_PATH_V4']):
+            return jsonify({'error': '发车数据不存在，请先更新数据'}), 400
+    else:
+        # 对于默认/理论寻路，检查v3版本的数据文件
+        if not os.path.exists(config['LOCAL_FILE_PATH_V3']):
+            return jsonify({'error': '车站数据不存在，请先更新数据'}), 400
+        if not os.path.exists(config['INTERVAL_PATH_V3']):
+            return jsonify({'error': '间隔数据不存在，请先更新数据'}), 400
+    
     try:
-        if algorithm in ['default', 'theory', 'real']:
-            # 统一处理所有版本的数据格式
-            # 确保station_data是列表格式，与源程序兼容
-            if isinstance(station_data, dict):
-                # 如果是字典格式，包装成列表格式
-                fixed_data = [{
-                    'stations': station_data['stations'],
-                    'routes': list(station_data['routes'].values())
-                }]
-                station_data = fixed_data
-            elif not isinstance(station_data, list):
-                # 其他情况，返回错误
-                return jsonify({'error': '无效的数据格式'}), 400
+        # 根据算法选择不同的寻路实现
+        if algorithm == 'real':
+            # 使用v4版程序的寻路功能
             
-            # 根据MTR_VER选择对应的寻路逻辑
-            G = create_graph(
-                station_data,
-                data.get('ignored_lines', []),
+            # 调用v4版程序的main函数，获取路线详情
+            result = mtr_main_v4(
+                station1=data['start'],
+                station2=data['end'],
+                LINK=config['LINK'],
+                LOCAL_FILE_PATH=config['LOCAL_FILE_PATH_V4'],
+                DEP_PATH=config['DEP_PATH_V4'],
+                BASE_PATH=BASE_PATH,
+                PNG_PATH=PNG_PATH,
+                MAX_WILD_BLOCKS=config['MAX_WILD_BLOCKS'],
+                TRANSFER_ADDITION=config['TRANSFER_ADDITION'],
+                WILD_ADDITION=config['WILD_ADDITION'],
+                STATION_TABLE=config['STATION_TABLE'],
+                ORIGINAL_IGNORED_LINES=config['ORIGINAL_IGNORED_LINES'],
+                UPDATE_DATA=False,
+                GEN_DEPARTURE=False,
+                IGNORED_LINES=data.get('ignored_lines', []),
+                AVOID_STATIONS=data.get('avoid_stations', []),
+                CALCULATE_HIGH_SPEED=not data.get('disable_high_speed', False),
+                CALCULATE_BOAT=not data.get('disable_boat', False),
+                CALCULATE_WALKING_WILD=data.get('enable_wild', False),
+                ONLY_LRT=data.get('only_lrt', False),
+                DETAIL=False,
+                MAX_HOUR=config['MAX_HOUR'],
+                gen_image=False,
+                show=False
+            )
+            
+            # 检查寻路结果
+            if result == []:
+                # 找不到路线
+                return jsonify({'error': '找不到路线，请尝试调整选项'}), 400
+            elif result is False:
+                # 找不到路线
+                return jsonify({'error': '找不到路线，请尝试调整选项'}), 400
+            elif result is None:
+                # 车站名称不正确
+                return jsonify({'error': '车站名称不正确，请检查输入'}), 400
+            
+            # 处理v4版程序的返回结果
+            # v4版返回的是路线详情列表，需要转换为前端期望的格式
+            
+            # 构建车站列表
+            station_names = []
+            for leg in result:
+                if len(leg) >= 2:
+                    # leg格式：(起点站, 终点站, 颜色, 路线名, 终点站信息, 发车时间, 到站时间, 交通类型)
+                    start_station, end_station = leg[0], leg[1]
+                    route_name = leg[3]
+                    
+                    if not station_names:
+                        station_names.append(start_station)
+                    station_names.append(route_name)
+                    station_names.append(end_station)
+            
+            # 计算总用时、乘车时间和等车时间
+            # v4版返回的是实际的发车和到站时间，需要计算差值
+            if result:
+                total_time = result[-1][6] - result[0][5]  # 总用时 = 最后一站到站时间 - 第一站发车时间
+                riding_time = sum(leg[6] - leg[5] for leg in result)  # 乘车时间 = 各段乘车时间之和
+                waiting_time = total_time - riding_time  # 等车时间 = 总用时 - 乘车时间
+            else:
+                total_time = 0
+                riding_time = 0
+                waiting_time = 0
+            
+            # 构建符合前端期望的结果数组
+            formatted_result = [
+                total_time,  # 总用时 (元素0)
+                station_names,  # 车站列表 (元素1)
+                result,  # 路线详情 (元素2)
+                riding_time,  # 乘车时间 (元素3)
+                waiting_time  # 等车时间 (元素4)
+            ]
+        else:
+            # 使用v3版程序的寻路功能
+            
+            # 读取数据文件
+            with open(config['LOCAL_FILE_PATH'], encoding='utf-8') as f:
+                data_file = json.load(f)
+            
+            IN_THEORY = algorithm == 'theory'
+            
+            # 合并忽略线路
+            ignored_lines = data.get('ignored_lines', []) + config['ORIGINAL_IGNORED_LINES']
+            
+            # 转换车站表格式
+            station_table = {x.lower(): y.lower() for x, y in config['STATION_TABLE'].items()}
+            
+            # 创建图
+            G = create_graph_v3(
+                data_file,
+                ignored_lines,
                 not data.get('disable_high_speed', False),
                 not data.get('disable_boat', False),
                 data.get('enable_wild', False),
                 data.get('only_lrt', False),
                 data.get('avoid_stations', []),
-                RouteType.WAITING if algorithm == 'default' else RouteType.IN_THEORY,
+                RouteTypeV3.IN_THEORY if IN_THEORY else RouteTypeV3.WAITING,
                 config['ORIGINAL_IGNORED_LINES'],
                 config['INTERVAL_PATH'],
                 '', '',
                 config['LOCAL_FILE_PATH'],
-                config['STATION_TABLE'],
+                station_table,
                 config['WILD_ADDITION'],
                 config['TRANSFER_ADDITION'],
                 config['MAX_WILD_BLOCKS'],
@@ -193,27 +307,23 @@ def api_find_route():
                 True
             )
             
-            result = find_shortest_route(
+            # 调用寻路函数获取完整结果
+            result = find_shortest_route_v3(
                 G, data['start'], data['end'],
-                station_data, config['STATION_TABLE'],
+                data_file, station_table,
                 config['MTR_VER']
             )
             
             # 检查寻路结果
+            station_str, shortest_distance, waiting_time, riding_time, every_route_time = result
+            
             if all(item is None for item in result):
                 # 所有结果都是None，说明车站名称不正确
                 return jsonify({'error': '车站名称不正确，请检查输入'}), 400
-            elif result[0] is False:
+            elif station_str is False:
                 # 找不到路线
                 return jsonify({'error': '找不到路线，请尝试调整选项'}), 400
             else:
-                # 修复结果格式，使其与前端期望的格式匹配
-                # 前端期望的格式：[0: ?, 1: ?, 2: ?, 3: 总用时, 4: 车站列表, 5: ?, 6: 路线详情, 7: 乘车时间, 8: 等车时间]
-                
-                # 解析原始结果
-                # result = (station_str, shortest_distance, waiting_time, riding_time, every_route_time)
-                station_str, shortest_distance, waiting_time, riding_time, every_route_time = result
-                
                 # 将车站字符串转换为车站列表
                 # 原始格式："车站1 -> 路线1 -> 车站2 -> 路线2 -> 车站3"
                 # 需要转换为：["车站1", "路线1", "车站2", "路线2", "车站3"]
@@ -221,25 +331,15 @@ def api_find_route():
                 
                 # 构建符合前端期望的结果数组
                 formatted_result = [
-                    None,  # 占位符0
-                    None,  # 占位符1
-                    None,  # 占位符2
-                    shortest_distance,  # 总用时 (元素3)
-                    station_names,  # 车站列表 (元素4)
-                    None,  # 占位符5
-                    every_route_time,  # 路线详情 (元素6)
-                    riding_time,  # 乘车时间 (元素7)
-                    waiting_time  # 等车时间 (元素8)
+                    shortest_distance,  # 总用时 (元素0)
+                    station_names,  # 车站列表 (元素1)
+                    every_route_time,  # 路线详情 (元素2)
+                    riding_time,  # 乘车时间 (元素3)
+                    waiting_time  # 等车时间 (元素4)
                 ]
-                
-                # 返回调整后的结果
-                return jsonify({'result': formatted_result})
-        elif algorithm == 'real_v4':
-            # 使用mtr_pathfinder_v4.py的CSA算法
-            # 这里需要实现完整的CSA算法调用逻辑
-            return jsonify({'error': '实时[v4]算法暂未实现'}), 500
-        else:
-            return jsonify({'error': '无效的算法选择'}), 400
+        
+        # 返回调整后的结果
+        return jsonify({'result': formatted_result})
     except Exception as e:
         import traceback
         import logging
@@ -255,10 +355,12 @@ def api_search_stations():
     # 车站模糊搜索
     query = request.args.get('q', '').lower()
     
-    if not os.path.exists(config['LOCAL_FILE_PATH']):
+    # 优先使用v3版本的数据文件，因为它包含更多信息
+    data_file_path = config['LOCAL_FILE_PATH_V3']
+    if not os.path.exists(data_file_path):
         return jsonify([])
     
-    with open(config['LOCAL_FILE_PATH'], 'r', encoding='utf-8') as f:
+    with open(data_file_path, 'r', encoding='utf-8') as f:
         data = json.load(f)
     
     stations = []
@@ -312,33 +414,40 @@ def api_update_data():
         # 保存原始stdin
         original_stdin = sys.stdin
         # 创建模拟输入流，自动返回'y'
-        mock_stdin = StringIO('y\n' * 10)  # 提供足够的'y'响应
+        mock_stdin = StringIO('y\n' * 20)  # 提供足够的'y'响应
         sys.stdin = mock_stdin
         
         try:
-            # 对于所有版本，统一使用mtr_pathfinder.py中的fetch_data函数
-            # 这确保生成的数据格式与源程序完全相同
+            # 1. 生成v3版程序所需的数据
+            # 调用v3版的fetch_data函数
             fetch_data_v3(
                 config['LINK'],
-                config['LOCAL_FILE_PATH'],
+                config['LOCAL_FILE_PATH_V3'],
                 config['MTR_VER']
             )
             
-            # 生成间隔数据文件，使用源程序的函数
+            # 生成v3版的间隔数据文件
             gen_route_interval_v3(
-                config['LOCAL_FILE_PATH'],
-                config['INTERVAL_PATH'],
+                config['LOCAL_FILE_PATH_V3'],
+                config['INTERVAL_PATH_V3'],
                 config['LINK'],
                 config['MTR_VER']
             )
             
-            # 生成发车数据
-            if config['MTR_VER'] == 4:
-                from mtr_pathfinder_lib.mtr_pathfinder_v4 import gen_departure as original_gen_departure
-                original_gen_departure(
-                    config['LINK'],
-                    config['DEP_PATH']
-                )
+            # 2. 生成v4版程序所需的数据
+            # 调用v4版的fetch_data函数
+            from mtr_pathfinder_lib.mtr_pathfinder_v4 import fetch_data as fetch_data_v4
+            fetch_data_v4(
+                config['LINK'],
+                config['LOCAL_FILE_PATH_V4'],
+                config['MAX_WILD_BLOCKS']
+            )
+            
+            # 生成v4版的发车数据
+            gen_departure_v4(
+                config['LINK'],
+                config['DEP_PATH_V4']
+            )
         finally:
             # 恢复原始stdin
             sys.stdin = original_stdin

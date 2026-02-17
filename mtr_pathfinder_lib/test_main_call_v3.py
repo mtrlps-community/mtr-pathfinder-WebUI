@@ -2,8 +2,8 @@ from mtr_pathfinder import main
 import hashlib
 
 # 出发、到达车站
-station1 = ""
-station2 = ""
+station1 = "Spawn"
+station2 = "Sundogs"
 
 # 地图设置
 # MTR模组版本（3/4），默认值为3
@@ -42,7 +42,7 @@ IGNORED_LINES: list = []
 # 避开的车站
 AVOID_STATIONS: list = []
 # 允许高铁，默认值为True
-CALCULATE_HIGH_SPEED: bool = True
+CALCULATE_HIGH_SPEED: bool = False
 # 允许船，默认值为True
 CALCULATE_BOAT: bool = True
 # 允许非出站换乘（越野），默认值为False
@@ -53,6 +53,6 @@ ONLY_LRT: bool = False
 IN_THEORY: bool = False
 
 # 输出的图片中是否显示详细信息，默认值为False
-DETAIL: bool = False
+DETAIL: bool = True
 
 main(station1, station2, LINK, LOCAL_FILE_PATH, INTERVAL_PATH, BASE_PATH, PNG_PATH, MAX_WILD_BLOCKS, TRANSFER_ADDITION, WILD_ADDITION, STATION_TABLE, ORIGINAL_IGNORED_LINES, UPDATE_DATA, GEN_ROUTE_INTERVAL, IGNORED_LINES, AVOID_STATIONS, CALCULATE_HIGH_SPEED, CALCULATE_BOAT, CALCULATE_WALKING_WILD, ONLY_LRT, IN_THEORY, DETAIL, MTR_VER, show=True)

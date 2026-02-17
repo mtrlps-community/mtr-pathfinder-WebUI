@@ -3,7 +3,7 @@ import hashlib
 
 # 地图设置
 # 在线线路图网址，结尾删除"/"
-LINK: str = ''
+LINK: str = 'https://letsplay.minecrafttransitrailway.com/system-map'
 # 从A站到B站，非出站换乘（越野）的最远步行距离，默认值为1500
 MAX_WILD_BLOCKS: int = 1500
 

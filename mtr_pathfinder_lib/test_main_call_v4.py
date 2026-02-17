@@ -2,12 +2,12 @@ from mtr_pathfinder_v4 import main
 import hashlib
 
 # 出发、到达车站
-station1 = ''
-station2 = ''
+station1 = "Spawn"
+station2 = "Sundogs"
 
 # 地图设置
 # 在线线路图网址，结尾删除"/"
-LINK: str = ""
+LINK: str = "https://letsplay.minecrafttransitrailway.com/system-map"
 # 旅途的最长时间，默认值为3
 MAX_HOUR: int = 3
 # 从A站到B站，非出站换乘（越野）的最远步行距离，默认值为1500
@@ -42,7 +42,7 @@ IGNORED_LINES: list = []
 # 避开的车站
 AVOID_STATIONS: list = []
 # 允许高铁，默认值为True
-CALCULATE_HIGH_SPEED: bool = True
+CALCULATE_HIGH_SPEED: bool = False
 # 允许船，默认值为True
 CALCULATE_BOAT: bool = True
 # 允许非出站换乘（越野），默认值为False
@@ -53,6 +53,6 @@ ONLY_LRT: bool = False
 DEP_TIME = None
 
 # 输出的图片中是否显示详细信息（每站的到站、出发时间）
-DETAIL: bool = False
+DETAIL: bool = True
 
 main(station1, station2, LINK, LOCAL_FILE_PATH, DEP_PATH, BASE_PATH, PNG_PATH, MAX_WILD_BLOCKS, TRANSFER_ADDITION, WILD_ADDITION, STATION_TABLE, ORIGINAL_IGNORED_LINES, UPDATE_DATA, GEN_DEPARTURE, IGNORED_LINES, AVOID_STATIONS, CALCULATE_HIGH_SPEED, CALCULATE_BOAT, CALCULATE_WALKING_WILD, ONLY_LRT, DETAIL, MAX_HOUR, show=True, departure_time=DEP_TIME)

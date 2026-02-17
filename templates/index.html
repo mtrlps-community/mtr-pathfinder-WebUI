@@ -133,7 +133,6 @@
                             <div class="algorithm-tab active" data-index="0" data-value="default">默认</div>
                             <div class="algorithm-tab" data-index="1" data-value="theory">理论</div>
                             <div class="algorithm-tab" data-index="2" data-value="real">实时</div>
-                            <div class="algorithm-tab" data-index="3" data-value="real_v4">实时[v4]</div>
                         </div>
                         <div class="mt-2 text-center font-medium text-blue-500" id="algorithm-display">默认（考虑等车时间）</div>
                         <input type="hidden" id="algorithm" name="algorithm" value="default">
@@ -200,8 +199,7 @@
     const algorithmMap = [
         { value: 'default', label: '默认（考虑等车时间）' },
         { value: 'theory', label: '理论（不考虑等车时间）' },
-        { value: 'real', label: '实时' },
-        { value: 'real_v4', label: '实时[v4]（CSA算法）' }
+        { value: 'real', label: '实时' }
     ];
     
     // 简码功能
@@ -596,15 +594,15 @@
         result.classList.remove('hidden');
         
         // 解析routeresult数组，添加默认值处理
-        const totalTime = routeResult[3] || 0; // 总用时 (元素3, 秒)
-        const travelingTime = routeResult[7] || 0; // 乘车时间 (元素7, 秒)
-        const waitingTime = routeResult[8] || 0; // 等车时间 (元素8, 秒)
+        const totalTime = routeResult[0] || 0; // 总用时 (元素0, 秒)
+        const travelingTime = routeResult[3] || 0; // 乘车时间 (元素3, 秒)
+        const waitingTime = routeResult[4] || 0; // 等车时间 (元素4, 秒)
         
         // 确保stationNames是数组
-        const stationNames = Array.isArray(routeResult[4]) ? routeResult[4] : [];
+        const stationNames = Array.isArray(routeResult[1]) ? routeResult[1] : [];
         
         // 确保routeDetails是数组，避免TypeError
-        const routeDetails = Array.isArray(routeResult[6]) ? routeResult[6] : [];
+        const routeDetails = Array.isArray(routeResult[2]) ? routeResult[2] : [];
         
         // 清空现有内容
         const detailsContainer = document.getElementById('route-details');
@@ -642,6 +640,19 @@
             return;
         }
         
+        // 计算非步行路线数量
+        let nonWalkRoutesCount = 0;
+        for (const detail of routeDetails) {
+            if (Array.isArray(detail)) {
+                const trainType = detail[7] || 'train_normal';
+                const routeName = detail[3] || '';
+                const isWalk = trainType === 'walk' || routeName.toLowerCase().includes('walk') || routeName.includes('步行');
+                if (!isWalk) {
+                    nonWalkRoutesCount++;
+                }
+            }
+        }
+        
         // 辅助函数：标准化车站名称，用于匹配比较
         function normalizeStationName(name) {
             if (typeof name === 'string') {
@@ -677,10 +688,10 @@
                         const timeText = timeValue.textContent;
                         const seconds = parseTimeString(timeText);
                         
-                        // 判断是乘车时间还是发车间隔
+                        // 判断是乘车时间还是等车时间
                         if (detail.textContent.includes('乘车时间') || detail.textContent.includes('步行时间')) {
                             totalTravelingTime += seconds;
-                        } else if (detail.textContent.includes('发车间隔')) {
+                        } else if (detail.textContent.includes('等车时间')) {
                             totalWaitingTime += seconds;
                         }
                     }
@@ -713,12 +724,13 @@
         }
         
         // 函数：构建路线信息
-        function buildRouteInfo(routeDetail, matchedRouteDetails) {
+        function buildRouteInfo(routeDetail, matchedRouteDetails, totalWaitingTime, nonWalkRoutesCount) {
             const routeInfoDiv = document.createElement('div');
             routeInfoDiv.className = 'route-info';
             
             // 解析路线详细信息，添加默认值
-            const [, , color = '#4a90e2', routeName = '', terminus = '', duration = 0, interval = 0, trainType = 'train_normal'] = routeDetail;
+            // 路线详情数组结构：[起点, 终点, 颜色, 路线名, 终点站信息, 时长, 等车时间, 发车间隔, 交通类型]
+            const [, , color = '#4a90e2', routeName = '', terminus = '', duration = 0, segmentWaitingTime = 0, departureInterval = 0, trainType = 'train_normal'] = routeDetail;
             
             // 处理路线名称，只保留中文和英文，去除方向和分隔符
             // 原始格式："地鐵南大陸綫北段|Metro South Continental Line N. Section||to New Red Leaves"
@@ -825,11 +837,19 @@
             durationDiv.innerHTML = `<span>${timeLabel}</span><span class="time-value">${formatTime(duration)}</span>`;
             routeInfoDiv.appendChild(durationDiv);
             
-            // 只有非步行路线才显示发车间隔
+            // 显示等车时间
             if (!isWalk) {
+                const waitingDiv = document.createElement('div');
+                waitingDiv.className = 'time-detail';
+                // 使用路线详情中的等车时间（index 6）
+                waitingDiv.innerHTML = `<span>⏳ 等车时间</span><span class="time-value">${formatTime(segmentWaitingTime)}</span>`;
+                routeInfoDiv.appendChild(waitingDiv);
+                
+                // 显示发车间隔
                 const intervalDiv = document.createElement('div');
                 intervalDiv.className = 'time-detail';
-                intervalDiv.innerHTML = `<span>⏳ 发车间隔</span><span class="time-value">${formatTime(interval)}</span>`;
+                // 使用路线详情中的发车间隔（index 7）
+                intervalDiv.innerHTML = `<span>⏳ 发车间隔</span><span class="time-value">${formatTime(departureInterval)}</span>`;
                 routeInfoDiv.appendChild(intervalDiv);
             }
             
@@ -892,7 +912,7 @@
                     // 添加点击事件
                     otherRouteTag.addEventListener('click', function() {
                         // 重新构建路线信息
-                        const newRouteInfo = buildRouteInfo(otherRoute, matchedRouteDetails);
+                        const newRouteInfo = buildRouteInfo(otherRoute, matchedRouteDetails, totalWaitingTime, nonWalkRoutesCount);
                         // 替换当前路线信息
                         routeInfoDiv.parentNode.replaceChild(newRouteInfo, routeInfoDiv);
                         // 更新总用时
@@ -951,7 +971,7 @@
             if (matchedRouteDetails.length > 0) {
                 // 显示第一种路线的详细信息
                 const currentRouteDetail = matchedRouteDetails[0];
-                const routeInfoDiv = buildRouteInfo(currentRouteDetail, matchedRouteDetails);
+                const routeInfoDiv = buildRouteInfo(currentRouteDetail, matchedRouteDetails, waitingTime, nonWalkRoutesCount);
                 routeStep.appendChild(routeInfoDiv);
             } else {
                 // 如果没有详细信息，显示基本路线信息
@@ -1000,6 +1020,28 @@
                     directionIndicator.className = 'direction-indicator';
                     directionIndicator.textContent = `前往 ${nextStation}`;
                     routeInfoDiv.appendChild(directionIndicator);
+                }
+                
+                // 显示乘车时长或步行时间
+                const durationDiv = document.createElement('div');
+                durationDiv.className = 'time-detail';
+                const timeLabel = isWalk ? '🕐 步行时间' : '🕐 乘车时间';
+                durationDiv.innerHTML = `<span>${timeLabel}</span><span class="time-value">00:00</span>`;
+                routeInfoDiv.appendChild(durationDiv);
+                
+                // 显示等车时间
+                if (!isWalk) {
+                    const waitingDiv = document.createElement('div');
+                    waitingDiv.className = 'time-detail';
+                    const segmentWaitingTime = nonWalkRoutesCount > 0 ? waitingTime / nonWalkRoutesCount : 0;
+                    waitingDiv.innerHTML = `<span>⏳ 等车时间</span><span class="time-value">${formatTime(segmentWaitingTime)}</span>`;
+                    routeInfoDiv.appendChild(waitingDiv);
+                    
+                    // 显示发车间隔
+                    const intervalDiv = document.createElement('div');
+                    intervalDiv.className = 'time-detail';
+                    intervalDiv.innerHTML = `<span>⏳ 发车间隔</span><span class="time-value">00:00</span>`;
+                    routeInfoDiv.appendChild(intervalDiv);
                 }
                 
                 routeStep.appendChild(routeInfoDiv);

@@ -56,9 +56,6 @@
                     <button id="update-data" class="btn-primary">
                         <i class="fa fa-refresh mr-2"></i> 更新数据
                     </button>
-                    <button id="update-departure" class="btn-secondary">
-                        <i class="fa fa-clock-o mr-2"></i> 更新发车数据
-                    </button>
                 </div>
             </div>
             
@@ -94,40 +91,28 @@
                     </div>
                 </div>
                 
-                <!-- 数据文件 -->
-                <div class="p-3 bg-gray-50 rounded-lg">
-                    <h3 class="font-medium text-gray-700 mb-3">数据文件</h3>
-                    <div class="space-y-2">
-                        <div class="flex justify-between">
-                            <span class="text-sm text-gray-600">车站数据文件</span>
-                            <span class="text-sm font-medium">{{ config['LOCAL_FILE_PATH'] }}</span>
-                        </div>
-                        <div class="flex justify-between">
-                            <span class="text-sm text-gray-600">线路数据文件</span>
-                            <span class="text-sm font-medium">{{ config['DEP_PATH'] }}</span>
-                        </div>
-                        <div class="flex justify-between">
-                            <span class="text-sm text-gray-600">区间数据文件</span>
-                            <span class="text-sm font-medium">{{ config['INTERVAL_PATH'] }}</span>
-                        </div>
-                    </div>
-                </div>
-                
                 <!-- 数据版本 -->
                 <div class="p-3 bg-gray-50 rounded-lg">
                     <h3 class="font-medium text-gray-700 mb-3">数据版本</h3>
                     <div class="space-y-2">
+                        <h4 class="text-sm font-medium text-gray-700 mt-3 mb-2">V3 版本</h4>
                         <div class="flex justify-between">
                             <span class="text-sm text-gray-600">车站数据版本</span>
                             <span class="text-sm font-medium" id="station-version">{{ station_version or '未生成' }}</span>
                         </div>
                         <div class="flex justify-between">
-                            <span class="text-sm text-gray-600">线路数据版本</span>
-                            <span class="text-sm font-medium" id="route-version">{{ route_version or '未生成' }}</span>
+                            <span class="text-sm text-gray-600">发车数据版本</span>
+                            <span class="text-sm font-medium" id="interval-version">{{ interval_version or '未生成' }}</span>
+                        </div>
+                        
+                        <h4 class="text-sm font-medium text-gray-700 mt-3 mb-2">V4 版本</h4>
+                        <div class="flex justify-between">
+                            <span class="text-sm text-gray-600">车站数据版本</span>
+                            <span class="text-sm font-medium" id="station-version-v4">{{ station_version_v4 or '未生成' }}</span>
                         </div>
                         <div class="flex justify-between">
                             <span class="text-sm text-gray-600">发车数据版本</span>
-                            <span class="text-sm font-medium" id="interval-version">{{ interval_version or '未生成' }}</span>
+                            <span class="text-sm font-medium" id="route-version-v4">{{ route_version_v4 or '未生成' }}</span>
                         </div>
                     </div>
                 </div>
@@ -251,23 +236,6 @@
         }
     });
     
-    // 更新发车数据
-    document.getElementById('update-departure').addEventListener('click', async () => {
-        const btn = document.getElementById('update-departure');
-        const originalText = btn.innerHTML;
-        btn.innerHTML = '<i class="fa fa-spinner fa-spin mr-2"></i> 更新中...';
-        btn.disabled = true;
-        
-        try {
-            // 这里可以添加单独更新发车数据的逻辑
-            showStatus('发车数据更新功能开发中');
-        } catch (error) {
-            showStatus('更新失败，请稍后重试', false);
-            console.error('更新发车数据错误:', error);
-        } finally {
-            btn.innerHTML = originalText;
-            btn.disabled = false;
-        }
-    });
+
 </script>
 {% endblock %}
