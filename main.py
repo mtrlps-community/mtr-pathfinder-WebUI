@@ -338,8 +338,8 @@ def api_find_route():
                     waiting_time  # 等车时间 (元素4)
                 ]
         
-        # 返回调整后的结果
-        return jsonify({'result': formatted_result})
+        # 返回调整后的结果，包含寻路模式
+        return jsonify({'result': formatted_result, 'algorithm': algorithm})
     except Exception as e:
         import traceback
         import logging

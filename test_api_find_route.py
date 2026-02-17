@@ -10,7 +10,7 @@ params = {
     'end': 'Sundogs',
     
     # 寻路参数
-    'algorithm': 'default',  # default, theory, real
+    'algorithm': 'real',  # default, theory, real
     'ignored_lines': [],
     'avoid_stations': [],
     'disable_high_speed': True,

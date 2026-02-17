@@ -567,8 +567,8 @@
             
             if (response.ok) {
                 if (resultData.result) {
-                    // 显示结果
-                    displayResult(resultData.result);
+                    // 显示结果，传递寻路模式
+                    displayResult(resultData.result, resultData.algorithm);
                 } else {
                     // 无结果
                     noResult.classList.remove('hidden');
@@ -589,8 +589,16 @@
         }
     });
     
+    // 格式化时间戳为HH:MM:SS格式
+    function formatTimestamp(timestamp) {
+        if (typeof timestamp !== 'number') return '';
+        
+        const date = new Date(timestamp * 1000);
+        return date.toISOString().substring(11, 19);
+    }
+    
     // 显示结果
-    function displayResult(routeResult) {
+    function displayResult(routeResult, algorithm) {
         result.classList.remove('hidden');
         
         // 解析routeresult数组，添加默认值处理
@@ -612,23 +620,44 @@
         const timeInfoDiv = document.createElement('div');
         timeInfoDiv.className = 'time-info';
         timeInfoDiv.id = 'time-info';
-        timeInfoDiv.innerHTML = `
-            <h3>路线概览</h3>
+        
+        // 构建时间网格内容，理论模式下只显示总用时
+        let timeGridContent = `
             <div class="time-grid">
-                <div class="time-item">
-                    <strong id="total-time">${formatTime(totalTime)}</strong>
-                    <span>总用时</span>
+                <div class="time-item total-time">
+                    <div class="time-icon">⏱️</div>
+                    <div class="time-content">
+                        <strong id="total-time">${formatTime(totalTime)}</strong>
+                        <span>总用时</span>
+                    </div>
                 </div>
-                <div class="time-item">
-                    <strong id="traveling-time">${formatTime(travelingTime)}</strong>
-                    <span>乘车时间</span>
+        `;
+        
+        // 非理论模式下显示乘车时间和等车时间
+        if (algorithm !== 'theory') {
+            timeGridContent += `
+                <div class="time-item traveling-time">
+                    <div class="time-icon">🚂</div>
+                    <div class="time-content">
+                        <strong id="traveling-time">${formatTime(travelingTime)}</strong>
+                        <span>乘车时间</span>
+                    </div>
                 </div>
-                <div class="time-item">
-                    <strong id="waiting-time">${formatTime(waitingTime)}</strong>
-                    <span>等车时间</span>
+                <div class="time-item waiting-time">
+                    <div class="time-icon">⏳</div>
+                    <div class="time-content">
+                        <strong id="waiting-time">${formatTime(waitingTime)}</strong>
+                        <span>等车时间</span>
+                    </div>
                 </div>
+            `;
+        }
+        
+        timeGridContent += `
             </div>
         `;
+        
+        timeInfoDiv.innerHTML = timeGridContent;
         detailsContainer.appendChild(timeInfoDiv);
         
         // 2. 处理路线步骤，确保stationNames有足够元素
@@ -724,7 +753,7 @@
         }
         
         // 函数：构建路线信息
-        function buildRouteInfo(routeDetail, matchedRouteDetails, totalWaitingTime, nonWalkRoutesCount) {
+        function buildRouteInfo(routeDetail, matchedRouteDetails, totalWaitingTime, nonWalkRoutesCount, algorithm, lineRidingTime = null, lineWaitingTime = null) {
             const routeInfoDiv = document.createElement('div');
             routeInfoDiv.className = 'route-info';
             
@@ -834,23 +863,23 @@
             const durationDiv = document.createElement('div');
             durationDiv.className = 'time-detail';
             const timeLabel = isWalk ? '🕐 步行时间' : '🕐 乘车时间';
-            durationDiv.innerHTML = `<span>${timeLabel}</span><span class="time-value">${formatTime(duration)}</span>`;
+            // 实时模式使用计算的乘车时间，否则使用原始duration
+            const displayRidingTime = algorithm === 'real' && lineRidingTime !== null ? lineRidingTime : duration;
+            durationDiv.innerHTML = `<span>${timeLabel}</span><span class="time-value">${formatTime(displayRidingTime)}</span>`;
             routeInfoDiv.appendChild(durationDiv);
             
-            // 显示等车时间
-            if (!isWalk) {
+            // 只有非步行路线且不是理论模式且不是实时模式才显示等车时间
+            // 实时模式下的等车时间已经显示在出站时间上方
+            if (!isWalk && algorithm !== 'theory' && algorithm !== 'real') {
+                // 显示等车时间
                 const waitingDiv = document.createElement('div');
                 waitingDiv.className = 'time-detail';
-                // 使用路线详情中的等车时间（index 6）
+                // 非实时模式使用路线详情中的等车时间
                 waitingDiv.innerHTML = `<span>⏳ 等车时间</span><span class="time-value">${formatTime(segmentWaitingTime)}</span>`;
                 routeInfoDiv.appendChild(waitingDiv);
                 
-                // 显示发车间隔
-                const intervalDiv = document.createElement('div');
-                intervalDiv.className = 'time-detail';
-                // 使用路线详情中的发车间隔（index 7）
-                intervalDiv.innerHTML = `<span>⏳ 发车间隔</span><span class="time-value">${formatTime(departureInterval)}</span>`;
-                routeInfoDiv.appendChild(intervalDiv);
+                // 移除发车间隔显示
+                // 不再显示发车间隔
             }
             
             // 如果有其他匹配的路线，显示"或"选项
@@ -870,7 +899,8 @@
                     }
                     
                     const otherRoute = matchedRouteDetails[j];
-                    const [, , otherColor = '#4a90e2', otherRouteName = '', , otherDuration = 0, otherInterval = 0, otherTrainType = 'train_normal'] = otherRoute;
+                    // 正确的数组解构：[起点, 终点, 颜色, 路线名, 终点站信息, 时长, 等车时间, 发车间隔, 交通类型]
+                    const [, , otherColor = '#4a90e2', otherRouteName = '', , otherDuration = 0, , , otherTrainType = 'train_normal'] = otherRoute;
                     
                     // 处理其他路线名称
                     let processedOtherRouteName = otherRouteName;
@@ -912,7 +942,7 @@
                     // 添加点击事件
                     otherRouteTag.addEventListener('click', function() {
                         // 重新构建路线信息
-                        const newRouteInfo = buildRouteInfo(otherRoute, matchedRouteDetails, totalWaitingTime, nonWalkRoutesCount);
+                        const newRouteInfo = buildRouteInfo(otherRoute, matchedRouteDetails, totalWaitingTime, nonWalkRoutesCount, algorithm);
                         // 替换当前路线信息
                         routeInfoDiv.parentNode.replaceChild(newRouteInfo, routeInfoDiv);
                         // 更新总用时
@@ -927,6 +957,16 @@
             }
             
             return routeInfoDiv;
+        }
+        
+        // 3. 添加出发时间戳（仅实时模式）
+        if (algorithm === 'real') {
+            const departureTimeDiv = document.createElement('div');
+            departureTimeDiv.className = 'time-stamp departure-time';
+            // 使用第一条路线的发车时间作为总出发时间
+            const departureTime = routeDetails.length > 0 ? routeDetails[0][5] : 0;
+            departureTimeDiv.textContent = `出发时间: ${formatTimestamp(departureTime)}`;
+            detailsContainer.appendChild(departureTimeDiv);
         }
         
         for (let i = 0; i < stationNames.length - 1; i += 2) {
@@ -971,8 +1011,54 @@
             if (matchedRouteDetails.length > 0) {
                 // 显示第一种路线的详细信息
                 const currentRouteDetail = matchedRouteDetails[0];
-                const routeInfoDiv = buildRouteInfo(currentRouteDetail, matchedRouteDetails, waitingTime, nonWalkRoutesCount);
-                routeStep.appendChild(routeInfoDiv);
+                
+                // 仅实时模式显示时间信息
+                if (algorithm === 'real') {
+                    const departureTime = currentRouteDetail[5] || 0;
+                    const arrivalTime = currentRouteDetail[6] || 0;
+                    
+                    // 计算本线路的乘车时间
+                    const lineRidingTime = arrivalTime - departureTime;
+                    
+                    // 计算等车时间（本线路出站时间 - 上一线路到站时间）
+                    let lineWaitingTime = 0;
+                    if (i > 0 && i < stationNames.length - 1) {
+                        // 找到上一条路线的到站时间
+                        const prevRouteIndex = Math.floor((i - 2) / 2);
+                        if (prevRouteIndex >= 0 && routeDetails[prevRouteIndex]) {
+                            const prevArrivalTime = routeDetails[prevRouteIndex][6] || 0;
+                            lineWaitingTime = departureTime - prevArrivalTime;
+                        }
+                    }
+                    
+                    // 显示等车时间（如果不是第一条路线）
+                    if (i > 0 && i < stationNames.length - 1 && lineWaitingTime > 0) {
+                        const waitingTimeDiv = document.createElement('div');
+                        waitingTimeDiv.className = 'time-stamp route-waiting-time';
+                        waitingTimeDiv.textContent = `等车时间：${formatTime(lineWaitingTime)}`;
+                        routeStep.appendChild(waitingTimeDiv);
+                    }
+                    
+                    // 显示线路前的发车时间
+                    const departureTimeDiv = document.createElement('div');
+                    departureTimeDiv.className = 'time-stamp route-departure-time';
+                    departureTimeDiv.textContent = `出站时间：${formatTimestamp(departureTime)}`;
+                    routeStep.appendChild(departureTimeDiv);
+                    
+                    // 传递计算的时间到buildRouteInfo函数
+                    const routeInfoDiv = buildRouteInfo(currentRouteDetail, matchedRouteDetails, waitingTime, nonWalkRoutesCount, algorithm, lineRidingTime, lineWaitingTime);
+                    routeStep.appendChild(routeInfoDiv);
+                    
+                    // 显示线路后的到站时间
+                    const arrivalTimeDiv = document.createElement('div');
+                    arrivalTimeDiv.className = 'time-stamp route-arrival-time';
+                    arrivalTimeDiv.textContent = `到站时间：${formatTimestamp(arrivalTime)}`;
+                    routeStep.appendChild(arrivalTimeDiv);
+                } else {
+                    // 非实时模式，使用原来的时间计算
+                    const routeInfoDiv = buildRouteInfo(currentRouteDetail, matchedRouteDetails, waitingTime, nonWalkRoutesCount, algorithm);
+                    routeStep.appendChild(routeInfoDiv);
+                }
             } else {
                 // 如果没有详细信息，显示基本路线信息
                 const routeInfoDiv = document.createElement('div');
@@ -1029,8 +1115,9 @@
                 durationDiv.innerHTML = `<span>${timeLabel}</span><span class="time-value">00:00</span>`;
                 routeInfoDiv.appendChild(durationDiv);
                 
-                // 显示等车时间
-                if (!isWalk) {
+                // 只有非步行路线且不是理论模式才显示等车时间和发车间隔
+                if (!isWalk && algorithm !== 'theory') {
+                    // 显示等车时间
                     const waitingDiv = document.createElement('div');
                     waitingDiv.className = 'time-detail';
                     const segmentWaitingTime = nonWalkRoutesCount > 0 ? waitingTime / nonWalkRoutesCount : 0;
@@ -1064,6 +1151,16 @@
         
         endStationStep.appendChild(endStationDiv);
         detailsContainer.appendChild(endStationStep);
+        
+        // 4. 添加到达时间戳（仅实时模式）
+        if (algorithm === 'real') {
+            const arrivalTimeDiv = document.createElement('div');
+            arrivalTimeDiv.className = 'time-stamp arrival-time';
+            // 使用最后一条路线的到站时间作为总到达时间
+            const arrivalTime = routeDetails.length > 0 ? routeDetails[routeDetails.length - 1][6] : 0;
+            arrivalTimeDiv.textContent = `到达时间: ${formatTimestamp(arrivalTime)}`;
+            detailsContainer.appendChild(arrivalTimeDiv);
+        }
     }
     
     // 格式化时间函数 (秒转 h:mm:ss 或 mm:ss)

@@ -132,39 +132,82 @@
         }
         /* 时间信息 */
         .time-info {
-            background: linear-gradient(135deg, #e3f2fd, #bbdefb);
-            padding: 10px 12px;
-            border-radius: 6px;
-            margin-bottom: 8px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            padding: 0 0 12px 0;
+            margin-bottom: 12px;
         }
         
         .time-info h3 {
-            margin-bottom: 6px;
-            color: #4a90e2;
-            font-size: 0.95rem;
+            margin-bottom: 12px;
+            color: #374151;
+            font-size: 1rem;
+            font-weight: 600;
         }
         
         .time-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
-            gap: 8px;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 16px;
         }
         
         .time-item {
-            text-align: center;
+            display: flex;
+            align-items: center;
+            background: white;
+            padding: 12px 16px;
+            border-radius: 6px;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
         }
         
-        .time-item strong {
+        .time-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+        
+        .time-item.total-time {
+            border-left: 4px solid #3b82f6;
+        }
+        
+        .time-item.traveling-time {
+            border-left: 4px solid #10b981;
+        }
+        
+        .time-item.waiting-time {
+            border-left: 4px solid #f59e0b;
+        }
+        
+        .time-icon {
+            font-size: 1.5rem;
+            margin-right: 12px;
+        }
+        
+        .time-content {
+            flex: 1;
+        }
+        
+        .time-content strong {
             display: block;
-            font-size: 1.2rem;
-            color: #4a90e2;
-            margin-bottom: 1px;
+            font-size: 1.3rem;
+            font-weight: 700;
+            margin-bottom: 2px;
         }
         
-        .time-item span {
+        .time-item.total-time .time-content strong {
+            color: #3b82f6;
+        }
+        
+        .time-item.traveling-time .time-content strong {
+            color: #10b981;
+        }
+        
+        .time-item.waiting-time .time-content strong {
+            color: #f59e0b;
+        }
+        
+        .time-content span {
             color: #6c757d;
-            font-size: 0.75rem;
+            font-size: 0.85rem;
+            font-weight: 500;
         }
         
         /* 路线步骤 */
@@ -331,6 +374,45 @@
         
         .other-route-name {
             margin-left: 3px;
+        }
+        
+        /* 时间戳样式 */
+        .time-stamp {
+            font-size: 0.85rem;
+            color: #6c757d;
+            padding: 8px 16px;
+            margin: 8px 0;
+            border-radius: 4px;
+            background: #f8f9fa;
+            text-align: left;
+            font-weight: 500;
+        }
+        
+        .departure-time, .arrival-time {
+            background: linear-gradient(135deg, #e3f2fd, #bbdefb);
+            font-size: 0.9rem;
+            color: #4a90e2;
+            font-weight: 600;
+        }
+        
+        .route-departure-time, .route-arrival-time, .route-waiting-time {
+            font-size: 0.8rem;
+            color: #6c757d;
+            background: #f0f0f0;
+        }
+        
+        .route-waiting-time {
+            margin-bottom: 4px;
+            background: linear-gradient(135deg, #fff3cd, #ffeeba);
+            color: #856404;
+        }
+        
+        .route-departure-time {
+            margin-bottom: 4px;
+        }
+        
+        .route-arrival-time {
+            margin-top: 4px;
         }
         
         .version-info {
