@@ -18,7 +18,7 @@
                     </button>
                 </div>
                 <div class="relative">
-                    <input type="text" id="shortcode" class="form-input" placeholder="/路线 <出发站>;<到达站>;[详细];[理论];[越野];[禁高铁];[禁船];[仅轻铁];[禁路线;<路线>;<路线> ...];[禁车站;<车站>;<车站> ...]]">
+                    <textarea id="shortcode" class="form-input" placeholder="/路线 <出发站>;<到达站>;[详细];[理论];[越野];[禁高铁];[禁船];[仅轻铁];[禁路线;<路线>;<路线> ...];[禁车站;<车站>;<车站> ...]]"></textarea>
                 </div>
                 <!-- 简码格式说明弹窗 -->
                 <div id="shortcode-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -61,8 +61,7 @@
                         <i class="fa fa-map-marker mr-1"></i> 起点站
                     </label>
                     <div class="relative">
-                        <input type="text" id="start-station" name="start" 
-                               class="form-input" placeholder="输入起点站名称" required>
+                        <textarea id="start-station" name="start" class="form-input" placeholder="输入起点站名称" required></textarea>
                         <div id="start-suggestions" class="absolute z-10 w-full bg-white border border-gray-300 rounded-md shadow-lg mt-1 hidden"></div>
                     </div>
                 </div>
@@ -73,8 +72,7 @@
                         <i class="fa fa-flag mr-1"></i> 终点站
                     </label>
                     <div class="relative">
-                        <input type="text" id="end-station" name="end" 
-                               class="form-input" placeholder="输入终点站名称" required>
+                        <textarea id="end-station" name="end" class="form-input" placeholder="输入终点站名称" required></textarea>
                         <div id="end-suggestions" class="absolute z-10 w-full bg-white border border-gray-300 rounded-md shadow-lg mt-1 hidden"></div>
                     </div>
                 </div>
@@ -84,8 +82,7 @@
                     <label class="block text-gray-700 font-medium mb-2" for="ignored-lines">
                         <i class="fa fa-ban mr-1"></i> 禁路线（分号分隔）
                     </label>
-                    <input type="text" id="ignored-lines" name="ignored_lines" 
-                           class="form-input" placeholder="输入要禁止的路线，以分号分隔">
+                    <textarea id="ignored-lines" name="ignored_lines" class="form-input" placeholder="输入要禁止的路线，以分号分隔"></textarea>
                 </div>
                 
                 <!-- 禁车站 -->
@@ -93,8 +90,7 @@
                     <label class="block text-gray-700 font-medium mb-2" for="avoid-stations">
                         <i class="fa fa-ban mr-1"></i> 禁车站（分号分隔）
                     </label>
-                    <input type="text" id="avoid-stations" name="avoid_stations" 
-                           class="form-input" placeholder="输入要避开的车站，以分号分隔">
+                    <textarea id="avoid-stations" name="avoid_stations" class="form-input" placeholder="输入要避开的车站，以分号分隔"></textarea>
                 </div>
                 
                 <!-- 寻路设置 -->
@@ -259,6 +255,14 @@
             // 设置默认算法选项卡为active
             document.querySelector('.algorithm-tab[data-value="default"]').classList.add('active');
             
+            // 重置后调整所有输入框高度
+            if (window.autoResizeTextarea) {
+                window.autoResizeTextarea(startStationInput);
+                window.autoResizeTextarea(endStationInput);
+                window.autoResizeTextarea(ignoredLinesInput);
+                window.autoResizeTextarea(avoidStationsInput);
+            }
+            
             // 解析简码
             if (!shortcode.startsWith('/路线')) {
                 return;
@@ -276,6 +280,12 @@
             // 出发站和到达站
             startStationInput.value = parts[0].replace(/^<|>$/g, '');
             endStationInput.value = parts[1].replace(/^<|>$/g, '');
+            
+            // 调整出发站和到达站输入框高度
+            if (window.autoResizeTextarea) {
+                window.autoResizeTextarea(startStationInput);
+                window.autoResizeTextarea(endStationInput);
+            }
             
             // 处理其他参数
             let i = 2;
@@ -331,6 +341,11 @@
                             i++;
                         }
                         ignoredLinesInput.value = routeLines.join(';');
+                        
+                        // 调整禁路线输入框高度
+                        if (window.autoResizeTextarea) {
+                            window.autoResizeTextarea(ignoredLinesInput);
+                        }
                         break;
                     case '禁车站':
                         // 处理禁车站，收集后续所有车站直到遇到下一个关键字
@@ -342,6 +357,11 @@
                             i++;
                         }
                         avoidStationsInput.value = avoidStations.join(';');
+                        
+                        // 调整禁车站输入框高度
+                        if (window.autoResizeTextarea) {
+                            window.autoResizeTextarea(avoidStationsInput);
+                        }
                         break;
                     default:
                         // 忽略未知参数
@@ -406,6 +426,10 @@
         // 简码输入框变化时，填充到表单
         shortcodeInput.addEventListener('input', function() {
             parseShortcode(this.value);
+            // 调整自身高度
+            if (window.autoResizeTextarea) {
+                window.autoResizeTextarea(this);
+            }
         });
         
         // 表单元素变化时，生成简码
@@ -425,10 +449,22 @@
             if (element.type === 'checkbox') {
                 element.addEventListener('change', function() {
                     shortcodeInput.value = generateShortcode();
+                    // 调整简码输入框高度
+                    if (window.autoResizeTextarea) {
+                        window.autoResizeTextarea(shortcodeInput);
+                    }
                 });
             } else {
                 element.addEventListener('input', function() {
                     shortcodeInput.value = generateShortcode();
+                    // 调整简码输入框高度
+                    if (window.autoResizeTextarea) {
+                        window.autoResizeTextarea(shortcodeInput);
+                    }
+                    // 调整自身高度
+                    if (window.autoResizeTextarea) {
+                        window.autoResizeTextarea(this);
+                    }
                 });
             }
         });
@@ -438,6 +474,10 @@
             tab.addEventListener('click', function() {
                 setTimeout(() => {
                     shortcodeInput.value = generateShortcode();
+                    // 调整简码输入框高度
+                    if (window.autoResizeTextarea) {
+                        window.autoResizeTextarea(shortcodeInput);
+                    }
                 }, 0);
             });
         });
@@ -868,18 +908,23 @@
             durationDiv.innerHTML = `<span>${timeLabel}</span><span class="time-value">${formatTime(displayRidingTime)}</span>`;
             routeInfoDiv.appendChild(durationDiv);
             
-            // 只有非步行路线且不是理论模式且不是实时模式才显示等车时间
+            // 只有非步行路线且不是理论模式才显示等车时间和发车间隔
             // 实时模式下的等车时间已经显示在出站时间上方
-            if (!isWalk && algorithm !== 'theory' && algorithm !== 'real') {
-                // 显示等车时间
-                const waitingDiv = document.createElement('div');
-                waitingDiv.className = 'time-detail';
-                // 非实时模式使用路线详情中的等车时间
-                waitingDiv.innerHTML = `<span>⏳ 等车时间</span><span class="time-value">${formatTime(segmentWaitingTime)}</span>`;
-                routeInfoDiv.appendChild(waitingDiv);
-                
-                // 移除发车间隔显示
-                // 不再显示发车间隔
+            if (!isWalk && algorithm !== 'theory') {
+                // 非实时模式下显示等车时间
+                if (algorithm !== 'real') {
+                    const waitingDiv = document.createElement('div');
+                    waitingDiv.className = 'time-detail';
+                    // 非实时模式使用路线详情中的等车时间
+                    waitingDiv.innerHTML = `<span>⏳ 等车时间</span><span class="time-value">${formatTime(segmentWaitingTime)}</span>`;
+                    routeInfoDiv.appendChild(waitingDiv);
+                    
+                    // 非实时模式下显示发车间隔（使用路线详情中的发车间隔，index 7）
+                    const intervalDiv = document.createElement('div');
+                    intervalDiv.className = 'time-detail';
+                    intervalDiv.innerHTML = `<span>⏳ 发车间隔</span><span class="time-value">${formatTime(departureInterval)}</span>`;
+                    routeInfoDiv.appendChild(intervalDiv);
+                }
             }
             
             // 如果有其他匹配的路线，显示"或"选项

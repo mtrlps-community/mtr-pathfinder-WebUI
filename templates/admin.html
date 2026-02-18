@@ -12,8 +12,7 @@
                 <label class="block text-gray-700 font-medium mb-2" for="link-input">
                     <i class="fa fa-link mr-1"></i> 地图链接 (LINK)
                 </label>
-                <input type="text" id="link-input" value="{{ config['LINK'] }}" 
-                       class="form-input" placeholder="输入MTR地图链接">
+                <textarea id="link-input" class="form-input" placeholder="输入MTR地图链接">{{ config['LINK'] }}</textarea>
             </div>
             
             <button id="save-link" class="btn-primary">

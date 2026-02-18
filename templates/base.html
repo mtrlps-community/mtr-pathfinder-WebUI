@@ -28,6 +28,14 @@
             padding: 0.5rem 0.75rem;
             border: 1px solid #d1d5db;
             border-radius: 0.375rem;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            resize: none;
+            min-height: 2.5rem;
+            height: 2.5rem;
+            line-height: 1.5;
+            font-size: 1rem;
+            overflow: hidden;
         }
         .form-input:focus {
             outline: 2px solid #3b82f6;
@@ -215,10 +223,7 @@
             margin-bottom: 8px;
         }
         
-        .route-step:hover {
-            /* 去掉悬停效果 */
-        }
-        
+
         .route-step.alternative {
             margin-left: 30px;
         }
@@ -471,5 +476,71 @@
 
     {% block scripts %}
     {% endblock %}
-</body>
+<script>
+        // 自适应调整textarea高度 - 简化版本
+        window.autoResizeTextarea = function(textarea) {
+            // 确保textarea元素存在
+            if (!textarea || !textarea.classList.contains('form-input')) return;
+            
+            // 获取计算样式
+            const computedStyle = getComputedStyle(textarea);
+            const lineHeight = parseInt(computedStyle.lineHeight);
+            const paddingTop = parseInt(computedStyle.paddingTop);
+            const paddingBottom = parseInt(computedStyle.paddingBottom);
+            
+            // 计算一行的实际高度（包括内边距）
+            const singleLineHeight = lineHeight + paddingTop + paddingBottom;
+            
+            // 重置高度以获得准确的scrollHeight
+            textarea.style.height = `${singleLineHeight}px`;
+            
+            // 计算新高度，确保至少为一行
+            const newHeight = Math.max(textarea.scrollHeight, singleLineHeight);
+            
+            // 只在高度变化时更新，避免不必要的重绘
+            if (textarea.style.height !== `${newHeight}px`) {
+                textarea.style.height = `${newHeight}px`;
+            }
+        }
+        
+        // 批量处理所有textarea
+        function processAllTextareas() {
+            const textareas = document.querySelectorAll('.form-input');
+            textareas.forEach(textarea => {
+                autoResizeTextarea(textarea);
+            });
+        }
+        
+        // 页面加载完成后初始化所有textarea
+        document.addEventListener('DOMContentLoaded', function() {
+            // 初始加载时调整高度
+            processAllTextareas();
+            
+            // 只监听必要的事件，避免性能问题
+            document.addEventListener('input', function(e) {
+                if (e.target && e.target.classList.contains('form-input')) {
+                    autoResizeTextarea(e.target);
+                }
+            });
+            
+            // 监听paste和cut事件
+            document.addEventListener('paste', function(e) {
+                if (e.target && e.target.classList.contains('form-input')) {
+                    setTimeout(() => autoResizeTextarea(e.target), 0);
+                }
+            });
+            
+            document.addEventListener('cut', function(e) {
+                if (e.target && e.target.classList.contains('form-input')) {
+                    setTimeout(() => autoResizeTextarea(e.target), 0);
+                }
+            });
+        });
+        
+        // 当页面完全加载（包括图片等资源）后再次调整高度
+        window.addEventListener('load', function() {
+            processAllTextareas();
+        });
+    </script>
+    </body>
 </html>

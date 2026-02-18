@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿{% extends 'base.html' %}
+﻿﻿﻿﻿﻿﻿{% extends 'base.html' %}
 
 {% block content %}
 <div class="card">
@@ -9,8 +9,7 @@
         <!-- 搜索和排序 -->
         <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div class="relative w-full md:w-64">
-                <input type="text" id="route-search" placeholder="搜索线路名称" 
-                       class="form-input pl-10">
+                <textarea id="route-search" placeholder="搜索线路名称" class="form-input pl-10"></textarea>
                 <i class="fa fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
             </div>
             <div class="flex space-x-2">
