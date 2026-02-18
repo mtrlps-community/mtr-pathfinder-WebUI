@@ -2,8 +2,8 @@ from mtr_pathfinder import main
 import hashlib
 
 # 出发、到达车站
-station1 = "Spawn"
-station2 = "Sundogs"
+station1 = "Lake City"
+station2 = "Hana-Koshi Beach"
 
 # 地图设置
 # MTR模组版本（3/4），默认值为3
@@ -22,7 +22,7 @@ WILD_ADDITION: dict[str, list[str]] = {}
 # "车站昵称: 车站实际名称, ..."
 STATION_TABLE: dict[str, str] = {}
 # 禁止乘坐的路线（未开通的路线）
-ORIGINAL_IGNORED_LINES: list = []
+ORIGINAL_IGNORED_LINES: list = ['Hana-Koshi Line']
 
 link_hash = hashlib.md5(LINK.encode('utf-8')).hexdigest()
 # 文件设置

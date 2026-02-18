@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, session, redirect
 import os
 import json
 import hashlib
@@ -33,6 +33,7 @@ default_config = {
     'WILD_ADDITION': {},
     'STATION_TABLE': {},
     'ORIGINAL_IGNORED_LINES': [],
+    'CONSOLE_PASSWORD': 'admin',
 }
 
 # 加载配置
@@ -133,8 +134,51 @@ def routes():
 
 
 
-@app.route('/admin')
+@app.route('/admin', methods=['GET', 'POST'])
 def admin():
+    if request.method == 'POST':
+        # 处理登录请求
+        password = request.form.get('password')
+        if password == config['CONSOLE_PASSWORD']:
+            session['admin_logged_in'] = True
+            return redirect('/admin')
+        else:
+            # 获取文件版本信息
+            station_version = ""
+            station_version_v4 = ""
+            route_version_v4 = ""
+            interval_version = ""
+            
+            if os.path.exists(config['LOCAL_FILE_PATH_V3']):
+                station_version = datetime.fromtimestamp(
+                    os.path.getmtime(config['LOCAL_FILE_PATH_V3'])
+                ).strftime('%Y%m%d-%H%M')
+            if os.path.exists(config['LOCAL_FILE_PATH_V4']):
+                station_version_v4 = datetime.fromtimestamp(
+                    os.path.getmtime(config['LOCAL_FILE_PATH_V4'])
+                ).strftime('%Y%m%d-%H%M')
+            if os.path.exists(config['DEP_PATH_V4']):
+                route_version_v4 = datetime.fromtimestamp(
+                    os.path.getmtime(config['DEP_PATH_V4'])
+                ).strftime('%Y%m%d-%H%M')
+            if os.path.exists(config['INTERVAL_PATH_V3']):
+                interval_version = datetime.fromtimestamp(
+                    os.path.getmtime(config['INTERVAL_PATH_V3'])
+                ).strftime('%Y%m%d-%H%M')
+            
+            return render_template('admin.html', 
+                                   config=config, 
+                                   station_version=station_version,
+                                   station_version_v4=station_version_v4,
+                                   route_version_v4=route_version_v4,
+                                   interval_version=interval_version,
+                                   error='密码错误')
+    
+    # GET请求，检查是否已登录
+    if not session.get('admin_logged_in'):
+        return render_template('admin.html', error=None)
+    
+    # 已登录，显示控制台内容
     # 获取文件版本信息
     station_version = ""
     station_version_v4 = ""
@@ -164,6 +208,11 @@ def admin():
                            station_version_v4=station_version_v4,
                            route_version_v4=route_version_v4,
                            interval_version=interval_version)
+
+@app.route('/admin/logout', methods=['POST'])
+def admin_logout():
+    session.pop('admin_logged_in', None)
+    return redirect('/admin')
 
 @app.route('/api/find_route', methods=['POST'])
 def api_find_route():
@@ -396,6 +445,21 @@ def api_update_config():
     if 'mtr_ver' in data:
         config['MTR_VER'] = int(data['mtr_ver'])
     
+    if 'max_wild_blocks' in data:
+        config['MAX_WILD_BLOCKS'] = int(data['max_wild_blocks'])
+    
+    if 'transfer_addition' in data:
+        config['TRANSFER_ADDITION'] = data['transfer_addition']
+    
+    if 'wild_addition' in data:
+        config['WILD_ADDITION'] = data['wild_addition']
+    
+    if 'station_table' in data:
+        config['STATION_TABLE'] = data['station_table']
+    
+    if 'original_ignored_lines' in data:
+        config['ORIGINAL_IGNORED_LINES'] = data['original_ignored_lines']
+    
     save_config(config)
     return jsonify({'success': True})
 
@@ -408,8 +472,6 @@ def api_update_data():
     try:
         import sys
         from io import StringIO
-        import json
-        import os
         
         # 保存原始stdin
         original_stdin = sys.stdin

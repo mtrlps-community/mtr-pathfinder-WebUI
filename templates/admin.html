@@ -1,64 +1,131 @@
 {% extends 'base.html' %}
 
 {% block content %}
+{% if not session.get('admin_logged_in') %}
+<!-- 登录表单 -->
+<div class="flex items-center justify-center min-h-[50vh]">
+    <div class="card max-w-md w-full">
+        <h2 class="text-2xl font-bold mb-6 text-center">控制台登录</h2>
+        
+        {% if error %}
+        <div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4">
+            <i class="fa fa-exclamation-circle mr-2"></i>{{ error }}
+        </div>
+        {% endif %}
+        
+        <form method="post" action="/admin">
+            <div class="mb-4">
+                <label class="block text-gray-700 font-medium mb-2" for="password">
+                    <i class="fa fa-lock mr-1"></i> 密码
+                </label>
+                <input type="password" id="password" name="password" class="form-input" placeholder="输入控制台密码" required>
+            </div>
+            
+            <button type="submit" class="btn-primary w-full">
+                <i class="fa fa-sign-in mr-2"></i> 登录
+            </button>
+        </form>
+    </div>
+</div>
+{% else %}
+<!-- 控制台内容 -->
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
     <!-- 左侧：配置设置 -->
-    <div class="lg:col-span-1 space-y-6">
-        <!-- 地图链接设置 -->
+    <div class="lg:col-span-1">
+        <!-- 合并的配置设置卡片 -->
         <div class="card">
-            <h2 class="text-2xl font-bold mb-6">地图链接设置</h2>
-            
-            <div class="mb-4">
-                <label class="block text-gray-700 font-medium mb-2" for="link-input">
-                    <i class="fa fa-link mr-1"></i> 地图链接 (LINK)
-                </label>
-                <textarea id="link-input" class="form-input" placeholder="输入MTR地图链接">{{ config['LINK'] }}</textarea>
-            </div>
-            
-            <button id="save-link" class="btn-primary">
-                <i class="fa fa-save mr-2"></i> 保存链接
-            </button>
-            <div class="mt-2 text-sm text-gray-500">
-                <p>地图链接用于获取车站和线路数据</p>
-            </div>
-        </div>
-        
-        <!-- MTR版本设置 -->
-        <div class="card">
-            <h2 class="text-2xl font-bold mb-6">MTR版本设置</h2>
-            
-            <div class="mb-4">
-                <label class="block text-gray-700 font-medium mb-2" for="mtr-ver-select">
-                    <i class="fa fa-code-fork mr-1"></i> MTR版本 (MTR_VER)
-                </label>
-                <select id="mtr-ver-select" class="form-input">
-                    <option value="3" {% if config['MTR_VER'] == 3 %}selected{% endif %}>版本 3</option>
-                    <option value="4" {% if config['MTR_VER'] == 4 %}selected{% endif %}>版本 4</option>
-                </select>
-            </div>
-            
-            <button id="save-mtr-ver" class="btn-primary">
-                <i class="fa fa-save mr-2"></i> 保存版本
-            </button>
-            <div class="mt-2 text-sm text-gray-500">
-                <p>选择MTR插件的版本，不同版本的数据格式不同</p>
-            </div>
-        </div>
-        
-        <!-- 数据更新 -->
-        <div class="card">
-            <h2 class="text-2xl font-bold mb-6">数据更新</h2>
-            
-            <div class="mb-4">
-                <p class="text-gray-600 mb-4">点击下方按钮从地图链接更新车站和线路数据</p>
-                <div class="flex space-x-3">
-                    <button id="update-data" class="btn-primary">
-                        <i class="fa fa-refresh mr-2"></i> 更新数据
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold">系统配置</h2>
+                <form method="post" action="/admin/logout" style="display: inline;">
+                    <button type="submit" class="btn-secondary text-sm">
+                        <i class="fa fa-sign-out mr-1"></i> 退出登录
                     </button>
+                </form>
+            </div>
+            
+            <!-- 合并的配置内容 -->
+            <div class="space-y-6">
+                <!-- 地图链接设置 -->
+                <div>
+                    <label class="block text-gray-700 font-medium mb-2" for="link-input">
+                        <i class="fa fa-link mr-1"></i> 地图链接 (LINK)
+                    </label>
+                    <textarea id="link-input" class="form-input" placeholder="输入MTR地图链接">{{ config['LINK'] }}</textarea>
+                </div>
+                
+                <!-- MTR版本设置 -->
+                <div>
+                    <label class="block text-gray-700 font-medium mb-2" for="mtr-ver-select">
+                        <i class="fa fa-code-fork mr-1"></i> MTR模组版本 (MTR_VER)
+                    </label>
+                    <div class="algorithm-tabs">
+                        <div class="flex overflow-x-auto no-scrollbar">
+                            <div class="algorithm-tab {% if config['MTR_VER'] == 3 %}active{% endif %}" data-index="0" data-value="3">MTR 3.x</div>
+                            <div class="algorithm-tab {% if config['MTR_VER'] == 4 %}active{% endif %}" data-index="1" data-value="4">MTR 4.0</div>
+                        </div>
+                    </div>
+                    <input type="hidden" id="mtr-ver-select" value="{{ config['MTR_VER'] }}">
+                </div>
+                
+                <!-- 最大越野距离 -->
+                <div>
+                    <label class="block text-gray-700 font-medium mb-2" for="max-wild-blocks">
+                        <i class="fa fa-map-marker mr-1"></i> 最大越野距离 (MAX_WILD_BLOCKS)
+                    </label>
+                    <p class="text-sm text-gray-500 mb-2">从A站到B站，非出站换乘（越野）的最远步行距离，默认值为1500</p>
+                    <input type="number" id="max-wild-blocks" class="form-input" value="{{ config['MAX_WILD_BLOCKS'] }}" min="0">
+                </div>
+                
+                <!-- 出站换乘增加 -->
+                <div>
+                    <label class="block text-gray-700 font-medium mb-2" for="transfer-addition">
+                        <i class="fa fa-exchange mr-1"></i> 出站换乘定义 (TRANSFER_ADDITION)
+                    </label>
+                    <p class="text-sm text-gray-500 mb-2">手动增加出站换乘，格式："车站: [出站换乘的车站, ...], ..."</p>
+                    <textarea id="transfer-addition" class="form-input" placeholder='JSON格式，例如：{"车站1": ["车站2", "车站3"], "车站4": ["车站5"]}'>{{ config['TRANSFER_ADDITION']|tojson }}</textarea>
+                </div>
+                
+                <!-- 非出站换乘增加 -->
+                <div>
+                    <label class="block text-gray-700 font-medium mb-2" for="wild-addition">
+                        <i class="fa fa-tree mr-1"></i> 非出站换乘定义 (WILD_ADDITION)
+                    </label>
+                    <p class="text-sm text-gray-500 mb-2">手动增加非出站换乘（越野），格式："车站: [非出站换乘的车站, ...], ..."</p>
+                    <textarea id="wild-addition" class="form-input" placeholder='JSON格式，例如：{"车站1": ["车站2", "车站3"], "车站4": ["车站5"]}'>{{ config['WILD_ADDITION']|tojson }}</textarea>
+                </div>
+                
+                <!-- 车站名称映射 -->
+                <div>
+                    <label class="block text-gray-700 font-medium mb-2" for="station-table">
+                        <i class="fa fa-table mr-1"></i> 车站名称映射 (STATION_TABLE)
+                    </label>
+                    <p class="text-sm text-gray-500 mb-2">车站昵称到实际名称的映射，格式："车站昵称: 车站实际名称, ..."</p>
+                    <textarea id="station-table" class="form-input" placeholder='JSON格式，例如：{"车站昵称": "车站实际名称", "昵称2": "实际名称2"}'>{{ config['STATION_TABLE']|tojson }}</textarea>
+                </div>
+                
+                <!-- 禁止乘坐的路线 -->
+                <div>
+                    <label class="block text-gray-700 font-medium mb-2" for="original-ignored-lines">
+                        <i class="fa fa-ban mr-1"></i> 全局禁路线 (ORIGINAL_IGNORED_LINES)
+                    </label>
+                    <p class="text-sm text-gray-500 mb-2">未开通或禁止乘坐的路线列表</p>
+                    <textarea id="original-ignored-lines" class="form-input" placeholder='JSON格式数组，例如：["线路1", "线路2"]'>{{ config['ORIGINAL_IGNORED_LINES']|tojson }}</textarea>
+                </div>
+                
+                <!-- 操作按钮区域 -->
+                <div>
+                    <div class="flex space-x-3">
+                        <button id="save-all" class="btn-primary">
+                            <i class="fa fa-save mr-2"></i> 保存配置
+                        </button>
+                        <button id="update-data" class="btn-green">
+                            <i class="fa fa-refresh mr-2"></i> 更新数据
+                        </button>
+                    </div>
+                    
+                    <div id="update-status" class="mt-4 p-4 rounded-lg hidden"></div>
                 </div>
             </div>
-            
-            <div id="update-status" class="mt-4 p-4 rounded-lg hidden"></div>
         </div>
     </div>
     
@@ -72,7 +139,6 @@
                 <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                     <div>
                         <h3 class="font-medium text-gray-700">当前地图链接</h3>
-                        <p class="text-sm text-gray-500 mt-1">用于获取数据的地图链接</p>
                     </div>
                     <div class="text-right">
                         <p class="font-medium" id="current-link">{{ config['LINK'] or '未设置' }}</p>
@@ -82,8 +148,7 @@
                 <!-- 当前版本 -->
                 <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                     <div>
-                        <h3 class="font-medium text-gray-700">当前MTR版本</h3>
-                        <p class="text-sm text-gray-500 mt-1">MTR插件版本</p>
+                        <h3 class="font-medium text-gray-700">当前MTR模组版本</h3>
                     </div>
                     <div class="text-right">
                         <p class="font-medium" id="current-mtr-ver">{{ config['MTR_VER'] }}</p>
@@ -134,6 +199,7 @@
         </div>
     </div>
 </div>
+{% endif %}
 {% endblock %}
 
 {% block scripts %}
@@ -149,9 +215,35 @@
         statusDiv.classList.remove('hidden');
     }
     
-    // 保存地图链接
-    document.getElementById('save-link').addEventListener('click', async () => {
+    // MTR版本滑动选择器逻辑
+    document.querySelectorAll('.algorithm-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+            // 移除所有active类
+            document.querySelectorAll('.algorithm-tab').forEach(t => t.classList.remove('active'));
+            // 添加当前active类
+            tab.classList.add('active');
+            // 更新隐藏输入框的值
+            document.getElementById('mtr-ver-select').value = tab.dataset.value;
+        });
+    });
+    
+    // 保存所有配置
+    document.getElementById('save-all').addEventListener('click', async () => {
         const link = document.getElementById('link-input').value;
+        const mtrVer = document.getElementById('mtr-ver-select').value;
+        const maxWildBlocks = parseInt(document.getElementById('max-wild-blocks').value);
+        
+        // 解析JSON配置项
+        let transferAddition, wildAddition, stationTable, originalIgnoredLines;
+        try {
+            transferAddition = JSON.parse(document.getElementById('transfer-addition').value || '{}');
+            wildAddition = JSON.parse(document.getElementById('wild-addition').value || '{}');
+            stationTable = JSON.parse(document.getElementById('station-table').value || '{}');
+            originalIgnoredLines = JSON.parse(document.getElementById('original-ignored-lines').value || '[]');
+        } catch (jsonError) {
+            showStatus('JSON格式错误: ' + jsonError.message, false);
+            return;
+        }
         
         try {
             const response = await fetch('/api/update_config', {
@@ -159,45 +251,32 @@
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ link })
+                body: JSON.stringify({ 
+                    link, 
+                    mtr_ver: mtrVer,
+                    max_wild_blocks: maxWildBlocks,
+                    transfer_addition: transferAddition,
+                    wild_addition: wildAddition,
+                    station_table: stationTable,
+                    original_ignored_lines: originalIgnoredLines
+                })
             });
             
             const result = await response.json();
             if (response.ok && result.success) {
                 document.getElementById('current-link').textContent = link;
-                showStatus('地图链接保存成功');
-            } else {
-                showStatus('保存失败', false);
-            }
-        } catch (error) {
-            showStatus('保存失败，请稍后重试', false);
-            console.error('保存链接错误:', error);
-        }
-    });
-    
-    // 保存MTR版本
-    document.getElementById('save-mtr-ver').addEventListener('click', async () => {
-        const mtrVer = document.getElementById('mtr-ver-select').value;
-        
-        try {
-            const response = await fetch('/api/update_config', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ mtr_ver: mtrVer })
-            });
-            
-            const result = await response.json();
-            if (response.ok && result.success) {
                 document.getElementById('current-mtr-ver').textContent = mtrVer;
-                showStatus('MTR版本保存成功');
+                showStatus('配置保存成功');
+                // 刷新页面以显示最新配置
+                setTimeout(() => {
+                    location.reload();
+                }, 1500);
             } else {
                 showStatus('保存失败', false);
             }
         } catch (error) {
             showStatus('保存失败，请稍后重试', false);
-            console.error('保存版本错误:', error);
+            console.error('保存配置错误:', error);
         }
     });
     
