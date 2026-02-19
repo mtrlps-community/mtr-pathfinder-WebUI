@@ -119,6 +119,92 @@ def stations():
     
     return render_template('stations.html', stations=stations_data)
 
+@app.route('/stations/<station_id>')
+def station_detail(station_id):
+    # 读取车站数据
+    station_data = None
+    routes_data = []
+    # 优先使用v3版本的数据文件，因为它包含更多信息
+    data_file_path = config['LOCAL_FILE_PATH_V3']
+    if os.path.exists(data_file_path):
+        with open(data_file_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+            # 统一处理，无论MTR_VER版本，都使用列表格式
+            if isinstance(data, list) and len(data) > 0:
+                # 获取车站数据
+                stations = data[0]['stations']
+                if station_id in stations:
+                    station_data = stations[station_id]
+                # 获取线路数据
+                routes_data = data[0]['routes']
+            elif isinstance(data, dict):
+                # 兼容旧格式
+                if 'stations' in data and station_id in data['stations']:
+                    station_data = data['stations'][station_id]
+                if 'routes' in data:
+                    routes_data = data['routes']
+    
+    # 不再使用v4版本数据文件
+    
+    # 如果仍然没有找到车站数据，返回404
+    if not station_data:
+        return render_template('error.html', message='车站不存在'), 404
+    
+    # 将车站名称中的竖杠替换为空格
+    if isinstance(station_data, dict) and 'name' in station_data:
+        station_data['name'] = station_data['name'].replace('|', ' ')
+    
+    # 获取所有车站数据
+    all_stations = {}
+    if isinstance(data, list) and len(data) > 0 and 'stations' in data[0]:
+        all_stations = data[0]['stations']
+    elif isinstance(data, dict) and 'stations' in data:
+        all_stations = data['stations']
+    
+    # 查找该车站所在的线路
+    station_routes = []
+    for route in routes_data:
+        if isinstance(route, dict) and 'stations' in route:
+            for station in route['stations']:
+                if isinstance(station, dict) and station.get('id') == station_id:
+                    # 将线路名称中的竖杠替换为空格
+                    if 'name' in route:
+                        route['name'] = route['name'].replace('|', ' ')
+                    
+                    # 处理站点列表，添加站点名称和运行时间
+                    processed_stations = []
+                    durations = route.get('durations', [])
+                    
+                    for i, route_station in enumerate(route['stations']):
+                        if isinstance(route_station, dict):
+                            # 深拷贝，避免修改原始数据
+                            processed_station = route_station.copy()
+                            # 获取站点ID
+                            route_station_id = processed_station.get('id')
+                            # 如果能找到对应的车站数据，替换为车站名称
+                            if route_station_id in all_stations:
+                                station_data = all_stations[route_station_id]
+                                # 将车站名称中的竖杠替换为空格
+                                if 'name' in station_data:
+                                    processed_station['name'] = station_data['name'].replace('|', ' ')
+                            
+                            # 添加运行时间信息：durations[i]是从当前站点到下一个站点的运行时间
+                            if i < len(durations):
+                                # 将秒转换为mm:ss格式
+                                seconds = durations[i]
+                                minutes = seconds // 60
+                                remaining_seconds = seconds % 60
+                                processed_station['travel_time'] = f"{minutes:02d}:{remaining_seconds:02d}"
+                            
+                            processed_stations.append(processed_station)
+                    # 更新线路的站点列表
+                    route['stations'] = processed_stations
+                    
+                    station_routes.append(route)
+                    break
+    
+    return render_template('station_detail.html', station=station_data, routes=station_routes, station_id=station_id)
+
 @app.route('/routes')
 def routes():
     # 读取线路数据
@@ -843,7 +929,7 @@ def api_update_data():
         try:
             # 1. 生成v3版程序所需的数据 - 阶段1
             data_update_progress.update({
-                'percentage': 10,
+                'percentage': 0,
                 'stage': '生成V3车站数据',
                 'message': '正在生成V3版车站数据...'
             })
