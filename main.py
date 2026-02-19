@@ -223,6 +223,9 @@ def admin_logout():
 
 @app.route('/api/find_route', methods=['POST'])
 def api_find_route():
+    # 开始计时
+    start_time = datetime.now()
+    
     # 重置进度
     global search_progress
     search_progress = {
@@ -399,7 +402,7 @@ def api_find_route():
             })
             
             # 创建图
-            G = create_graph_v3(
+            G, used_cache = create_graph_v3(
                 data_file,
                 ignored_lines,
                 not data.get('disable_high_speed', False),
@@ -472,8 +475,49 @@ def api_find_route():
             'message': '路径计算完成！'
         })
         
-        # 返回调整后的结果，包含寻路模式
-        return jsonify({'result': formatted_result, 'algorithm': algorithm})
+        # 计算寻路用时
+        end_time = datetime.now()
+        calc_time = (end_time - start_time).total_seconds()
+        
+        # 获取数据版本信息
+        station_version = ""
+        station_version_v4 = ""
+        route_version_v4 = ""
+        interval_version = ""
+        
+        if os.path.exists(config['LOCAL_FILE_PATH_V3']):
+            station_version = datetime.fromtimestamp(
+                os.path.getmtime(config['LOCAL_FILE_PATH_V3'])
+            ).strftime('%Y%m%d-%H%M')
+        if os.path.exists(config['LOCAL_FILE_PATH_V4']):
+            station_version_v4 = datetime.fromtimestamp(
+                os.path.getmtime(config['LOCAL_FILE_PATH_V4'])
+            ).strftime('%Y%m%d-%H%M')
+        if os.path.exists(config['DEP_PATH_V4']):
+            route_version_v4 = datetime.fromtimestamp(
+                os.path.getmtime(config['DEP_PATH_V4'])
+            ).strftime('%Y%m%d-%H%M')
+        if os.path.exists(config['INTERVAL_PATH_V3']):
+            interval_version = datetime.fromtimestamp(
+                os.path.getmtime(config['INTERVAL_PATH_V3'])
+            ).strftime('%Y%m%d-%H%M')
+        
+        # 初始化used_cache变量，实时寻路模式下默认为False
+        used_cache = locals().get('used_cache', False)
+        
+        # 返回调整后的结果，包含寻路模式、计算用时、数据版本和缓存标志
+        return jsonify({
+            'result': formatted_result, 
+            'algorithm': algorithm,
+            'calc_time': calc_time,
+            'used_cache': used_cache,
+            'data_versions': {
+                'station_version': station_version,
+                'station_version_v4': station_version_v4,
+                'route_version_v4': route_version_v4,
+                'interval_version': interval_version
+            }
+        })
     except Exception as e:
         import traceback
         import logging

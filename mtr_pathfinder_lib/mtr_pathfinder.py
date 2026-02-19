@@ -587,7 +587,7 @@ def create_graph(data: list, IGNORED_LINES: list[str],
                  version1: str, version2: str,
                  LOCAL_FILE_PATH, STATION_TABLE,
                  WILD_ADDITION, TRANSFER_ADDITION,
-                 MAX_WILD_BLOCKS, MTR_VER, cache) -> nx.MultiDiGraph:
+                 MAX_WILD_BLOCKS, MTR_VER, cache) -> tuple[nx.MultiDiGraph, bool]:
     '''
     Create the graph of all routes.
     '''
@@ -600,6 +600,7 @@ def create_graph(data: list, IGNORED_LINES: list[str],
 
     filename = ''
     m = hashlib.md5()
+    used_cache = False
     if cache is True and IGNORED_LINES == original_ignored_lines and \
             CALCULATE_BOAT is True and ONLY_LRT is False and \
             AVOID_STATIONS == [] and route_type == RouteType.WAITING:
@@ -614,8 +615,8 @@ def create_graph(data: list, IGNORED_LINES: list[str],
                 tup = pickle.load(f)
                 G = tup[0]
                 original = tup[1]
-
-            return G
+            used_cache = True
+            return G, used_cache
 
     routes = data[0]['routes']
     new_durations = {}
@@ -1031,7 +1032,7 @@ def create_graph(data: list, IGNORED_LINES: list[str],
             with open(filename, 'wb') as f:
                 pickle.dump((G, original), f)
 
-    return G
+    return G, used_cache
 
 
 def find_shortest_route(G: nx.MultiDiGraph, start: str, end: str,
@@ -1552,11 +1553,11 @@ def main(station1: str, station2: str, LINK: str,
 
     if G is None:
         G = create_graph(data, IGNORED_LINES, CALCULATE_HIGH_SPEED,
-                         CALCULATE_BOAT, CALCULATE_WALKING_WILD, ONLY_LRT,
-                         AVOID_STATIONS, route_type, ORIGINAL_IGNORED_LINES,
-                         INTERVAL_PATH, version1, version2, LOCAL_FILE_PATH,
-                         STATION_TABLE, WILD_ADDITION, TRANSFER_ADDITION,
-                         MAX_WILD_BLOCKS, MTR_VER, cache)
+                                     CALCULATE_BOAT, CALCULATE_WALKING_WILD, ONLY_LRT,
+                                     AVOID_STATIONS, route_type, ORIGINAL_IGNORED_LINES,
+                                     INTERVAL_PATH, version1, version2, LOCAL_FILE_PATH,
+                                     STATION_TABLE, WILD_ADDITION, TRANSFER_ADDITION,
+                                     MAX_WILD_BLOCKS, MTR_VER, cache)
 
     shortest_path, shortest_distance, waiting_time, riding_time, ert = \
         find_shortest_route(G, station1, station2,

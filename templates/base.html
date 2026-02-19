@@ -171,32 +171,32 @@
             display: flex;
             align-items: center;
             background: white;
-            padding: 12px 16px;
-            border-radius: 6px;
-            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+            padding: 8px 12px;
+            border-radius: 4px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
             transition: transform 0.2s ease, box-shadow 0.2s ease;
         }
         
         .time-item:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            transform: translateY(-1px);
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
         }
         
         .time-item.total-time {
-            border-left: 4px solid #3b82f6;
+            border-left: 3px solid #3b82f6;
         }
         
         .time-item.traveling-time {
-            border-left: 4px solid #10b981;
+            border-left: 3px solid #10b981;
         }
         
         .time-item.waiting-time {
-            border-left: 4px solid #f59e0b;
+            border-left: 3px solid #f59e0b;
         }
         
         .time-icon {
-            font-size: 1.5rem;
-            margin-right: 12px;
+            font-size: 1.2rem;
+            margin-right: 8px;
         }
         
         .time-content {
@@ -205,9 +205,47 @@
         
         .time-content strong {
             display: block;
-            font-size: 1.3rem;
+            font-size: 1.1rem;
             font-weight: 700;
-            margin-bottom: 2px;
+            margin-bottom: 1px;
+        }
+        
+        /* 数据版本特殊样式 */
+        .time-item.data-version .time-content strong {
+            font-size: 0.75rem;
+        }
+        
+        /* 调整时间网格，确保数据版本项正确排列 */
+        .time-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 12px;
+        }
+        
+        /* 让数据版本项在一行中显示两个 */
+        @media (min-width: 640px) {
+            .time-grid {
+                grid-template-columns: repeat(4, minmax(0, 1fr));
+            }
+            
+            /* 理论模式下：总用时和计算用时各占2列，占满第一行 */
+            .time-grid.theory-mode .time-item.total-time,
+            .time-grid.theory-mode .time-item.calc-time {
+                grid-column: span 2;
+            }
+            
+            /* 非理论模式下：前四个非数据版本项各占一列 */
+            .time-grid:not(.theory-mode) .time-item.total-time,
+            .time-grid:not(.theory-mode) .time-item.traveling-time,
+            .time-grid:not(.theory-mode) .time-item.waiting-time,
+            .time-grid:not(.theory-mode) .time-item.calc-time {
+                grid-column: span 1;
+            }
+            
+            /* 数据版本项两个一组，占满一行 */
+            .time-item.data-version {
+                grid-column: span 2;
+            }
         }
         
         .time-item.total-time .time-content strong {
@@ -224,7 +262,7 @@
         
         .time-content span {
             color: #6c757d;
-            font-size: 0.85rem;
+            font-size: 0.75rem;
             font-weight: 500;
         }
         

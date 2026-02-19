@@ -690,8 +690,8 @@
             
             if (response.ok) {
                 if (resultData.result) {
-                    // 显示结果，传递寻路模式
-                    displayResult(resultData.result, resultData.algorithm);
+                    // 显示结果，传递寻路模式、计算用时、数据版本和缓存标志
+                    displayResult(resultData.result, resultData.algorithm, resultData.calc_time, resultData.data_versions, resultData.used_cache);
                 } else {
                     // 无结果
                     noResult.classList.remove('hidden');
@@ -726,7 +726,7 @@
     }
     
     // 显示结果
-    function displayResult(routeResult, algorithm) {
+    function displayResult(routeResult, algorithm, calcTime, dataVersions, usedCache) {
         result.classList.remove('hidden');
         
         // 解析routeresult数组，添加默认值处理
@@ -751,7 +751,7 @@
         
         // 构建时间网格内容，理论模式下只显示总用时
         let timeGridContent = `
-            <div class="time-grid">
+            <div class="time-grid ${algorithm === 'theory' ? 'theory-mode' : ''}">
                 <div class="time-item total-time">
                     <div class="time-icon">⏱️</div>
                     <div class="time-content">
@@ -779,6 +779,73 @@
                     </div>
                 </div>
             `;
+        }
+        
+        // 添加寻路计算用时
+        const cacheBadge = usedCache ? '<span style="color: green; font-size: 0.75rem; display: block; margin-bottom: -2px;">(调用缓存)</span>' : '';
+        timeGridContent += `
+                <div class="time-item calc-time">
+                    <div class="time-icon">⚡</div>
+                    <div class="time-content">
+                        <strong>${calcTime ? calcTime.toFixed(2) + 's' : '-'}</strong>
+                        ${cacheBadge}
+                        <span>计算用时</span>
+                    </div>
+                </div>
+        `;
+        
+        // 添加数据版本信息
+        if (dataVersions) {
+            // 根据算法选择使用哪个版本的数据
+            if (algorithm === 'real') {
+                // 实时寻路使用v4版本数据
+                if (dataVersions.station_version_v4) {
+                    timeGridContent += `
+                        <div class="time-item data-version">
+                            <div class="time-icon">📅</div>
+                            <div class="time-content">
+                                <strong>${dataVersions.station_version_v4}</strong>
+                                <span>车站数据版本(V4)</span>
+                            </div>
+                        </div>
+                    `;
+                }
+                if (dataVersions.route_version_v4) {
+                    timeGridContent += `
+                        <div class="time-item data-version">
+                            <div class="time-icon">🗺️</div>
+                            <div class="time-content">
+                                <strong>${dataVersions.route_version_v4}</strong>
+                                <span>线路数据版本(V4)</span>
+                            </div>
+                        </div>
+                    `;
+                }
+            } else {
+                // 默认/理论寻路使用v3版本数据
+                if (dataVersions.station_version) {
+                    timeGridContent += `
+                        <div class="time-item data-version">
+                            <div class="time-icon">📅</div>
+                            <div class="time-content">
+                                <strong>${dataVersions.station_version}</strong>
+                                <span>车站数据版本(V3)</span>
+                            </div>
+                        </div>
+                    `;
+                }
+                if (dataVersions.interval_version) {
+                    timeGridContent += `
+                        <div class="time-item data-version">
+                            <div class="time-icon">🗺️</div>
+                            <div class="time-content">
+                                <strong>${dataVersions.interval_version}</strong>
+                                <span>间隔数据版本(V3)</span>
+                            </div>
+                        </div>
+                    `;
+                }
+            }
         }
         
         timeGridContent += `
@@ -1212,57 +1279,59 @@
             stationNameSpan.style.textAlign = 'left';
             stationDiv.appendChild(stationNameSpan);
             
-            // 添加叉按钮
-            const stationCloseBtn = document.createElement('button');
-            stationCloseBtn.className = 'station-close-btn';
-            stationCloseBtn.innerHTML = '&times;';
-            stationCloseBtn.style.cssText = `
-                background: none;
-                border: none;
-                width: auto;
-                height: auto;
-                cursor: pointer;
-                font-size: 1rem;
-                line-height: 1;
-                opacity: 0.7;
-                transition: color 0.2s;
-                color: #6b7280;
-                margin-left: 8px;
-            `;
-            
-            // 悬停效果
-            stationCloseBtn.addEventListener('mouseenter', function() {
-                this.style.opacity = 1;
-                this.style.color = '#ef4444';
-            });
-            stationCloseBtn.addEventListener('mouseleave', function() {
-                this.style.opacity = 0.7;
-                this.style.color = '#6b7280';
-            });
-            
-            // 点击事件：添加到禁车站
-            stationCloseBtn.addEventListener('click', function() {
-                const avoidStationsInput = document.getElementById('avoid-stations');
-                const currentValue = avoidStationsInput.value;
-                const stationValue = formattedStationName;
+            // 只给非起点站添加叉按钮
+            if (i !== 0) {
+                const stationCloseBtn = document.createElement('button');
+                stationCloseBtn.className = 'station-close-btn';
+                stationCloseBtn.innerHTML = '&times;';
+                stationCloseBtn.style.cssText = `
+                    background: none;
+                    border: none;
+                    width: auto;
+                    height: auto;
+                    cursor: pointer;
+                    font-size: 1rem;
+                    line-height: 1;
+                    opacity: 0.7;
+                    transition: color 0.2s;
+                    color: #6b7280;
+                    margin-left: 8px;
+                `;
                 
-                // 检查是否已存在
-                const stations = currentValue.split(/[,;；]/).map(s => s.trim()).filter(Boolean);
-                if (!stations.includes(stationValue)) {
-                    stations.push(stationValue);
-                    avoidStationsInput.value = stations.join(';');
-                    // 触发自动调整高度
-                    if (window.autoResizeTextarea) {
-                        window.autoResizeTextarea(avoidStationsInput);
+                // 悬停效果
+                stationCloseBtn.addEventListener('mouseenter', function() {
+                    this.style.opacity = 1;
+                    this.style.color = '#ef4444';
+                });
+                stationCloseBtn.addEventListener('mouseleave', function() {
+                    this.style.opacity = 0.7;
+                    this.style.color = '#6b7280';
+                });
+                
+                // 点击事件：添加到禁车站
+                stationCloseBtn.addEventListener('click', function() {
+                    const avoidStationsInput = document.getElementById('avoid-stations');
+                    const currentValue = avoidStationsInput.value;
+                    const stationValue = formattedStationName;
+                    
+                    // 检查是否已存在
+                    const stations = currentValue.split(/[,;；]/).map(s => s.trim()).filter(Boolean);
+                    if (!stations.includes(stationValue)) {
+                        stations.push(stationValue);
+                        avoidStationsInput.value = stations.join(';');
+                        // 触发自动调整高度
+                        if (window.autoResizeTextarea) {
+                            window.autoResizeTextarea(avoidStationsInput);
+                        }
+                        // 更新简码
+                        if (typeof updateShortcode === 'function') {
+                            updateShortcode();
+                        }
                     }
-                    // 更新简码
-                    if (typeof updateShortcode === 'function') {
-                        updateShortcode();
-                    }
-                }
-            });
-            
-            stationDiv.appendChild(stationCloseBtn);
+                });
+                
+                stationDiv.appendChild(stationCloseBtn);
+            }
             stationStep.appendChild(stationDiv);
             detailsContainer.appendChild(stationStep);
             
