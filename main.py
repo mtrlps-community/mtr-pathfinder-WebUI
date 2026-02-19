@@ -27,6 +27,13 @@ search_progress = {
     'message': '正在初始化寻路参数...'
 }
 
+# 数据更新进度跟踪变量
+data_update_progress = {
+    'percentage': 0,
+    'stage': '准备中...',
+    'message': '正在准备数据更新...'
+}
+
 # 配置文件路径
 CONFIG_PATH = 'config.json'
 
@@ -246,8 +253,8 @@ def api_find_route():
     
     # 更新进度
     search_progress.update({
-        'percentage': 10,
-        'stage': '验证参数',
+        'percentage': 25,
+        'stage': '(1/4)验证参数',
         'message': '正在验证输入参数...'
     })
     
@@ -267,8 +274,8 @@ def api_find_route():
     
     # 更新进度
     search_progress.update({
-        'percentage': 20,
-        'stage': '数据验证',
+        'percentage': 50,
+        'stage': '(2/4)数据验证',
         'message': '数据文件验证通过，准备开始寻路...'
     })
     
@@ -279,8 +286,8 @@ def api_find_route():
             
             # 更新进度
             search_progress.update({
-                'percentage': 30,
-                'stage': '寻路计算',
+                'percentage': 75,
+                'stage': '(3/4)寻路计算',
                 'message': '正在使用实时算法计算路径...'
             })
             
@@ -314,8 +321,8 @@ def api_find_route():
             
             # 更新进度
             search_progress.update({
-                'percentage': 70,
-                'stage': '结果处理',
+                'percentage': 75,
+                'stage': '(4/4)结果处理',
                 'message': '寻路计算完成，正在处理结果...'
             })
             
@@ -370,8 +377,8 @@ def api_find_route():
             
             # 更新进度
             search_progress.update({
-                'percentage': 30,
-                'stage': '数据加载',
+                'percentage': 20,
+                'stage': '(1/5)数据加载',
                 'message': '正在加载车站数据...'
             })
             
@@ -382,7 +389,7 @@ def api_find_route():
             # 更新进度
             search_progress.update({
                 'percentage': 40,
-                'stage': '参数准备',
+                'stage': '(2/5)参数准备',
                 'message': '正在准备寻路参数...'
             })
             
@@ -396,8 +403,8 @@ def api_find_route():
             
             # 更新进度
             search_progress.update({
-                'percentage': 50,
-                'stage': '图构建',
+                'percentage': 60,
+                'stage': '(3/5)图构建',
                 'message': '正在构建站点连接图...'
             })
             
@@ -425,8 +432,8 @@ def api_find_route():
             
             # 更新进度
             search_progress.update({
-                'percentage': 70,
-                'stage': '寻路计算',
+                'percentage': 80,
+                'stage': '(4/5)寻路计算',
                 'message': '正在使用最短路径算法计算最优路线...'
             })
             
@@ -440,7 +447,7 @@ def api_find_route():
             # 更新进度
             search_progress.update({
                 'percentage': 90,
-                'stage': '结果处理',
+                'stage': '(5/5)结果处理',
                 'message': '寻路计算完成，正在处理结果...'
             })
             
@@ -542,6 +549,12 @@ def api_progress():
     global search_progress
     return jsonify(search_progress)
 
+@app.route('/api/update_progress', methods=['GET'])
+def api_update_progress():
+    """返回当前数据更新进度"""
+    global data_update_progress
+    return jsonify(data_update_progress)
+
 
 @app.route('/api/search_stations', methods=['GET'])
 def api_search_stations():
@@ -613,6 +626,14 @@ def api_update_data():
     if not config['LINK']:
         return jsonify({'error': '未设置地图链接'}), 400
     
+    # 重置数据更新进度
+    global data_update_progress
+    data_update_progress = {
+        'percentage': 0,
+        'stage': '准备中...',
+        'message': '正在准备数据更新...'
+    }
+    
     try:
         import sys
         from io import StringIO
@@ -624,13 +645,26 @@ def api_update_data():
         sys.stdin = mock_stdin
         
         try:
-            # 1. 生成v3版程序所需的数据
+            # 1. 生成v3版程序所需的数据 - 阶段1
+            data_update_progress.update({
+                'percentage': 10,
+                'stage': '生成V3车站数据',
+                'message': '正在生成V3版车站数据...'
+            })
+            
             # 调用v3版的fetch_data函数
             fetch_data_v3(
                 config['LINK'],
                 config['LOCAL_FILE_PATH_V3'],
                 config['MTR_VER']
             )
+            
+            # 阶段1完成，进入阶段2
+            data_update_progress.update({
+                'percentage': 25,
+                'stage': '生成V3间隔数据',
+                'message': '正在生成V3版间隔数据...'
+            })
             
             # 生成v3版的间隔数据文件
             gen_route_interval_v3(
@@ -639,6 +673,13 @@ def api_update_data():
                 config['LINK'],
                 config['MTR_VER']
             )
+            
+            # 阶段2完成，进入阶段3
+            data_update_progress.update({
+                'percentage': 50,
+                'stage': '生成V4车站数据',
+                'message': '正在生成V4版车站数据...'
+            })
             
             # 2. 生成v4版程序所需的数据
             # 调用v4版的fetch_data函数
@@ -649,17 +690,37 @@ def api_update_data():
                 config['MAX_WILD_BLOCKS']
             )
             
+            # 阶段3完成，进入阶段4
+            data_update_progress.update({
+                'percentage': 75,
+                'stage': '生成V4发车数据',
+                'message': '正在生成V4版发车数据...'
+            })
+            
             # 生成v4版的发车数据
             gen_departure_v4(
                 config['LINK'],
                 config['DEP_PATH_V4']
             )
+            
+            # 数据更新完成
+            data_update_progress.update({
+                'percentage': 100,
+                'stage': '完成',
+                'message': '数据更新完成！'
+            })
         finally:
             # 恢复原始stdin
             sys.stdin = original_stdin
         
         return jsonify({'success': True})
     except Exception as e:
+        # 更新失败时设置错误状态
+        data_update_progress.update({
+            'percentage': 0,
+            'stage': '错误',
+            'message': f'更新失败: {str(e)}'
+        })
         return jsonify({'error': str(e)}), 500
 
 

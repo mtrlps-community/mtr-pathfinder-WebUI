@@ -123,6 +123,19 @@
                         </button>
                     </div>
                     
+                    <!-- 数据更新进度条 -->
+                    <div id="update-progress" class="mt-4 hidden">
+                        <h4 class="text-sm font-medium text-gray-700 mb-2">更新进度</h4>
+                        <div class="w-full bg-gray-200 rounded-full h-2.5 mb-2">
+                            <div id="progress-bar" class="bg-green-600 h-2.5 rounded-full" style="width: 0%"></div>
+                        </div>
+                        <div class="flex justify-between text-sm text-gray-600">
+                            <span id="progress-stage">准备中...</span>
+                            <span id="progress-percentage">0%</span>
+                        </div>
+                        <div id="progress-message" class="text-sm text-gray-500 mt-1"></div>
+                    </div>
+                    
                     <div id="update-status" class="mt-4 p-4 rounded-lg hidden"></div>
                 </div>
             </div>
@@ -280,6 +293,61 @@
         }
     });
     
+    // 更新数据进度
+    let updateProgressInterval = null;
+    
+    // 更新进度显示
+    function updateProgressDisplay(progress) {
+        const progressBar = document.getElementById('progress-bar');
+        const progressStage = document.getElementById('progress-stage');
+        const progressPercentage = document.getElementById('progress-percentage');
+        const progressMessage = document.getElementById('progress-message');
+        
+        progressBar.style.width = `${progress.percentage}%`;
+        progressStage.textContent = progress.stage;
+        progressPercentage.textContent = `${progress.percentage}%`;
+        if (progress.message) {
+            progressMessage.textContent = progress.message;
+        }
+    }
+    
+    // 开始轮询更新进度
+    function startProgressPolling() {
+        // 清除之前的轮询
+        if (updateProgressInterval) {
+            clearInterval(updateProgressInterval);
+        }
+        
+        // 显示进度条
+        document.getElementById('update-progress').classList.remove('hidden');
+        
+        // 开始轮询
+        updateProgressInterval = setInterval(async () => {
+            try {
+                const response = await fetch('/api/update_progress');
+                const progress = await response.json();
+                updateProgressDisplay(progress);
+                
+                // 如果进度达到100%，停止轮询
+                if (progress.percentage >= 100) {
+                    clearInterval(updateProgressInterval);
+                }
+            } catch (error) {
+                console.error('获取更新进度错误:', error);
+            }
+        }, 500);
+    }
+    
+    // 停止轮询更新进度
+    function stopProgressPolling() {
+        if (updateProgressInterval) {
+            clearInterval(updateProgressInterval);
+            updateProgressInterval = null;
+        }
+        // 隐藏进度条
+        document.getElementById('update-progress').classList.add('hidden');
+    }
+    
     // 更新数据
     document.getElementById('update-data').addEventListener('click', async () => {
         const btn = document.getElementById('update-data');
@@ -287,7 +355,13 @@
         btn.innerHTML = '<i class="fa fa-spinner fa-spin mr-2"></i> 更新中...';
         btn.disabled = true;
         
+        // 隐藏之前的状态消息
+        document.getElementById('update-status').classList.add('hidden');
+        
         try {
+            // 开始轮询进度
+            startProgressPolling();
+            
             const response = await fetch('/api/update_data', {
                 method: 'POST',
                 headers: {
@@ -296,6 +370,10 @@
             });
             
             const result = await response.json();
+            
+            // 停止轮询
+            stopProgressPolling();
+            
             if (response.ok && result.success) {
                 showStatus('数据更新成功');
                 // 刷新页面以显示最新数据版本
@@ -306,6 +384,9 @@
                 showStatus(result.error || '更新失败', false);
             }
         } catch (error) {
+            // 停止轮询
+            stopProgressPolling();
+            
             showStatus('更新失败，请检查链接是否正确', false);
             console.error('更新数据错误:', error);
         } finally {
