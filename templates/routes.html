@@ -24,33 +24,17 @@
             </div>
         </div>
         
-        <!-- 列选择 -->
+        <!-- 列选择 - 只保留ID和名称 -->
         <div class="column-selection bg-gray-50 p-3 rounded-md">
             <div class="flex items-center space-x-4 flex-wrap">
                 <span class="text-sm font-medium text-gray-700">显示列：</span>
                 <label class="flex items-center text-sm">
-                    <input type="checkbox" id="show-id" class="form-checkbox" checked>
+                    <input type="checkbox" id="show-id" class="form-checkbox" checked disabled>
                     <span class="ml-1 text-gray-700">ID</span>
                 </label>
                 <label class="flex items-center text-sm">
-                    <input type="checkbox" id="show-name" class="form-checkbox" checked>
+                    <input type="checkbox" id="show-name" class="form-checkbox" checked disabled>
                     <span class="ml-1 text-gray-700">名称</span>
-                </label>
-                <label class="flex items-center text-sm">
-                    <input type="checkbox" id="show-type" class="form-checkbox" checked>
-                    <span class="ml-1 text-gray-700">类型</span>
-                </label>
-                <label class="flex items-center text-sm">
-                    <input type="checkbox" id="show-stations" class="form-checkbox" checked>
-                    <span class="ml-1 text-gray-700">站点数量</span>
-                </label>
-                <label class="flex items-center text-sm">
-                    <input type="checkbox" id="show-status" class="form-checkbox" checked>
-                    <span class="ml-1 text-gray-700">状态</span>
-                </label>
-                <label class="flex items-center text-sm">
-                    <input type="checkbox" id="show-color" class="form-checkbox" checked>
-                    <span class="ml-1 text-gray-700">颜色</span>
                 </label>
             </div>
         </div>
@@ -63,10 +47,6 @@
                 <tr class="bg-gray-50">
                     <th class="col-id py-3 px-4 text-left text-sm font-semibold text-gray-700 border-b">ID</th>
                     <th class="col-name py-3 px-4 text-left text-sm font-semibold text-gray-700 border-b">名称</th>
-                    <th class="col-type py-3 px-4 text-left text-sm font-semibold text-gray-700 border-b">类型</th>
-                    <th class="col-stations py-3 px-4 text-left text-sm font-semibold text-gray-700 border-b">站点数量</th>
-                    <th class="col-status py-3 px-4 text-left text-sm font-semibold text-gray-700 border-b">状态</th>
-                    <th class="col-color py-3 px-4 text-left text-sm font-semibold text-gray-700 border-b">颜色</th>
                 </tr>
             </thead>
             <tbody id="route-table-body">
@@ -77,31 +57,9 @@
                                 {{ route.get('id', 'N/A') }}
                             </td>
                             <td class="col-name py-3 px-4 border-b text-sm font-medium">
-                                {{ route.get('name', 'N/A') }}
-                            </td>
-                            <td class="col-type py-3 px-4 border-b text-sm text-gray-600">
-                                {{ route.get('type', 'N/A') }}
-                            </td>
-                            <td class="col-stations py-3 px-4 border-b text-sm text-gray-600">
-                                {{ route.get('stations', [])|length }}
-                            </td>
-                            <td class="col-status py-3 px-4 border-b text-sm">
-                                {% if route.get('hidden', False) %}
-                                    <span class="px-2 py-1 bg-red-100 text-red-800 rounded-full text-xs">隐藏</span>
-                                {% else %}
-                                    <span class="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs">显示</span>
-                                {% endif %}
-                            </td>
-                            <td class="col-color py-3 px-4 border-b">
-                                {% if 'color' in route %}
-                                    <div class="flex items-center">
-                                        <div class="w-6 h-6 rounded-full mr-2" 
-                                             data-color="#{{ route.color|default('000000') }}"></div>
-                                        <span class="text-sm text-gray-600">#{{ route.color|default('000000') }}</span>
-                                    </div>
-                                {% else %}
-                                    N/A
-                                {% endif %}
+                                <a href="/routes/{{ route.get('id', '') }}" class="text-blue-600 hover:underline transition-colors">
+                                    {{ route.get('name', 'N/A') }}
+                                </a>
                             </td>
                         </tr>
                     {% endfor %}
@@ -134,7 +92,7 @@
         if (filteredRoutes.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="6" class="py-12 text-center text-gray-500">
+                    <td colspan="2" class="py-12 text-center text-gray-500">
                         <i class="fa fa-search text-4xl mb-2"></i>
                         <p>未找到匹配的线路</p>
                     </td>
@@ -147,27 +105,9 @@
                         ${route.id || 'N/A'}
                     </td>
                     <td class="col-name py-3 px-4 border-b text-sm font-medium">
-                        ${route.name || 'N/A'}
-                    </td>
-                    <td class="col-type py-3 px-4 border-b text-sm text-gray-600">
-                        ${route.type || 'N/A'}
-                    </td>
-                    <td class="col-stations py-3 px-4 border-b text-sm text-gray-600">
-                        ${route.stations ? route.stations.length : 0}
-                    </td>
-                    <td class="col-status py-3 px-4 border-b text-sm">
-                        ${route.hidden ? 
-                            '<span class="px-2 py-1 bg-red-100 text-red-800 rounded-full text-xs">隐藏</span>' : 
-                            '<span class="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs">显示</span>'}
-                    </td>
-                    <td class="col-color py-3 px-4 border-b">
-                        ${route.color ? 
-                            `<div class="flex items-center">
-                                <div class="w-6 h-6 rounded-full mr-2" 
-                                     style="background-color: #${route.color.toString().padStart(6, '0')}"></div>
-                                <span class="text-sm text-gray-600">#${route.color.toString().padStart(6, '0')}</span>
-                            </div>` : 
-                            'N/A'}
+                        <a href="/routes/${route.id || ''}" class="text-blue-600 hover:underline transition-colors">
+                            ${route.name || 'N/A'}
+                        </a>
                     </td>
                 </tr>
             `).join('');

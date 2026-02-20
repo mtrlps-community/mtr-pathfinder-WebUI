@@ -192,8 +192,9 @@ def station_detail(station_id):
                             if i < len(durations):
                                 # 将秒转换为mm:ss格式
                                 seconds = durations[i]
-                                minutes = seconds // 60
-                                remaining_seconds = seconds % 60
+                                # 转换为整数，避免浮点数格式化错误
+                                minutes = int(seconds // 60)
+                                remaining_seconds = int(seconds % 60)
                                 processed_station['travel_time'] = f"{minutes:02d}:{remaining_seconds:02d}"
                             
                             processed_stations.append(processed_station)
@@ -231,6 +232,105 @@ def routes():
             route['name'] = route['name'].replace('|', ' ')
     
     return render_template('routes.html', routes=routes_data)
+
+@app.route('/routes/<route_id>')
+def route_detail(route_id):
+    # 读取线路数据
+    route_data = None
+    all_stations = {}
+    # 优先使用v3版本的数据文件，因为它包含更多信息
+    data_file_path = config['LOCAL_FILE_PATH_V3']
+    if os.path.exists(data_file_path):
+        with open(data_file_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+            # 统一处理，无论MTR_VER版本，都使用列表格式
+            if isinstance(data, list) and len(data) > 0:
+                # 获取车站数据
+                all_stations = data[0]['stations']
+                # 获取线路数据
+                routes_data = data[0]['routes']
+                # 查找指定线路
+                if isinstance(routes_data, dict):
+                    if route_id in routes_data:
+                        route_data = routes_data[route_id]
+                else:
+                    for route in routes_data:
+                        if isinstance(route, dict) and route.get('id') == route_id:
+                            route_data = route
+                            break
+            elif isinstance(data, dict):
+                # 兼容旧格式
+                all_stations = data.get('stations', {})
+                routes_data = data.get('routes', {})
+                # 查找指定线路
+                if isinstance(routes_data, dict):
+                    if route_id in routes_data:
+                        route_data = routes_data[route_id]
+                else:
+                    for route in routes_data:
+                        if isinstance(route, dict) and route.get('id') == route_id:
+                            route_data = route
+                            break
+    
+    # 如果没有找到线路数据，返回404
+    if not route_data:
+        return render_template('error.html', message='线路不存在'), 404
+    
+    # 将线路名称中的竖杠替换为空格
+    if isinstance(route_data, dict) and 'name' in route_data:
+        route_data['name'] = route_data['name'].replace('|', ' ')
+    
+    # 处理站点列表，添加站点名称和运行时间
+    processed_stations = []
+    durations = route_data.get('durations', [])
+    if isinstance(route_data, dict) and 'stations' in route_data:
+        total_seconds = 0  # 累计运行时长（秒）
+        for i, route_station in enumerate(route_data['stations']):
+            if isinstance(route_station, dict):
+                # 深拷贝，避免修改原始数据
+                processed_station = route_station.copy()
+                # 获取站点ID
+                route_station_id = processed_station.get('id')
+                # 如果能找到对应的车站数据，替换为车站名称
+                if route_station_id in all_stations:
+                    station_data = all_stations[route_station_id]
+                    # 将车站名称中的竖杠替换为空格
+                    if 'name' in station_data:
+                        processed_station['name'] = station_data['name'].replace('|', ' ')
+                
+                # 处理停靠站台：使用原始站点数据中的name字段作为站台编号
+                processed_station['platform'] = route_station.get('name', 'N/A')
+                
+                # 处理停站时长：将毫秒转换为mm:ss格式
+                dwell_time_ms = processed_station.get('dwellTime', 0)
+                dwell_seconds = dwell_time_ms / 1000
+                dwell_minutes = int(dwell_seconds // 60)
+                dwell_remaining_seconds = int(dwell_seconds % 60)
+                processed_station['dwell_time'] = f"{dwell_minutes:02d}:{dwell_remaining_seconds:02d}"
+                
+                # 添加运行时间信息：durations[i]是从当前站点到下一个站点的运行时间
+                if i < len(durations):
+                    # 将秒转换为mm:ss格式
+                    seconds = durations[i]
+                    # 转换为整数，避免浮点数格式化错误
+                    minutes = int(seconds // 60)
+                    remaining_seconds = int(seconds % 60)
+                    processed_station['travel_time'] = f"{minutes:02d}:{remaining_seconds:02d}"
+                    
+                    # 计算累计运行时长（不包括当前站点的停站时间）
+                    if i > 0:
+                        total_seconds += seconds
+                
+                # 处理累计运行时长：转换为mm:ss格式
+                total_minutes = int(total_seconds // 60)
+                total_remaining_seconds = int(total_seconds % 60)
+                processed_station['total_time'] = f"{total_minutes:02d}:{total_remaining_seconds:02d}"
+                
+                processed_stations.append(processed_station)
+        # 更新线路的站点列表
+        route_data['stations'] = processed_stations
+    
+    return render_template('route_detail.html', route=route_data)
 
 
 

@@ -1,0 +1,190 @@
+{% extends 'base.html' %}
+
+{% block scripts %}
+<script>
+    // 处理复选框变化，显示/隐藏对应的字段
+    document.addEventListener('DOMContentLoaded', function() {
+        // 定义字段映射
+        const fieldMap = {
+            'show-platform': '.station-platform',
+            'show-dwell-time': '.station-dwell-time',
+            'show-total-time': '.station-total-time',
+            'show-travel-time': '.station-travel-time'
+        };
+        
+        // 绑定事件监听器
+        Object.keys(fieldMap).forEach(function(checkboxId) {
+            const checkbox = document.getElementById(checkboxId);
+            if (checkbox) {
+                checkbox.addEventListener('change', function() {
+                    const fieldSelector = fieldMap[checkboxId];
+                    const fields = document.querySelectorAll(fieldSelector);
+                    fields.forEach(function(field) {
+                        field.style.display = checkbox.checked ? '' : 'none';
+                    });
+                });
+            }
+        });
+    });
+</script>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2 class="text-2xl font-bold mb-6">线路详情</h2>
+    
+    <!-- 线路基本信息 -->
+    <div class="mb-8">
+        <h3 class="text-xl font-semibold mb-4">基本信息</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="bg-gray-50 p-4 rounded-md">
+                <div class="flex justify-between items-center">
+                    <span class="text-gray-600">线路ID</span>
+                    <span class="font-medium">{{ route.get('id', 'N/A') }}</span>
+                </div>
+            </div>
+            <div class="bg-gray-50 p-4 rounded-md">
+                <div class="flex justify-between items-center">
+                    <span class="text-gray-600">线路名称</span>
+                    <span class="font-medium">{{ route.get('name', 'N/A') }}</span>
+                </div>
+            </div>
+            {% if 'color' in route %}
+            <div class="bg-gray-50 p-4 rounded-md">
+                <div class="flex justify-between items-center">
+                    <span class="text-gray-600">线路颜色</span>
+                    <div class="flex items-center">
+                        <div class="w-4 h-4 rounded-full mr-2" style="background-color: #{{ '{:06x}'.format(route['color']) }}"></div>
+                        <span class="font-medium">#{{ '{:06x}'.format(route['color']) }}</span>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+            {% if 'type' in route %}
+            <div class="bg-gray-50 p-4 rounded-md">
+                <div class="flex justify-between items-center">
+                    <span class="text-gray-600">线路类型</span>
+                    <span class="font-medium">
+                        {% if route['type'] == 'train_normal' %}
+                            列车
+                        {% elif route['type'] == 'train_high_speed' %}
+                            高铁
+                        {% elif route['type'] == 'train_light_rail' %}
+                            轻轨
+                        {% elif route['type'] == 'boat_normal' %}
+                            轮渡
+                        {% elif route['type'] == 'boat_light_rail' %}
+                            邮轮
+                        {% elif route['type'] == 'boat_high_speed' %}
+                            快船
+                        {% elif route['type'] == 'cable_car_normal' %}
+                            缆车
+                        {% elif route['type'] == 'airplane_normal' %}
+                            飞机
+                        {% elif route['type'] == 'walk' %}
+                            步行
+                        {% else %}
+                            {{ route['type'] }}
+                        {% endif %}
+                    </span>
+                </div>
+            </div>
+            {% endif %}
+            <div class="bg-gray-50 p-4 rounded-md">
+                <div class="flex justify-between items-center">
+                    <span class="text-gray-600">站点数量</span>
+                    <span class="font-medium">{{ route.get('stations', [])|length }}</span>
+                </div>
+            </div>
+            <div class="bg-gray-50 p-4 rounded-md">
+                <div class="flex justify-between items-center">
+                    <span class="text-gray-600">状态</span>
+                    <span class="font-medium">
+                        {% if route.get('hidden', False) %}
+                            <span class="text-red-600">隐藏</span>
+                        {% else %}
+                            <span class="text-green-600">显示</span>
+                        {% endif %}
+                    </span>
+                </div>
+            </div>
+            {% if 'number' in route and route['number'] %}
+            <div class="bg-gray-50 p-4 rounded-md">
+                <div class="flex justify-between items-center">
+                    <span class="text-gray-600">线路编号</span>
+                    <span class="font-medium">{{ route['number'] }}</span>
+                </div>
+            </div>
+            {% endif %}
+            {% if 'circularState' in route and route['circularState'] != 'NONE' %}
+            <div class="bg-gray-50 p-4 rounded-md">
+                <div class="flex justify-between items-center">
+                    <span class="text-gray-600">环线状态</span>
+                    <span class="font-medium">{{ route['circularState'] }}</span>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <!-- 线路站点列表 -->
+    {% if route.get('stations') %}
+    <div class="mb-8">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="text-xl font-semibold">站点列表</h3>
+            <div class="flex space-x-4">
+                <label class="flex items-center text-sm">
+                    <input type="checkbox" id="show-platform" class="form-checkbox" checked>
+                    <span class="ml-1 text-gray-700">停靠站台</span>
+                </label>
+                <label class="flex items-center text-sm">
+                    <input type="checkbox" id="show-dwell-time" class="form-checkbox" checked>
+                    <span class="ml-1 text-gray-700">停站时长</span>
+                </label>
+                <label class="flex items-center text-sm">
+                    <input type="checkbox" id="show-total-time" class="form-checkbox" checked>
+                    <span class="ml-1 text-gray-700">累计运行时间</span>
+                </label>
+                <label class="flex items-center text-sm">
+                    <input type="checkbox" id="show-travel-time" class="form-checkbox" checked>
+                    <span class="ml-1 text-gray-700">运行时间</span>
+                </label>
+            </div>
+        </div>
+        <div class="space-y-1" id="stations-1">
+            {% for station in route['stations'] %}
+            <div class="flex items-center justify-between bg-blue-50 p-3 rounded-lg hover:bg-blue-100 transition-colors">
+                <a href="/stations/{{ station.get('id', '') }}" class="text-blue-700 text-sm font-medium mr-4">
+                    {{ station.get('name', 'N/A') }}
+                </a>
+                <div class="flex space-x-4">
+                    <div class="flex items-center station-platform">
+                        <span class="text-gray-600 text-xs">停靠站台:</span>
+                        <span class="text-gray-800 text-xs ml-1">{{ station.get('platform', 'N/A') }}</span>
+                    </div>
+                    <div class="flex items-center station-dwell-time">
+                        <span class="text-gray-600 text-xs">停站时长:</span>
+                        <span class="text-gray-800 text-xs ml-1">{{ station.get('dwell_time', '00:00') }}</span>
+                    </div>
+                    <div class="flex items-center station-total-time">
+                        <span class="text-gray-600 text-xs">累计运行时间:</span>
+                        <span class="text-gray-800 text-xs ml-1">{{ station.get('total_time', '00:00') }}</span>
+                    </div>
+                </div>
+            </div>
+            {% if not loop.last and station.get('travel_time') %}
+            <div class="flex justify-end mt-1 station-travel-time">
+                <span class="text-gray-500 text-xs">运行时间: {{ station['travel_time'] }}</span>
+            </div>
+            {% endif %}
+            {% endfor %}
+        </div>
+    </div>
+    {% else %}
+    <div class="bg-gray-50 p-6 rounded-md text-center">
+        <i class="fa fa-train text-4xl text-gray-400 mb-2"></i>
+        <p class="text-gray-500">该线路未关联任何站点</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

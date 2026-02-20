@@ -90,7 +90,11 @@
                         {% if 'color' in route %}
                         <div class="w-4 h-4 rounded-full mr-2" style="background-color: #{{ '{:06x}'.format(route['color']) }}"></div>
                         {% endif %}
-                        <h4 class="font-medium">{{ route.get('name', 'N/A') }}</h4>
+                        <h4 class="font-medium">
+                            <a href="/routes/{{ route.get('id', '') }}" class="text-blue-600 hover:underline transition-colors">
+                                {{ route.get('name', 'N/A') }}
+                            </a>
+                        </h4>
                     </div>
                     {% if 'type' in route %}
                     <span class="bg-gray-100 text-gray-800 text-xs px-2 py-1 rounded-full">
@@ -161,11 +165,6 @@
                             {% endif %}">
                             {{ station.get('name', 'N/A') }}
                         </a>
-                        {% if not loop.last and station.get('travel_time') %}
-                        <div class="flex justify-end">
-                            <span class="text-gray-500 text-xs">运行时间：{{ station['travel_time'] }}</span>
-                        </div>
-                        {% endif %}
                         {% endfor %}
                     </div>
                 </div>
