@@ -2,6 +2,18 @@
 
 {% block scripts %}
 <script>
+    // 设置颜色盒的背景颜色
+    function setColorBoxes() {
+        const colorBoxes = document.querySelectorAll('.color-box');
+        colorBoxes.forEach(function(box) {
+            const color = box.getAttribute('data-color');
+            if (color) {
+                const hexColor = '#' + parseInt(color).toString(16).padStart(6, '0');
+                box.style.backgroundColor = hexColor;
+            }
+        });
+    }
+    
     // 折叠/展开站点列表
     function toggleStations(stationsId) {
         const stationsDiv = document.getElementById(stationsId);
@@ -15,6 +27,11 @@
             icon.style.transform = 'rotate(0deg)';
         }
     }
+    
+    // 页面加载完成后设置颜色盒
+    document.addEventListener('DOMContentLoaded', function() {
+        setColorBoxes();
+    });
 </script>
 {% endblock %}
 
@@ -43,7 +60,7 @@
                 <div class="flex justify-between items-center">
                     <span class="text-gray-600">车站颜色</span>
                     <div class="flex items-center">
-                        <div class="w-4 h-4 rounded-full mr-2" style="background-color: #{{ '{:06x}'.format(station['color']) }}"></div>
+                        <div class="w-4 h-4 rounded-full mr-2 color-box" data-color="{{ station['color'] }}"></div>
                         <span class="font-medium">#{{ '{:06x}'.format(station['color']) }}</span>
                     </div>
                 </div>
@@ -88,7 +105,7 @@
                 <div class="flex flex-wrap justify-between items-center mb-3">
                     <div class="flex items-center">
                         {% if 'color' in route %}
-                        <div class="w-4 h-4 rounded-full mr-2" style="background-color: #{{ '{:06x}'.format(route['color']) }}"></div>
+                        <div class="w-4 h-4 rounded-full mr-2 color-box" data-color="{{ route['color'] }}"></div>
                         {% endif %}
                         <h4 class="font-medium">
                             <a href="/routes/{{ route.get('id', '') }}" class="text-blue-600 hover:underline transition-colors">

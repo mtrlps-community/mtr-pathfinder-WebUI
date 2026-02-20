@@ -2,8 +2,23 @@
 
 {% block scripts %}
 <script>
+    // 设置颜色盒的背景颜色
+    function setColorBoxes() {
+        const colorBoxes = document.querySelectorAll('.color-box');
+        colorBoxes.forEach(function(box) {
+            const color = box.getAttribute('data-color');
+            if (color) {
+                const hexColor = '#' + parseInt(color).toString(16).padStart(6, '0');
+                box.style.backgroundColor = hexColor;
+            }
+        });
+    }
+    
     // 处理复选框变化，显示/隐藏对应的字段
     document.addEventListener('DOMContentLoaded', function() {
+        // 设置颜色盒
+        setColorBoxes();
+        
         // 定义字段映射
         const fieldMap = {
             'show-platform': '.station-platform',
@@ -54,7 +69,7 @@
                 <div class="flex justify-between items-center">
                     <span class="text-gray-600">线路颜色</span>
                     <div class="flex items-center">
-                        <div class="w-4 h-4 rounded-full mr-2" style="background-color: #{{ '{:06x}'.format(route['color']) }}"></div>
+                        <div class="w-4 h-4 rounded-full mr-2 color-box" data-color="{{ route['color'] }}"></div>
                         <span class="font-medium">#{{ '{:06x}'.format(route['color']) }}</span>
                     </div>
                 </div>
