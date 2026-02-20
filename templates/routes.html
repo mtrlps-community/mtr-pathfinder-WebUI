@@ -14,6 +14,7 @@
             </div>
             <div class="flex space-x-2">
                 <select id="route-sort" class="form-input">
+                    <option value="default" selected>按数据文件默认排序</option>
                     <option value="name">按名称排序</option>
                     <option value="id">按ID排序</option>
                     <option value="stations">按站点数量排序</option>
@@ -32,8 +33,9 @@
         <table class="min-w-full bg-white border border-gray-200">
             <thead>
                 <tr class="bg-gray-50">
-                    <th class="col-id py-3 px-4 text-left text-sm font-semibold text-gray-700 border-b">ID</th>
+                    <th class="col-id py-3 px-4 text-left text-sm font-semibold text-gray-700 border-b whitespace-nowrap">ID</th>
                     <th class="col-name py-3 px-4 text-left text-sm font-semibold text-gray-700 border-b">名称</th>
+                    <th class="col-stations py-3 px-4 text-left text-sm font-semibold text-gray-700 border-b whitespace-nowrap">站点数量</th>
                 </tr>
             </thead>
             <tbody id="route-table-body">
@@ -48,11 +50,14 @@
                                     {{ route.get('name', 'N/A') }}
                                 </a>
                             </td>
+                            <td class="col-stations py-3 px-4 border-b text-sm text-gray-600 whitespace-nowrap">
+                                {{ route.get('stations', [])|length }}
+                            </td>
                         </tr>
                     {% endfor %}
                 {% else %}
                     <tr>
-                        <td colspan="6" class="py-12 text-center text-gray-500">
+                        <td colspan="3" class="py-12 text-center text-gray-500">
                             <i class="fa fa-train text-4xl mb-2"></i>
                             <p>暂无线路数据，请先在控制台更新数据</p>
                         </td>
@@ -84,7 +89,7 @@
     
     // 确保初始数据正确
     let filteredRoutes = routesData && Array.isArray(routesData) ? [...routesData] : [];
-    let sortField = 'name';
+    let sortField = 'default';
     let sortDirection = 'asc';
     
     // 简化版搜索功能 - 只搜索线路名称
@@ -119,7 +124,7 @@
         if (!filteredRoutes || filteredRoutes.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="2" class="py-12 text-center text-gray-500">
+                    <td colspan="3" class="py-12 text-center text-gray-500">
                         <i class="fa fa-search text-4xl mb-2"></i>
                         <p>未找到匹配的线路</p>
                     </td>
@@ -135,6 +140,9 @@
                         <a href="/routes/${route.id || ''}" class="text-blue-600 hover:underline transition-colors">
                             ${route.name || 'N/A'}
                         </a>
+                    </td>
+                    <td class="col-stations py-3 px-4 border-b text-sm text-gray-600 whitespace-nowrap">
+                        ${route.stations ? route.stations.length : 0}
                     </td>
                 </tr>
             `).join('');
@@ -192,26 +200,55 @@
             return;
         }
         
-        filteredRoutes.sort(function(a, b) {
-            let aVal, bVal;
+        // 如果选择默认排序
+        if (sortField === 'default') {
+            // 先获取当前搜索条件下的原始顺序
+            const searchInput = document.getElementById('route-search');
+            const query = searchInput ? searchInput.value.toLowerCase().trim() : '';
+            let originalOrderRoutes = [];
             
-            if (sortField === 'stations') {
-                aVal = a.stations ? a.stations.length : 0;
-                bVal = b.stations ? b.stations.length : 0;
+            if (!query) {
+                // 搜索词为空，使用所有原始数据
+                originalOrderRoutes = routesData && Array.isArray(routesData) ? [...routesData] : [];
             } else {
-                aVal = a[sortField] || '';
-                bVal = b[sortField] || '';
-                
-                if (typeof aVal === 'string' && typeof bVal === 'string') {
-                    aVal = aVal.toLowerCase();
-                    bVal = bVal.toLowerCase();
-                }
+                // 搜索词不为空，过滤原始数据
+                originalOrderRoutes = routesData.filter(route => {
+                    const routeName = route.name ? route.name.toLowerCase() : '';
+                    return routeName.includes(query);
+                });
             }
             
-            if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
-            if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
-            return 0;
-        });
+            // 根据排序方向调整顺序
+            if (sortDirection === 'asc') {
+                // 正序：使用原始顺序
+                filteredRoutes = [...originalOrderRoutes];
+            } else {
+                // 倒序：使用原始顺序的逆序
+                filteredRoutes = [...originalOrderRoutes].reverse();
+            }
+        } else {
+            // 其他排序方式
+            filteredRoutes.sort(function(a, b) {
+                let aVal, bVal;
+                
+                if (sortField === 'stations') {
+                    aVal = a.stations ? a.stations.length : 0;
+                    bVal = b.stations ? b.stations.length : 0;
+                } else {
+                    aVal = a[sortField] || '';
+                    bVal = b[sortField] || '';
+                    
+                    if (typeof aVal === 'string' && typeof bVal === 'string') {
+                        aVal = aVal.toLowerCase();
+                        bVal = bVal.toLowerCase();
+                    }
+                }
+                
+                if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
+                if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
+                return 0;
+            });
+        }
         
         renderTable();
     }
