@@ -76,9 +76,9 @@
     let intervalData = {};
     
     try {
-        // 使用JSON.parse解析JSON字符串，避免语法错误
-        routesData = JSON.parse('{{ routes|tojson|safe }}');
-        intervalData = JSON.parse('{{ interval_data|tojson|safe }}');
+        // 使用JSON.parse解析JSON字符串，使用双引号避免单引号转义问题
+        routesData = JSON.parse("{{ routes|tojson }}");
+        intervalData = JSON.parse("{{ interval_data|tojson }}");
     } catch (error) {
         console.error('Error loading data:', error);
         // 如果解析失败，使用默认空值
@@ -86,12 +86,19 @@
         intervalData = {};
     }
     
+    // 确保数据类型正确
+    if (!Array.isArray(routesData)) {
+        routesData = [];
+    }
+    if (typeof intervalData !== 'object' || intervalData === null) {
+        intervalData = {};
+    }
+    
     // 添加调试日志
     console.log('Routes data length:', routesData.length);
     console.log('Interval data keys:', Object.keys(intervalData).length);
     
-    // 确保初始数据正确
-    let filteredRoutes = routesData && Array.isArray(routesData) ? [...routesData] : [];
+    let filteredRoutes = [...routesData];
     let sortField = 'default';
     let sortDirection = 'asc';
     

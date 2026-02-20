@@ -587,7 +587,8 @@ def create_graph(data: list, IGNORED_LINES: list[str],
                  version1: str, version2: str,
                  LOCAL_FILE_PATH, STATION_TABLE,
                  WILD_ADDITION, TRANSFER_ADDITION,
-                 MAX_WILD_BLOCKS, MTR_VER, cache) -> tuple[nx.MultiDiGraph, bool]:
+                 MAX_WILD_BLOCKS, MTR_VER, cache, ONLY_ROUTES: list[str] = [],
+                 ROUTE_MAPPING: dict = {}) -> tuple[nx.MultiDiGraph, bool]:
     '''
     Create the graph of all routes.
     '''
@@ -603,7 +604,8 @@ def create_graph(data: list, IGNORED_LINES: list[str],
     used_cache = False
     if cache is True and IGNORED_LINES == original_ignored_lines and \
             CALCULATE_BOAT is True and ONLY_LRT is False and \
-            AVOID_STATIONS == [] and route_type == RouteType.WAITING:
+            AVOID_STATIONS == [] and route_type == RouteType.WAITING and \
+            not ONLY_ROUTES:
         for s in original_ignored_lines:
             m.update(s.encode('utf-8'))
 
@@ -760,9 +762,21 @@ def create_graph(data: list, IGNORED_LINES: list[str],
                         break
 
     TEMP_IGNORED_LINES = [x.lower().strip() for x in IGNORED_LINES if x != '']
+    TEMP_ONLY_ROUTES = [x.lower().strip() for x in ONLY_ROUTES if x != '']
     # 添加普通路线
     for route in data[0]['routes']:
+        # 应用线路映射配置
         n: str = route['name']
+        # 如果当前路线名称在映射表中，使用映射后的名称
+        if ROUTE_MAPPING and n in ROUTE_MAPPING:
+            n = ROUTE_MAPPING[n]
+        elif ROUTE_MAPPING:
+            # 尝试匹配路线名称的不同格式
+            for original_name, mapped_name in ROUTE_MAPPING.items():
+                if original_name in n:
+                    n = mapped_name
+                    break
+        
         # 禁路线
         number: str = route['number']
         route_names = [n, n.split('|')[0]]
@@ -807,6 +821,27 @@ def create_graph(data: list, IGNORED_LINES: list[str],
 
         if ONLY_LRT and route['type'] != 'train_light_rail':
             continue
+            
+        if TEMP_ONLY_ROUTES:
+            in_only_routes = False
+            for x in route_names:
+                x = x.lower().strip()
+                if x in TEMP_ONLY_ROUTES:
+                    in_only_routes = True
+                    break
+                    
+                simp1 = opencc3.convert(x)
+                if simp1 in TEMP_ONLY_ROUTES:
+                    in_only_routes = True
+                    break
+                    
+                simp2 = opencc3.convert(opencc4.convert(x))
+                if simp2 in TEMP_ONLY_ROUTES:
+                    in_only_routes = True
+                    break
+            
+            if not in_only_routes:
+                continue
 
         if route_type == RouteType.WAITING:
             if route['type'] == 'cable_car_normal':

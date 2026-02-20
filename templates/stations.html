@@ -69,14 +69,18 @@
     // 车站数据
     let stationsData = [];
     try {
-        // 使用JSON.parse解析JSON字符串，避免语法错误
-        stationsData = JSON.parse('{{ stations|tojson|safe }}');
+        // 使用JSON.parse解析JSON字符串，使用双引号避免单引号转义问题
+        stationsData = JSON.parse("{{ stations|tojson }}");
     } catch (error) {
         console.error('Error loading stations data:', error);
         // 如果解析失败，使用默认空值
         stationsData = [];
     }
-    let filteredStations = stationsData && Array.isArray(stationsData) ? [...stationsData] : [];
+    // 确保stationsData是数组
+    if (!Array.isArray(stationsData)) {
+        stationsData = [];
+    }
+    let filteredStations = [...stationsData];
     let sortField = 'default';
     let sortDirection = 'asc';
     

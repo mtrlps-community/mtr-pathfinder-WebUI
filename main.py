@@ -47,6 +47,7 @@ default_config = {
     'WILD_ADDITION': {},
     'STATION_TABLE': {},
     'ORIGINAL_IGNORED_LINES': [],
+    'ROUTE_MAPPING': {},
     'CONSOLE_PASSWORD': 'admin',
 }
 
@@ -536,6 +537,8 @@ def api_find_route():
                 UPDATE_DATA=False,
                 GEN_DEPARTURE=False,
                 IGNORED_LINES=data.get('ignored_lines', []),
+                ONLY_ROUTES=data.get('only_routes', []),
+                ROUTE_MAPPING=data.get('route_mapping_dict', {}),
                 AVOID_STATIONS=data.get('avoid_stations', []),
                 CALCULATE_HIGH_SPEED=not data.get('disable_high_speed', False),
                 CALCULATE_BOAT=not data.get('disable_boat', False),
@@ -655,7 +658,9 @@ def api_find_route():
                 config['TRANSFER_ADDITION'],
                 config['MAX_WILD_BLOCKS'],
                 config['MTR_VER'],
-                True
+                True,
+                data.get('only_routes', []),
+                data.get('route_mapping_dict', {})
             )
             
             # 更新进度
@@ -777,6 +782,13 @@ def api_progress():
     global search_progress
     return jsonify(search_progress)
 
+@app.route('/api/get_config', methods=['GET'])
+def api_get_config():
+    """获取配置信息"""
+    return jsonify({
+        'route_mapping': config.get('ROUTE_MAPPING', {})
+    })
+
 @app.route('/api/update_progress', methods=['GET'])
 def api_update_progress():
     """返回当前数据更新进度"""
@@ -861,12 +873,14 @@ def api_generate_image():
                 UPDATE_DATA=False,
                 GEN_DEPARTURE=False,
                 IGNORED_LINES=data.get('ignored_lines', []),
+                ONLY_ROUTES=data.get('only_routes', []),
+                ROUTE_MAPPING=data.get('route_mapping_dict', {}),
                 AVOID_STATIONS=data.get('avoid_stations', []),
                 CALCULATE_HIGH_SPEED=not data.get('disable_high_speed', False),
                 CALCULATE_BOAT=not data.get('disable_boat', False),
                 CALCULATE_WALKING_WILD=data.get('enable_wild', False),
                 ONLY_LRT=data.get('only_lrt', False),
-                DETAIL=True,
+                DETAIL=data.get('detail', True),
                 MAX_HOUR=config['MAX_HOUR'],
                 gen_image=True,
                 show=False
@@ -918,7 +932,9 @@ def api_generate_image():
                 config['TRANSFER_ADDITION'],
                 config['MAX_WILD_BLOCKS'],
                 config['MTR_VER'],
-                True
+                True,
+                data.get('only_routes', []),
+                data.get('route_mapping_dict', {})
             )
             
             # 查找最短路径
@@ -959,7 +975,7 @@ def api_generate_image():
                 BASE_PATH,
                 station_version,
                 interval_version,
-                True,  # DETAIL
+                data.get('detail', True),  # DETAIL
                 PNG_PATH,
                 False  # show
             )
@@ -1040,6 +1056,9 @@ def api_update_config():
     
     if 'original_ignored_lines' in data:
         config['ORIGINAL_IGNORED_LINES'] = data['original_ignored_lines']
+    
+    if 'route_mapping' in data:
+        config['ROUTE_MAPPING'] = data['route_mapping']
     
     save_config(config)
     return jsonify({'success': True})
