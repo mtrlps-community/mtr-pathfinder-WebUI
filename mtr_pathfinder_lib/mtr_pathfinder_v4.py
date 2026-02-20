@@ -459,7 +459,8 @@ def gen_timetable(data: dict, IGNORED_LINES: list[str],
                   AVOID_STATIONS: list, route_type: RouteType,
                   original_ignored_lines: list[str], DEP_PATH: str,
                   version1: str, version2: str,
-                  STATION_TABLE, WILD_ADDITION, TRANSFER_ADDITION
+                  STATION_TABLE, WILD_ADDITION, TRANSFER_ADDITION,
+                  ONLY_ROUTES: list[str] = [], ROUTE_MAPPING: dict = {}
                   ) -> list[tuple]:
     '''
     Generate the timetable of all routes.
@@ -474,7 +475,8 @@ def gen_timetable(data: dict, IGNORED_LINES: list[str],
     m = hashlib.md5()
     if IGNORED_LINES == original_ignored_lines and \
             CALCULATE_BOAT is True and ONLY_LRT is False and \
-            AVOID_STATIONS == [] and route_type == RouteType.REAL_TIME:
+            AVOID_STATIONS == [] and route_type == RouteType.REAL_TIME and \
+            not ONLY_ROUTES and not ROUTE_MAPPING:
         for s in original_ignored_lines:
             m.update(s.encode('utf-8'))
 
@@ -493,6 +495,7 @@ def gen_timetable(data: dict, IGNORED_LINES: list[str],
 
     # 添加普通路线
     TEMP_IGNORED_LINES = [x.lower() for x in IGNORED_LINES]
+    TEMP_ONLY_ROUTES = [x.lower().strip() for x in ONLY_ROUTES if x != '']
     tt_dict = {}
     for route_id in dep_data.keys():
         if route_id not in data['routes']:
@@ -500,12 +503,41 @@ def gen_timetable(data: dict, IGNORED_LINES: list[str],
 
         route = data['routes'][route_id]
         n: str = route['name']
-        if n.split('|')[0].lower() in TEMP_IGNORED_LINES or \
-                n.lower() in TEMP_IGNORED_LINES:
+        
+        # 应用线路映射配置
+        mapped_name = n
+        if ROUTE_MAPPING and n in ROUTE_MAPPING:
+            mapped_name = ROUTE_MAPPING[n]
+        elif ROUTE_MAPPING:
+            # 尝试匹配路线名称的不同格式
+            for original_name, new_name in ROUTE_MAPPING.items():
+                if original_name in n:
+                    mapped_name = new_name
+                    break
+        
+        # 检查是否在忽略路线中
+        if mapped_name.split('|')[0].lower() in TEMP_IGNORED_LINES or \
+                mapped_name.lower() in TEMP_IGNORED_LINES:
             continue
 
-        if n.count('|') > 1:
-            if n.split('|')[1].split('|')[0].lower() in TEMP_IGNORED_LINES:
+        if mapped_name.count('|') > 1:
+            if mapped_name.split('|')[1].split('|')[0].lower() in TEMP_IGNORED_LINES:
+                continue
+        
+        # 仅路线过滤
+        if TEMP_ONLY_ROUTES:
+            in_only_routes = False
+            route_names = [mapped_name, mapped_name.split('|')[0]]
+            if mapped_name.count('|') > 0:
+                route_names.append(mapped_name.split('|')[1].split('|')[0])
+            
+            for x in route_names:
+                x = x.lower().strip()
+                if x in TEMP_ONLY_ROUTES:
+                    in_only_routes = True
+                    break
+            
+            if not in_only_routes:
                 continue
 
         if (not CALCULATE_HIGH_SPEED) and route['type'] == 'train_high_speed':
@@ -1018,9 +1050,10 @@ def main(station1: str, station2: str, LINK: str,
          TRANSFER_ADDITION: dict[str, list[str]] = {},
          WILD_ADDITION: dict[str, list[str]] = {},
          STATION_TABLE: dict[str, str] = {},
-         ORIGINAL_IGNORED_LINES: list = [], UPDATE_DATA: bool = False,
+         ORIGINAL_IGNORED_LINES: list = [], ROUTE_MAPPING: dict = {},
+         UPDATE_DATA: bool = False,
          GEN_DEPARTURE: bool = False, IGNORED_LINES: list = [],
-         AVOID_STATIONS: list = [],
+         ONLY_ROUTES: list[str] = [], AVOID_STATIONS: list = [],
          CALCULATE_HIGH_SPEED: bool = True, CALCULATE_BOAT: bool = True,
          CALCULATE_WALKING_WILD: bool = False, ONLY_LRT: bool = False,
          DETAIL: bool = False, MAX_HOUR=3, timetable=None, gen_image=True,
@@ -1077,7 +1110,8 @@ def main(station1: str, station2: str, LINK: str,
             data, IGNORED_LINES, CALCULATE_HIGH_SPEED, CALCULATE_BOAT,
             CALCULATE_WALKING_WILD, ONLY_LRT, AVOID_STATIONS, route_type,
             ORIGINAL_IGNORED_LINES, DEP_PATH, version1, version2,
-            STATION_TABLE, WILD_ADDITION, TRANSFER_ADDITION)
+            STATION_TABLE, WILD_ADDITION, TRANSFER_ADDITION,
+            ONLY_ROUTES, ROUTE_MAPPING)
 
     tt, trips = load_tt(timetable, data, station1, station2, departure_time,
                         DEP_PATH, STATION_TABLE, TRANSFER_ADDITION,
@@ -1127,6 +1161,9 @@ def run():
     STATION_TABLE: dict[str, str] = {}
     # 禁止乘坐的路线（未开通的路线）
     ORIGINAL_IGNORED_LINES: list = []
+    # 路线名称映射
+    # "原始路线名称: 映射后的路线名称, ..."
+    ROUTE_MAPPING: dict = {}
 
     # 文件设置
     link_hash = hashlib.md5(LINK.encode('utf-8')).hexdigest()
@@ -1143,6 +1180,9 @@ def run():
     # 寻路设置
     # 避开的路线
     IGNORED_LINES: list = []
+    # 仅使用指定路线
+    # "路线名称1, 路线名称2, ..."
+    ONLY_ROUTES: list = []
     # 避开的车站
     AVOID_STATIONS: list = []
     # 允许高铁，默认值为True
@@ -1166,8 +1206,8 @@ def run():
     main(station1, station2, LINK, LOCAL_FILE_PATH, DEP_PATH,
          BASE_PATH, PNG_PATH, MAX_WILD_BLOCKS,
          TRANSFER_ADDITION, WILD_ADDITION, STATION_TABLE,
-         ORIGINAL_IGNORED_LINES, UPDATE_DATA, GEN_DEPARTURE,
-         IGNORED_LINES, AVOID_STATIONS, CALCULATE_HIGH_SPEED,
+         ORIGINAL_IGNORED_LINES, ROUTE_MAPPING, UPDATE_DATA, GEN_DEPARTURE,
+         IGNORED_LINES, ONLY_ROUTES, AVOID_STATIONS, CALCULATE_HIGH_SPEED,
          CALCULATE_BOAT, CALCULATE_WALKING_WILD, ONLY_LRT, DETAIL, MAX_HOUR,
          show=True, departure_time=DEP_TIME)
 

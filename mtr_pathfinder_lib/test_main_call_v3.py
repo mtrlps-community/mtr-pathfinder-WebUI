@@ -22,7 +22,10 @@ WILD_ADDITION: dict[str, list[str]] = {}
 # "车站昵称: 车站实际名称, ..."
 STATION_TABLE: dict[str, str] = {}
 # 禁止乘坐的路线（未开通的路线）
-ORIGINAL_IGNORED_LINES: list = ['Hana-Koshi Line']
+ORIGINAL_IGNORED_LINES: list = []
+# 路线名称映射
+# "原始路线名称: 映射后的路线名称, ..."
+ROUTE_MAPPING: dict = {}
 
 link_hash = hashlib.md5(LINK.encode('utf-8')).hexdigest()
 # 文件设置
@@ -39,10 +42,13 @@ GEN_ROUTE_INTERVAL: bool = False
 # 寻路设置
 # 避开的路线
 IGNORED_LINES: list = []
+# 仅使用指定路线
+# "路线名称1, 路线名称2, ..."
+ONLY_ROUTES: list = []
 # 避开的车站
 AVOID_STATIONS: list = []
 # 允许高铁，默认值为True
-CALCULATE_HIGH_SPEED: bool = False
+CALCULATE_HIGH_SPEED: bool = True
 # 允许船，默认值为True
 CALCULATE_BOAT: bool = True
 # 允许非出站换乘（越野），默认值为False
@@ -55,4 +61,4 @@ IN_THEORY: bool = False
 # 输出的图片中是否显示详细信息，默认值为False
 DETAIL: bool = True
 
-main(station1, station2, LINK, LOCAL_FILE_PATH, INTERVAL_PATH, BASE_PATH, PNG_PATH, MAX_WILD_BLOCKS, TRANSFER_ADDITION, WILD_ADDITION, STATION_TABLE, ORIGINAL_IGNORED_LINES, UPDATE_DATA, GEN_ROUTE_INTERVAL, IGNORED_LINES, AVOID_STATIONS, CALCULATE_HIGH_SPEED, CALCULATE_BOAT, CALCULATE_WALKING_WILD, ONLY_LRT, IN_THEORY, DETAIL, MTR_VER, show=True)
+main(station1, station2, LINK, LOCAL_FILE_PATH, INTERVAL_PATH, BASE_PATH, PNG_PATH, MAX_WILD_BLOCKS, TRANSFER_ADDITION, WILD_ADDITION, STATION_TABLE, ORIGINAL_IGNORED_LINES, ROUTE_MAPPING, UPDATE_DATA, GEN_ROUTE_INTERVAL, IGNORED_LINES, ONLY_ROUTES, AVOID_STATIONS, CALCULATE_HIGH_SPEED, CALCULATE_BOAT, CALCULATE_WALKING_WILD, ONLY_LRT, IN_THEORY, DETAIL, MTR_VER, show=True)

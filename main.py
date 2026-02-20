@@ -34,6 +34,9 @@ data_update_progress = {
     'message': '正在准备数据更新...'
 }
 
+# 寻路次数统计
+route_search_count = 0
+
 # 配置文件路径
 CONFIG_PATH = 'config.json'
 
@@ -410,16 +413,17 @@ def admin():
                 ).strftime('%Y%m%d-%H%M')
             
             return render_template('admin.html', 
-                                   config=config, 
-                                   station_version=station_version,
-                                   station_version_v4=station_version_v4,
-                                   route_version_v4=route_version_v4,
-                                   interval_version=interval_version,
-                                   error='密码错误')
+                           config=config, 
+                           station_version=station_version,
+                           station_version_v4=station_version_v4,
+                           route_version_v4=route_version_v4,
+                           interval_version=interval_version,
+                           route_search_count=route_search_count,
+                           error='密码错误')
     
     # GET请求，检查是否已登录
     if not session.get('admin_logged_in'):
-        return render_template('admin.html', error=None)
+        return render_template('admin.html', error=None, route_search_count=route_search_count)
     
     # 已登录，显示控制台内容
     # 获取文件版本信息
@@ -450,7 +454,8 @@ def admin():
                            station_version=station_version,
                            station_version_v4=station_version_v4,
                            route_version_v4=route_version_v4,
-                           interval_version=interval_version)
+                           interval_version=interval_version,
+                           route_search_count=route_search_count)
 
 @app.route('/admin/logout', methods=['POST'])
 def admin_logout():
@@ -469,6 +474,10 @@ def api_find_route():
         'stage': '准备中...',
         'message': '正在初始化寻路参数...'
     }
+    
+    # 增加寻路次数统计
+    global route_search_count
+    route_search_count += 1
     
     # 处理寻路请求
     data = request.json
@@ -1029,6 +1038,60 @@ def api_get_image():
         print(f"获取图片错误: {traceback.format_exc()}")
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/clear_cache', methods=['POST'])
+def api_clear_cache():
+    """清除寻路缓存"""
+    try:
+        import os
+        import shutil
+        
+        # 清除mtr_pathfinder_temp文件夹中的所有内容
+        temp_dir = 'mtr_pathfinder_temp'
+        deleted_files = []
+        
+        if os.path.exists(temp_dir):
+            # 遍历文件夹中的所有文件和子文件夹
+            for root, dirs, files in os.walk(temp_dir):
+                for file in files:
+                    file_path = os.path.join(root, file)
+                    os.remove(file_path)
+                    deleted_files.append(file_path)
+                for dir in dirs:
+                    dir_path = os.path.join(root, dir)
+                    shutil.rmtree(dir_path)
+                    deleted_files.append(dir_path)
+        
+        return jsonify({'success': True, 'deleted_files': deleted_files})
+    except Exception as e:
+        import traceback
+        print(f"清除寻路缓存错误: {traceback.format_exc()}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/clear_images', methods=['POST'])
+def api_clear_images():
+    """清除寻路结果图片"""
+    try:
+        import os
+        import glob
+        
+        # 清除generated_images目录下的所有PNG文件
+        output_dir = 'generated_images'
+        if os.path.exists(output_dir):
+            png_files = glob.glob(os.path.join(output_dir, '*.png'))
+            for png_file in png_files:
+                if os.path.exists(png_file):
+                    os.remove(png_file)
+        
+        # 重置最新图片路径
+        global latest_image_path
+        latest_image_path = ''
+        
+        return jsonify({'success': True})
+    except Exception as e:
+        import traceback
+        print(f"清除结果图片错误: {traceback.format_exc()}")
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/update_config', methods=['POST'])
 def api_update_config():
     # 更新配置
@@ -1165,8 +1228,81 @@ def api_update_data():
             'message': f'更新失败: {str(e)}'
         })
         return jsonify({'error': str(e)}), 500
-
+def check_and_update_data():
+    """检查数据文件是否存在，如果不存在则自动更新数据"""
+    import os
+    import sys
+    from io import StringIO
+    
+    print("检查数据文件是否存在...")
+    
+    # 检查必要的数据文件是否存在
+    required_files = [
+        config['LOCAL_FILE_PATH_V3'],
+        config['INTERVAL_PATH_V3'],
+        config['LOCAL_FILE_PATH_V4'],
+        config['DEP_PATH_V4']
+    ]
+    
+    # 检查是否有任何文件不存在
+    files_exist = all(os.path.exists(file_path) for file_path in required_files)
+    
+    if files_exist:
+        print("所有数据文件已存在，无需更新")
+        return True
+    
+    print("检测到缺失的数据文件，正在自动更新...")
+    
+    try:
+        # 保存原始stdin
+        original_stdin = sys.stdin
+        # 创建模拟输入流，自动返回'y'
+        mock_stdin = StringIO('y\n' * 20)  # 提供足够的'y'响应
+        sys.stdin = mock_stdin
+        
+        # 1. 生成v3版程序所需的数据
+        print("正在生成V3版车站数据...")
+        fetch_data_v3(
+            config['LINK'],
+            config['LOCAL_FILE_PATH_V3'],
+            config['MTR_VER']
+        )
+        
+        print("正在生成V3版间隔数据...")
+        gen_route_interval_v3(
+            config['LOCAL_FILE_PATH_V3'],
+            config['INTERVAL_PATH_V3'],
+            config['LINK'],
+            config['MTR_VER']
+        )
+        
+        # 2. 生成v4版程序所需的数据
+        print("正在生成V4版车站数据...")
+        from mtr_pathfinder_lib.mtr_pathfinder_v4 import fetch_data as fetch_data_v4
+        fetch_data_v4(
+            config['LINK'],
+            config['LOCAL_FILE_PATH_V4'],
+            config['MAX_WILD_BLOCKS']
+        )
+        
+        print("正在生成V4版发车数据...")
+        gen_departure_v4(
+            config['LINK'],
+            config['DEP_PATH_V4']
+        )
+        
+        print("数据更新完成！")
+        return True
+    except Exception as e:
+        print(f"数据更新失败: {str(e)}")
+        return False
+    finally:
+        # 恢复原始stdin
+        sys.stdin = original_stdin
 
 
 if __name__ == '__main__':
+    # 检查并更新数据文件
+    check_and_update_data()
+    
     app.run(debug=True, port=5000)

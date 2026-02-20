@@ -1045,8 +1045,8 @@
             routeInfoDiv.className = 'route-info';
             
             // 解析路线详细信息，添加默认值
-            // 路线详情数组结构：[起点, 终点, 颜色, 路线名, 终点站信息, 时长, 等车时间, 发车间隔, 交通类型]
-            const [, , color = '#4a90e2', routeName = '', terminus = '', duration = 0, segmentWaitingTime = 0, departureInterval = 0, trainType = 'train_normal'] = routeDetail;
+            // 路线详情数组结构：[起点, 终点, 颜色, 路线名, 终点站信息, 时长, 等车时间, 发车间隔, 交通类型, 站台编号]
+            const [, , color = '#4a90e2', routeName = '', terminus = '', duration = 0, segmentWaitingTime = 0, departureInterval = 0, trainType = 'train_normal', platform = ''] = routeDetail;
             
             // 处理路线名称，只保留中文和英文，去除方向和分隔符
             // 原始格式："地鐵南大陸綫北段|Metro South Continental Line N. Section||to New Red Leaves"
@@ -1094,12 +1094,32 @@
                 routeLeftContent.innerHTML = `
                     ${transportIcon}
                     <span class="route-name">${processedRouteName}</span>
-                    <span style="margin-left: 8px; opacity: 0.8;">(${transportName})</span>
+                    <span style="margin-left: 8px; opacity: 0.8; padding: 1px 6px; background-color: #e5e7eb; color: #374151; border: 1px solid #d1d5db; border-radius: 4px; font-size: 0.85em;">${transportName}</span>
+                `;
+            }
+            
+            // 路线信息右侧内容（站台显示）
+            const routeRightContent = document.createElement('div');
+            routeRightContent.style.display = 'flex';
+            routeRightContent.style.alignItems = 'center';
+            routeRightContent.style.justifyContent = 'flex-end';
+            routeRightContent.style.flex = '1';
+            routeRightContent.style.gap = '8px';
+            
+            // 显示站台编号
+            if (platform && platform.trim() !== '') {
+                routeRightContent.innerHTML = `
+                    <span class="station-info" style="opacity: 0.9; font-size: 0.85rem; font-weight: lighter;">站台 ${platform}</span>
+                `;
+            } else {
+                routeRightContent.innerHTML = `
+                    <span class="station-info" style="opacity: 0.9; font-size: 0.85rem; font-weight: lighter;"></span>
                 `;
             }
             
             // 直接添加内容到routeTag
             routeTag.appendChild(routeLeftContent);
+            routeTag.appendChild(routeRightContent);
             
             // 非步行路线才添加叉按钮
             if (!isWalk) {
@@ -1325,7 +1345,7 @@
                         otherRouteTag.innerHTML = `
                             ${otherTransportIcon}
                             <span class="other-route-name">${processedOtherRouteName}</span>
-                            <span style="margin-left: 4px; opacity: 0.8; font-size: 0.85em;">(${otherTransportName})</span>
+                            <span style="margin-left: 4px; opacity: 0.8; padding: 1px 6px; background-color: #e5e7eb; color: #374151; border: 1px solid #d1d5db; border-radius: 4px; font-size: 0.85em;">${otherTransportName}</span>
                         `;
                     }
                     

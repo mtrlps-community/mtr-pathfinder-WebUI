@@ -1173,12 +1173,15 @@ def process_path(G: nx.MultiDiGraph, path: list, shortest_distance: int,
                              route_name.split('||')[0]).strip()
                     route = route.replace('|', ' ')
                     next_id = None
+                    platform = ''
+                    
                     if MTR_VER == 3:
                         sta_id = z['stations'][-1].split('_')[0]
                         for q, x in enumerate(z['stations']):
                             if x.split('_')[0] == sta1_id and \
                                     q != len(z['stations']) - 1:
                                 next_id = z['stations'][q + 1].split('_')[0]
+                                platform = x.split('_')[1] if len(x.split('_')) > 1 else ''
                                 break
                     else:
                         sta_id = z['stations'][-1]['id']
@@ -1186,6 +1189,7 @@ def process_path(G: nx.MultiDiGraph, path: list, shortest_distance: int,
                             if x['id'] == sta1_id and \
                                     q != len(z['stations']) - 1:
                                 next_id = z['stations'][q + 1]['id']
+                                platform = x.get('name', '')
                                 break
 
                     if z['circular'] in ['cw', 'ccw']:
@@ -1236,7 +1240,7 @@ def process_path(G: nx.MultiDiGraph, path: list, shortest_distance: int,
                 sep_waiting = int(intervals[route_name])
 
             r = (sta1_name, sta2_name, color, route, terminus, duration,
-                 waiting, sep_waiting, train_type)
+                 waiting, sep_waiting, train_type, platform)
 
             if len(each_route_time) > 0:
                 old_r = each_route_time[-1]
@@ -1276,7 +1280,7 @@ def save_image(route_type: RouteType, every_route_time: list,
     time_img = Image.open(PNG_PATH + os.sep + 'time.png')
     for route_data in every_route_time:
         now_sta = (route_data[0], route_data[1])
-        route_img = Image.open(PNG_PATH + os.sep + f'{route_data[-1]}.png')
+        route_img = Image.open(PNG_PATH + os.sep + f'{route_data[8]}.png')
         if route_data[4][0] is True:
             terminus = ' '.join(route_data[4][1:])
         else:
@@ -1297,22 +1301,22 @@ def save_image(route_type: RouteType, every_route_time: list,
             pattern.append((ImagePattern.STATION, route_data[0],
                             route_data[2]))  # 车站
             if DETAIL and route_type == RouteType.WAITING and \
-                    route_data[-1] is not None:
+                    route_data[8] is not None:
                 pattern.append((ImagePattern.TEXT, f'等车 Wait {time2}'))  # 车站
             pattern.append((ImagePattern.THUMB_TEXT, route_img,
                             route_data[3]))  # 路线名
-            if route_data[-1] is not None:
+            if route_data[8] is not None:
                 # 正常
                 pattern.append((ImagePattern.GREY_TEXT, terminus))  # 方向
 
             if DETAIL and route_type == RouteType.WAITING and \
-                    route_data[-1] is not None:
+                    route_data[8] is not None:
                 pattern.append((ImagePattern.THUMB_TEXT, time_img,
                                 f'间隔 Interval {time3}'))
 
             prefix = ''
             colour = 'grey'
-            if DETAIL and route_data[-1] is not None:
+            if DETAIL and route_data[8] is not None:
                 prefix = '乘车 Ride '
                 colour = 'black'
             pattern.append((ImagePattern.THUMB_TEXT, time_img,
@@ -1323,19 +1327,19 @@ def save_image(route_type: RouteType, every_route_time: list,
             # 有缩进
             pattern.append((ImagePattern.THUMB_INTEND_TEXT, route_img,
                             route_data[3]))  # 路线名
-            if route_data[-1] is not None:
+            if route_data[8] is not None:
                 # 正常
                 pattern.append((ImagePattern.GREY_INTEND_TEXT,
                                 terminus))  # 方向
 
             if DETAIL and route_type == RouteType.WAITING and \
-                    route_data[-1] is not None:
+                    route_data[8] is not None:
                 pattern.append((ImagePattern.THUMB_INTEND_TEXT, time_img,
                                 f'间隔 Interval {time3}'))  # 用时
 
             prefix = ''
             colour = 'grey'
-            if DETAIL and route_data[-1] is not None:
+            if DETAIL and route_data[8] is not None:
                 prefix = '乘车 Ride '
                 colour = 'black'
             pattern.append((ImagePattern.THUMB_INTEND_TEXT, time_img,
@@ -1532,9 +1536,11 @@ def main(station1: str, station2: str, LINK: str,
          TRANSFER_ADDITION: dict[str, list[str]] = {},
          WILD_ADDITION: dict[str, list[str]] = {},
          STATION_TABLE: dict[str, str] = {},
-         ORIGINAL_IGNORED_LINES: list = [], UPDATE_DATA: bool = False,
+         ORIGINAL_IGNORED_LINES: list = [], ROUTE_MAPPING: dict = {},
+         UPDATE_DATA: bool = False,
          GEN_ROUTE_INTERVAL: bool = False, IGNORED_LINES: list = [],
-         AVOID_STATIONS: list = [], CALCULATE_HIGH_SPEED: bool = True,
+         ONLY_ROUTES: list[str] = [], AVOID_STATIONS: list = [], 
+         CALCULATE_HIGH_SPEED: bool = True,
          CALCULATE_BOAT: bool = True, CALCULATE_WALKING_WILD: bool = False,
          ONLY_LRT: bool = False, IN_THEORY: bool = False, DETAIL: bool = False,
          MTR_VER: int = 3, G=None, gen_image=True, show=False,
@@ -1592,7 +1598,8 @@ def main(station1: str, station2: str, LINK: str,
                                      AVOID_STATIONS, route_type, ORIGINAL_IGNORED_LINES,
                                      INTERVAL_PATH, version1, version2, LOCAL_FILE_PATH,
                                      STATION_TABLE, WILD_ADDITION, TRANSFER_ADDITION,
-                                     MAX_WILD_BLOCKS, MTR_VER, cache)
+                                     MAX_WILD_BLOCKS, MTR_VER, cache, ONLY_ROUTES,
+                                     ROUTE_MAPPING)
 
     shortest_path, shortest_distance, waiting_time, riding_time, ert = \
         find_shortest_route(G, station1, station2,
@@ -1628,6 +1635,9 @@ def run():
     STATION_TABLE: dict[str, str] = {}
     # 禁止乘坐的路线（未开通的路线）
     ORIGINAL_IGNORED_LINES: list = []
+    # 路线名称映射
+    # "原始路线名称: 映射后的路线名称, ..."
+    ROUTE_MAPPING: dict = {}
 
     link_hash = hashlib.md5(LINK.encode('utf-8')).hexdigest()
     # 文件设置
@@ -1644,6 +1654,9 @@ def run():
     # 寻路设置
     # 避开的路线
     IGNORED_LINES: list = []
+    # 仅使用指定路线
+    # "路线名称1, 路线名称2, ..."
+    ONLY_ROUTES: list = []
     # 避开的车站
     AVOID_STATIONS: list = []
     # 允许高铁，默认值为True
@@ -1667,8 +1680,8 @@ def run():
     main(station1, station2, LINK, LOCAL_FILE_PATH, INTERVAL_PATH,
          BASE_PATH, PNG_PATH, MAX_WILD_BLOCKS,
          TRANSFER_ADDITION, WILD_ADDITION, STATION_TABLE,
-         ORIGINAL_IGNORED_LINES, UPDATE_DATA, GEN_ROUTE_INTERVAL,
-         IGNORED_LINES, AVOID_STATIONS, CALCULATE_HIGH_SPEED,
+         ORIGINAL_IGNORED_LINES, ROUTE_MAPPING, UPDATE_DATA, GEN_ROUTE_INTERVAL,
+         IGNORED_LINES, ONLY_ROUTES, AVOID_STATIONS, CALCULATE_HIGH_SPEED,
          CALCULATE_BOAT, CALCULATE_WALKING_WILD, ONLY_LRT, IN_THEORY, DETAIL,
          MTR_VER, show=True)
 
