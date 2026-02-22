@@ -46,6 +46,66 @@
         }
     }
     
+    // 折叠/展开连接车站列表
+    function toggleConnections() {
+        const connectionsDiv = document.getElementById('connections-list');
+        const icon = document.getElementById('connections-icon');
+        
+        if (connectionsDiv.classList.contains('hidden')) {
+            connectionsDiv.classList.remove('hidden');
+            icon.style.transform = 'rotate(180deg)';
+            icon.classList.remove('fa-chevron-down');
+            icon.classList.add('fa-chevron-up');
+        } else {
+            connectionsDiv.classList.add('hidden');
+            icon.style.transform = 'rotate(0deg)';
+            icon.classList.remove('fa-chevron-up');
+            icon.classList.add('fa-chevron-down');
+        }
+    }
+    
+    // 全部展开交路列表
+    function expandAllBranches() {
+        // 获取所有交路列表容器
+        const branchesDivs = document.querySelectorAll('[id^="branches-"]');
+        
+        branchesDivs.forEach(div => {
+            // 展开列表
+            div.classList.remove('hidden');
+            // 获取对应的图标
+            const iconId = div.id.replace('branches-', 'branches-icon-');
+            const icon = document.getElementById(iconId);
+            if (icon) {
+                // 旋转图标
+                icon.style.transform = 'rotate(180deg)';
+                // 切换图标类
+                icon.classList.remove('fa-chevron-down');
+                icon.classList.add('fa-chevron-up');
+            }
+        });
+    }
+    
+    // 全部收起交路列表
+    function collapseAllBranches() {
+        // 获取所有交路列表容器
+        const branchesDivs = document.querySelectorAll('[id^="branches-"]');
+        
+        branchesDivs.forEach(div => {
+            // 收起列表
+            div.classList.add('hidden');
+            // 获取对应的图标
+            const iconId = div.id.replace('branches-', 'branches-icon-');
+            const icon = document.getElementById(iconId);
+            if (icon) {
+                // 旋转图标
+                icon.style.transform = 'rotate(0deg)';
+                // 切换图标类
+                icon.classList.remove('fa-chevron-up');
+                icon.classList.add('fa-chevron-down');
+            }
+        });
+    }
+    
     // 页面加载完成后设置颜色盒
     document.addEventListener('DOMContentLoaded', function() {
         setColorBoxes();
@@ -161,10 +221,40 @@
         </div>
     </div>
     
+    <!-- 连接车站 -->
+    {% if connected_stations %}
+    <div class="mb-8">
+        <div class="flex justify-between items-center cursor-pointer mb-2" onclick="toggleConnections()">
+            <h3 class="text-xl font-semibold">连接车站</h3>
+            <i class="fa fa-chevron-down text-gray-400 transition-transform duration-300" id="connections-icon"></i>
+        </div>
+        <div class="flex flex-wrap gap-2 hidden" id="connections-list">
+            {% for connected_station in connected_stations %}
+            <a href="/stations/{{ connected_station.id }}" class="inline-flex items-center bg-blue-50 border border-blue-100 rounded-full px-4 py-2 hover:bg-blue-100 transition-colors text-sm">
+                {% if 'color' in connected_station %}
+                <div class="w-3 h-3 rounded-full mr-2 color-box" data-color="{{ connected_station.color }}"></div>
+                {% endif %}
+                <span class="font-medium text-blue-800">{{ connected_station.name }}</span>
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+    
     <!-- 经过车站的线路 -->
     {% if grouped_routes %}
     <div>
-        <h3 class="text-xl font-semibold mb-4">经过线路</h3>
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-xl font-semibold">经过线路</h3>
+            <div class="flex gap-2">
+                <button onclick="expandAllBranches()" class="text-sm bg-gray-100 hover:bg-gray-200 px-3 py-1 rounded-md transition-colors">
+                    全部展开
+                </button>
+                <button onclick="collapseAllBranches()" class="text-sm bg-gray-100 hover:bg-gray-200 px-3 py-1 rounded-md transition-colors">
+                    全部收起
+                </button>
+            </div>
+        </div>
         <div class="space-y-4">
             {% for group in grouped_routes %}
             <div class="bg-white border border-gray-200 rounded-md p-4 hover:shadow-md transition-shadow">

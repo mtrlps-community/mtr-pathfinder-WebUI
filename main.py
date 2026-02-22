@@ -282,7 +282,18 @@ def station_detail(station_id):
     # 转换为列表格式便于模板处理
     grouped_routes_list = list(grouped_routes.values())
     
-    return render_template('station_detail.html', station=station_data, grouped_routes=grouped_routes_list, station_id=station_id)
+    # 处理连接车站信息
+    connected_stations = []
+    if 'connections' in station_data and station_data['connections']:
+        for connection_id in station_data['connections']:
+            if connection_id in all_stations:
+                connected_station = all_stations[connection_id].copy()
+                # 将车站名称中的竖杠替换为空格
+                if 'name' in connected_station:
+                    connected_station['name'] = connected_station['name'].replace('|', ' ')
+                connected_stations.append(connected_station)
+    
+    return render_template('station_detail.html', station=station_data, grouped_routes=grouped_routes_list, station_id=station_id, connected_stations=connected_stations)
 
 @app.route('/routes')
 def routes():
