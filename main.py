@@ -2,6 +2,7 @@ from flask import Flask, render_template, request, jsonify, session, redirect, s
 import os
 import json
 import hashlib
+import re
 from datetime import datetime
 
 from mtr_pathfinder_lib.mtr_pathfinder import (
@@ -191,13 +192,43 @@ def station_detail(station_id):
         if isinstance(route, dict) and 'stations' in route:
             for station in route['stations']:
                 if isinstance(station, dict) and station.get('id') == station_id:
-                    # 将线路名称中的竖杠替换为空格
+                    # 处理线路名称，将名称和交路编号分开
                     if 'name' in route:
-                        route['name'] = route['name'].replace('|', ' ')
+                        route_name = route['name']
+                        # 检查是否包含双竖杠分隔符
+                        if '||' in route_name:
+                            # 分割线路名称和交路编号
+                            name_parts = route_name.split('||')
+                            # 将名称中的单个竖杠替换为空格
+                            route['name'] = name_parts[0].strip().replace('|', ' ')
+                            # 处理交路编号
+                            if len(name_parts) > 1:
+                                route_number = name_parts[1].strip()
+                                # 移除JSON调试信息（大括号包裹的内容）
+                                route_number = re.sub(r'\{.*?\}', '', route_number)
+                                # 将单个竖杠替换为空格
+                                route_number = route_number.replace('|', ' ')
+                                # 去除多余空格
+                                route_number = ' '.join(route_number.split())
+                                route['route_number'] = route_number
+                            else:
+                                route['route_number'] = ''
+                        else:
+                            # 没有交路编号，只保留名称
+                            route['name'] = route_name.strip().replace('|', ' ')
+                            route['route_number'] = ''
                     
                     # 处理站点列表，添加站点名称和运行时间
                     processed_stations = []
                     durations = route.get('durations', [])
+                    
+                    # 查找当前车站在该线路中的站台编号
+                    current_platform = 'N/A'
+                    for route_station in route['stations']:
+                        if isinstance(route_station, dict) and route_station.get('id') == station_id:
+                            # 使用原始站点数据中的name字段作为站台编号
+                            current_platform = route_station.get('name', 'N/A')
+                            break
                     
                     for i, route_station in enumerate(route['stations']):
                         if isinstance(route_station, dict):
@@ -228,13 +259,30 @@ def station_detail(station_id):
                                     processed_station['travel_time'] = f"{minutes:02d}:{remaining_seconds:02d}"
                             
                             processed_stations.append(processed_station)
+                    
+                    # 将当前车站的站台编号添加到线路数据中
+                    route['current_platform'] = current_platform
                     # 更新线路的站点列表
                     route['stations'] = processed_stations
                     
                     station_routes.append(route)
                     break
     
-    return render_template('station_detail.html', station=station_data, routes=station_routes, station_id=station_id)
+    # 将线路按主名称分组
+    grouped_routes = {}
+    for route in station_routes:
+        route_name = route.get('name', 'N/A')
+        if route_name not in grouped_routes:
+            grouped_routes[route_name] = {
+                'main_route': route,  # 使用第一条线路作为主线路信息
+                'routes': []
+            }
+        grouped_routes[route_name]['routes'].append(route)
+    
+    # 转换为列表格式便于模板处理
+    grouped_routes_list = list(grouped_routes.values())
+    
+    return render_template('station_detail.html', station=station_data, grouped_routes=grouped_routes_list, station_id=station_id)
 
 @app.route('/routes')
 def routes():
@@ -298,6 +346,7 @@ def route_detail(route_id):
     # 读取线路数据
     route_data = None
     all_stations = {}
+    all_routes_data = []
     # 优先使用v3版本的数据文件，因为它包含更多信息
     data_file_path = config['LOCAL_FILE_PATH_V3']
     if os.path.exists(data_file_path):
@@ -309,36 +358,57 @@ def route_detail(route_id):
                 all_stations = data[0]['stations']
                 # 获取线路数据
                 routes_data = data[0]['routes']
-                # 查找指定线路
+                # 转换为列表格式便于处理
                 if isinstance(routes_data, dict):
-                    if route_id in routes_data:
-                        route_data = routes_data[route_id]
+                    all_routes_data = list(routes_data.values())
                 else:
-                    for route in routes_data:
-                        if isinstance(route, dict) and route.get('id') == route_id:
-                            route_data = route
-                            break
+                    all_routes_data = routes_data
+                # 查找指定线路
+                for route in all_routes_data:
+                    if isinstance(route, dict) and route.get('id') == route_id:
+                        route_data = route
+                        break
             elif isinstance(data, dict):
                 # 兼容旧格式
                 all_stations = data.get('stations', {})
                 routes_data = data.get('routes', {})
-                # 查找指定线路
+                # 转换为列表格式便于处理
                 if isinstance(routes_data, dict):
-                    if route_id in routes_data:
-                        route_data = routes_data[route_id]
+                    all_routes_data = list(routes_data.values())
                 else:
-                    for route in routes_data:
-                        if isinstance(route, dict) and route.get('id') == route_id:
-                            route_data = route
-                            break
+                    all_routes_data = routes_data
+                # 查找指定线路
+                for route in all_routes_data:
+                    if isinstance(route, dict) and route.get('id') == route_id:
+                        route_data = route
+                        break
     
     # 如果没有找到线路数据，返回404
     if not route_data:
         return render_template('error.html', message='线路不存在'), 404
     
-    # 将线路名称中的竖杠替换为空格
+    import re
+    # 处理线路名称，分割主线路名称和交路编号
     if isinstance(route_data, dict) and 'name' in route_data:
-        route_data['name'] = route_data['name'].replace('|', ' ')
+        original_name = route_data['name']
+        # 分割主线路名称和交路编号
+        if '||' in original_name:
+            main_name = original_name.split('||')[0].strip()
+            route_data['main_name'] = main_name.replace('|', ' ')
+        else:
+            route_data['main_name'] = original_name.replace('|', ' ')
+        
+        # 处理交路编号
+        route_number = ''
+        if '||' in original_name:
+            route_number = original_name.split('||')[1].strip()
+            # 移除JSON调试信息（大括号包裹的内容）
+            route_number = re.sub(r'\{.*?\}', '', route_number)
+            # 将单个竖杠替换为空格
+            route_number = route_number.replace('|', ' ')
+            # 去除多余空格
+            route_number = ' '.join(route_number.split())
+        route_data['route_number'] = route_number
     
     # 处理站点列表，添加站点名称和运行时间
     processed_stations = []
@@ -398,7 +468,36 @@ def route_detail(route_id):
         # 更新线路的站点列表
         route_data['stations'] = processed_stations
     
-    return render_template('route_detail.html', route=route_data)
+    # 查找所有同名线路的交路
+    same_name_routes = []
+    for route in all_routes_data:
+        if isinstance(route, dict) and 'name' in route:
+            # 提取主线路名称
+            route_name = route['name']
+            if '||' in route_name:
+                route_main_name = route_name.split('||')[0].strip()
+            else:
+                route_main_name = route_name.strip()
+            
+            # 比较主线路名称
+            if route_main_name == (original_name.split('||')[0].strip() if '||' in original_name else original_name.strip()):
+                # 处理交路信息
+                route_info = {
+                    'id': route.get('id', ''),
+                    'name': route_name.replace('|', ' ')
+                }
+                # 添加交路编号
+                if '||' in route_name:
+                    route_number = route_name.split('||')[1].strip()
+                    # 移除JSON调试信息
+                    route_number = re.sub(r'\{.*?\}', '', route_number)
+                    # 清理交路编号
+                    route_number = route_number.replace('|', ' ')
+                    route_number = ' '.join(route_number.split())
+                    route_info['route_number'] = route_number
+                same_name_routes.append(route_info)
+    
+    return render_template('route_detail.html', route=route_data, same_name_routes=same_name_routes)
 
 
 

@@ -43,20 +43,20 @@
     <div class="mb-8">
         <h3 class="text-xl font-semibold mb-4">基本信息</h3>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div class="bg-gray-50 p-4 rounded-md">
-                <div class="flex justify-between items-center">
-                    <span class="text-gray-600">车站ID</span>
-                    <span class="font-medium">{{ station.get('id', 'N/A') }}</span>
-                </div>
-            </div>
-            <div class="bg-gray-50 p-4 rounded-md">
+            <div class="bg-gray-50 p-2 rounded-md">
                 <div class="flex justify-between items-center">
                     <span class="text-gray-600">车站名称</span>
                     <span class="font-medium">{{ station.get('name', 'N/A') }}</span>
                 </div>
             </div>
+            <div class="bg-gray-50 p-2 rounded-md">
+                <div class="flex justify-between items-center">
+                    <span class="text-gray-600">车站ID</span>
+                    <span class="font-medium">{{ station.get('id', 'N/A') }}</span>
+                </div>
+            </div>
             {% if 'color' in station %}
-            <div class="bg-gray-50 p-4 rounded-md">
+            <div class="bg-gray-50 p-2 rounded-md">
                 <div class="flex justify-between items-center">
                     <span class="text-gray-600">车站颜色</span>
                     <div class="flex items-center">
@@ -67,7 +67,7 @@
             </div>
             {% endif %}
             {% if 'x' in station and 'z' in station %}
-            <div class="bg-gray-50 p-4 rounded-md">
+            <div class="bg-gray-50 p-2 rounded-md">
                 <div class="flex justify-between items-center">
                     <span class="text-gray-600">坐标</span>
                     <span class="font-medium">X: {{ station['x'] }}, Z: {{ station['z'] }}</span>
@@ -75,7 +75,7 @@
             </div>
             {% endif %}
             {% if 'zone1' in station %}
-            <div class="bg-gray-50 p-4 rounded-md">
+            <div class="bg-gray-50 p-2 rounded-md">
                 <div class="flex justify-between items-center">
                     <span class="text-gray-600">收费区域编号</span>
                     <span class="font-medium">
@@ -85,107 +85,152 @@
             </div>
             {% endif %}
             {% if 'connections' in station %}
-            <div class="bg-gray-50 p-4 rounded-md">
+            <div class="bg-gray-50 p-2 rounded-md">
                 <div class="flex justify-between items-center">
                     <span class="text-gray-600">连接车站数</span>
                     <span class="font-medium">{{ station['connections']|length }}</span>
                 </div>
             </div>
             {% endif %}
+            <div class="bg-gray-50 p-2 rounded-md">
+                <div class="flex justify-between items-center">
+                    <span class="text-gray-600">经过线路数</span>
+                    <span class="font-medium">{{ grouped_routes|length }}</span>
+                </div>
+            </div>
+            <div class="bg-gray-50 p-2 rounded-md">
+                <div class="flex justify-between items-center">
+                    <span class="text-gray-600">经过交路数</span>
+                    <span class="font-medium">
+                        {% set total_branches = namespace(value=0) %}
+                        {% for group in grouped_routes %}
+                            {% set total_branches.value = total_branches.value + group.routes|length %}
+                        {% endfor %}
+                        {{ total_branches.value }}
+                    </span>
+                </div>
+            </div>
         </div>
     </div>
     
     <!-- 经过车站的线路 -->
-    {% if routes %}
+    {% if grouped_routes %}
     <div>
         <h3 class="text-xl font-semibold mb-4">经过线路</h3>
         <div class="space-y-4">
-            {% for route in routes %}
+            {% for group in grouped_routes %}
             <div class="bg-white border border-gray-200 rounded-md p-4 hover:shadow-md transition-shadow">
+                <!-- 主线路信息 -->
                 <div class="flex flex-wrap justify-between items-center mb-3">
                     <div class="flex items-center">
-                        {% if 'color' in route %}
-                        <div class="w-4 h-4 rounded-full mr-2 color-box" data-color="{{ route['color'] }}"></div>
+                        {% if 'color' in group.main_route %}
+                        <div class="w-4 h-4 rounded-full mr-2 color-box" data-color="{{ group.main_route['color'] }}"></div>
                         {% endif %}
-                        <h4 class="font-medium">
-                            <a href="/routes/{{ route.get('id', '') }}" class="text-blue-600 hover:underline transition-colors">
-                                {{ route.get('name', 'N/A') }}
-                            </a>
+                        <h4 class="font-medium text-gray-800">
+                            {{ group.main_route.get('name', 'N/A') }}
                         </h4>
                     </div>
-                    {% if 'type' in route %}
+                    {% if 'type' in group.main_route %}
                     <span class="bg-gray-100 text-gray-800 text-xs px-2 py-1 rounded-full">
-                        {% if route['type'] == 'train_normal' %}
+                        {% if group.main_route['type'] == 'train_normal' %}
                             列车
-                        {% elif route['type'] == 'train_high_speed' %}
+                        {% elif group.main_route['type'] == 'train_high_speed' %}
                             高铁
-                        {% elif route['type'] == 'train_light_rail' %}
+                        {% elif group.main_route['type'] == 'train_light_rail' %}
                             轻轨
-                        {% elif route['type'] == 'boat_normal' %}
+                        {% elif group.main_route['type'] == 'boat_normal' %}
                             轮渡
-                        {% elif route['type'] == 'boat_light_rail' %}
+                        {% elif group.main_route['type'] == 'boat_light_rail' %}
                             邮轮
-                        {% elif route['type'] == 'boat_high_speed' %}
+                        {% elif group.main_route['type'] == 'boat_high_speed' %}
                             快船
-                        {% elif route['type'] == 'cable_car_normal' %}
+                        {% elif group.main_route['type'] == 'cable_car_normal' %}
                             缆车
-                        {% elif route['type'] == 'airplane_normal' %}
+                        {% elif group.main_route['type'] == 'airplane_normal' %}
                             飞机
                         {% else %}
-                            {{ route['type'] }}
+                            {{ group.main_route['type'] }}
                         {% endif %}
                     </span>
                     {% endif %}
                 </div>
                 
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
-                    <div>
-                        <span class="text-gray-600">线路ID:</span> {{ route.get('id', 'N/A') }}
-                    </div>
-                    <div>
-                        <span class="text-gray-600">站点数量:</span> {{ route.get('stations', [])|length }}
-                    </div>
-                    <div>
-                        <span class="text-gray-600">状态:</span> 
-                        {% if route.get('hidden', False) %}
-                            <span class="text-red-600">隐藏</span>
-                        {% else %}
-                            <span class="text-green-600">显示</span>
+                <!-- 交路列表 -->
+                <div class="mt-3 space-y-3">
+                    {% for route in group.routes %}
+                    <div class="border-l-2 border-gray-200 pl-3">
+                        <div class="flex flex-wrap justify-between items-center mb-2">
+                            <div class="flex items-center">
+                                <h5 class="font-medium text-sm">
+                                    <a href="/routes/{{ route.get('id', '') }}" class="text-blue-600 hover:underline transition-colors">
+                                        {% if route.get('route_number') %}
+                                            {{ route.get('route_number') }}
+                                        {% else %}
+                                            主线
+                                        {% endif %}
+                                    </a>
+                                </h5>
+                            </div>
+                            <div class="flex items-center space-x-2">
+                                {% if 'current_platform' in route %}
+                                <span class="bg-gray-200 text-gray-800 text-xs px-2 py-1 rounded-full">
+                                    站台 {{ route['current_platform'] }}
+                                </span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+                            <div>
+                                <span class="text-gray-600">线路ID:</span> {{ route.get('id', 'N/A') }}
+                            </div>
+                            <div>
+                                <span class="text-gray-600">站点数量:</span> {{ route.get('stations', [])|length }}
+                            </div>
+                            <div>
+                                <span class="text-gray-600">状态:</span> 
+                                {% if route.get('hidden', False) %}
+                                    <span class="text-red-600">隐藏</span>
+                                {% else %}
+                                    <span class="text-green-600">显示</span>
+                                {% endif %}
+                            </div>
+                            {% if 'number' in route and route['number'] %}
+                            <div>
+                                <span class="text-gray-600">线路编号:</span> {{ route['number'] }}
+                            </div>
+                            {% endif %}
+                            {% if 'circularState' in route and route['circularState'] != 'NONE' %}
+                            <div>
+                                <span class="text-gray-600">环线状态:</span> {{ route['circularState'] }}
+                            </div>
+                            {% endif %}
+                        </div>
+                        
+                        <!-- 线路站点列表 -->
+                        {% if route.get('stations') %}
+                        <div class="mt-2">
+                            <div class="flex items-center justify-between cursor-pointer" onclick="toggleStations('stations-{{ route.get('id', '0') }}')">
+                                <span class="text-gray-600 text-xs block mb-1">站点列表</span>
+                                <i class="fa fa-chevron-down text-gray-400 transition-transform duration-300" id="stations-icon-{{ route.get('id', '0') }}"></i>
+                            </div>
+                            <div class="space-y-1 hidden" id="stations-{{ route.get('id', '0') }}">
+                                {% for station in route['stations'] %}
+                                <a href="/stations/{{ station.get('id', '') }}" class="flex items-center text-xs px-3 py-2 rounded-full transition-colors
+                                    {% if station.get('id') == station_id %}
+                                        bg-yellow-100 text-yellow-800 hover:bg-yellow-200 font-medium
+                                    {% else %}
+                                        bg-blue-50 text-blue-700 hover:bg-blue-100
+                                    {% endif %}">
+                                    {{ station.get('name', 'N/A') }}
+                                </a>
+                                {% endfor %}
+                            </div>
+                        </div>
                         {% endif %}
                     </div>
-                    {% if 'number' in route and route['number'] %}
-                    <div>
-                        <span class="text-gray-600">线路编号:</span> {{ route['number'] }}
-                    </div>
-                    {% endif %}
-                    {% if 'circularState' in route and route['circularState'] != 'NONE' %}
-                    <div>
-                        <span class="text-gray-600">环线状态:</span> {{ route['circularState'] }}
-                    </div>
-                    {% endif %}
+                    {% endfor %}
                 </div>
-                
-                <!-- 线路站点列表 -->
-                {% if route.get('stations') %}
-                <div class="mt-3">
-                    <div class="flex items-center justify-between cursor-pointer" onclick="toggleStations('stations-{{ loop.index }}')">
-                        <span class="text-gray-600 text-sm block mb-1">站点列表</span>
-                        <i class="fa fa-chevron-down text-gray-400 transition-transform duration-300" id="stations-icon-{{ loop.index }}"></i>
-                    </div>
-                    <div class="space-y-1 hidden" id="stations-{{ loop.index }}">
-                        {% for station in route['stations'] %}
-                        <a href="/stations/{{ station.get('id', '') }}" class="flex items-center text-xs px-3 py-2 rounded-full transition-colors
-                            {% if station.get('id') == station_id %}
-                                bg-yellow-100 text-yellow-800 hover:bg-yellow-200 font-medium
-                            {% else %}
-                                bg-blue-50 text-blue-700 hover:bg-blue-100
-                            {% endif %}">
-                            {{ station.get('name', 'N/A') }}
-                        </a>
-                        {% endfor %}
-                    </div>
-                </div>
-                {% endif %}
             </div>
             {% endfor %}
         </div>

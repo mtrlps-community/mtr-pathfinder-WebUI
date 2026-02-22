@@ -50,22 +50,91 @@
     
     <!-- 线路基本信息 -->
     <div class="mb-8">
+        <!-- 线路主名称 -->
+        <div class="bg-gray-50 p-2 rounded-md mb-4">
+            <div class="flex justify-between items-center">
+                <span class="text-gray-600">线路名称</span>
+                <span class="text-xl font-bold">{{ route.get('main_name', route.get('name', 'N/A')) }}</span>
+            </div>
+        </div>
+        
+        <!-- 同名线路交路列表 - 折叠菜单 -->
+        {% if same_name_routes and same_name_routes|length > 1 %}
+        <div class="mb-6">
+            <!-- 折叠菜单标题栏 -->
+            <div class="flex justify-between items-center bg-gray-50 p-2 rounded-md cursor-pointer" onclick="toggleRoutesList()">
+                <h3 class="text-gray-600">交路列表</h3>
+                <i class="fa fa-chevron-down text-gray-500 transition-transform duration-300" id="routes-list-icon"></i>
+            </div>
+            <!-- 交路列表内容，默认收起 -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mt-3" id="routes-list-content" style="display: none;">
+                {% for same_route in same_name_routes %}
+                <!-- 检查是否是当前交路 -->
+                {% if same_route.id == route.id %}
+                <!-- 当前交路高亮显示 -->
+                <a href="/routes/{{ same_route.id }}" class="block bg-blue-200 p-2 rounded-md hover:bg-blue-300 transition-colors border-2 border-blue-400">
+                    <div class="flex justify-between items-center">
+                        <div class="flex-1">
+                            <div class="text-blue-900 font-semibold text-sm">{{ same_route.route_number or '无交路编号' }}</div>
+                        </div>
+                        <span class="ml-4 text-xs bg-gray-300 text-gray-700 px-2 py-0.5 rounded-full">
+                            {{ same_route.id }}
+                        </span>
+                    </div>
+                </a>
+                {% else %}
+                <!-- 其他交路 -->
+                <a href="/routes/{{ same_route.id }}" class="block bg-blue-50 p-2 rounded-md hover:bg-blue-100 transition-colors">
+                    <div class="flex justify-between items-center">
+                        <div class="flex-1">
+                            <div class="text-blue-700 font-medium text-sm">{{ same_route.route_number or '无交路编号' }}</div>
+                        </div>
+                        <span class="ml-4 text-xs bg-gray-300 text-gray-700 px-2 py-0.5 rounded-full">
+                            {{ same_route.id }}
+                        </span>
+                    </div>
+                </a>
+                {% endif %}
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+        
+        <script>
+        // 折叠菜单功能
+        function toggleRoutesList() {
+            const content = document.getElementById('routes-list-content');
+            const icon = document.getElementById('routes-list-icon');
+            
+            if (content.style.display === 'none') {
+                // 展开菜单
+                content.style.display = 'grid';
+                icon.style.transform = 'rotate(180deg)';
+            } else {
+                // 收起菜单
+                content.style.display = 'none';
+                icon.style.transform = 'rotate(0deg)';
+            }
+        }
+        </script>
+        
+        <!-- 其他基本信息 -->
         <h3 class="text-xl font-semibold mb-4">基本信息</h3>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div class="bg-gray-50 p-4 rounded-md">
+            <div class="bg-gray-50 p-2 rounded-md">
+                <div class="flex justify-between items-center">
+                    <span class="text-gray-600">交路编号</span>
+                    <span class="font-medium">{{ route.get('route_number', '无') }}</span>
+                </div>
+            </div>
+            <div class="bg-gray-50 p-2 rounded-md">
                 <div class="flex justify-between items-center">
                     <span class="text-gray-600">线路ID</span>
                     <span class="font-medium">{{ route.get('id', 'N/A') }}</span>
                 </div>
             </div>
-            <div class="bg-gray-50 p-4 rounded-md">
-                <div class="flex justify-between items-center">
-                    <span class="text-gray-600">线路名称</span>
-                    <span class="font-medium">{{ route.get('name', 'N/A') }}</span>
-                </div>
-            </div>
             {% if 'color' in route %}
-            <div class="bg-gray-50 p-4 rounded-md">
+            <div class="bg-gray-50 p-2 rounded-md">
                 <div class="flex justify-between items-center">
                     <span class="text-gray-600">线路颜色</span>
                     <div class="flex items-center">
@@ -76,7 +145,7 @@
             </div>
             {% endif %}
             {% if 'type' in route %}
-            <div class="bg-gray-50 p-4 rounded-md">
+            <div class="bg-gray-50 p-2 rounded-md">
                 <div class="flex justify-between items-center">
                     <span class="text-gray-600">线路类型</span>
                     <span class="font-medium">
@@ -105,13 +174,13 @@
                 </div>
             </div>
             {% endif %}
-            <div class="bg-gray-50 p-4 rounded-md">
+            <div class="bg-gray-50 p-2 rounded-md">
                 <div class="flex justify-between items-center">
                     <span class="text-gray-600">站点数量</span>
                     <span class="font-medium">{{ route.get('stations', [])|length }}</span>
                 </div>
             </div>
-            <div class="bg-gray-50 p-4 rounded-md">
+            <div class="bg-gray-50 p-2 rounded-md">
                 <div class="flex justify-between items-center">
                     <span class="text-gray-600">状态</span>
                     <span class="font-medium">
@@ -123,16 +192,8 @@
                     </span>
                 </div>
             </div>
-            {% if 'number' in route and route['number'] %}
-            <div class="bg-gray-50 p-4 rounded-md">
-                <div class="flex justify-between items-center">
-                    <span class="text-gray-600">线路编号</span>
-                    <span class="font-medium">{{ route['number'] }}</span>
-                </div>
-            </div>
-            {% endif %}
             {% if 'circularState' in route and route['circularState'] != 'NONE' %}
-            <div class="bg-gray-50 p-4 rounded-md">
+            <div class="bg-gray-50 p-2 rounded-md">
                 <div class="flex justify-between items-center">
                     <span class="text-gray-600">环线状态</span>
                     <span class="font-medium">{{ route['circularState'] }}</span>
@@ -168,7 +229,7 @@
         </div>
         <div class="space-y-1" id="stations-1">
             {% for station in route['stations'] %}
-            <div class="flex items-center justify-between bg-blue-50 p-3 rounded-lg hover:bg-blue-100 transition-colors">
+            <div class="flex items-center justify-between bg-blue-50 p-2 rounded-lg hover:bg-blue-100 transition-colors">
                 <a href="/stations/{{ station.get('id', '') }}" class="text-blue-700 text-sm font-medium mr-4">
                     {{ station.get('name', 'N/A') }}
                 </a>
