@@ -8,6 +8,10 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Font Awesome -->
     <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <!-- Umami Analytics -->
+    {% if config.UMAMI_SCRIPT_URL and config.UMAMI_WEBSITE_ID %}
+    <script defer src="{{ config.UMAMI_SCRIPT_URL }}" data-website-id="{{ config.UMAMI_WEBSITE_ID }}"></script>
+    {% endif %}
     <style>
         /* 自定义样式 */
         .nav-item {

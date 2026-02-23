@@ -52,6 +52,8 @@ default_config = {
     'STATION_TABLE': {},
     'ORIGINAL_IGNORED_LINES': [],
     'CONSOLE_PASSWORD': 'admin',
+    'UMAMI_SCRIPT_URL': '',
+    'UMAMI_WEBSITE_ID': ''
 }
 
 # 加载配置
@@ -140,6 +142,10 @@ def update_file_paths():
 update_file_paths()
 BASE_PATH = 'mtr_pathfinder_data'
 PNG_PATH = 'mtr_pathfinder_data'
+
+@app.context_processor
+def inject_config():
+    return dict(config=config)
 
 @app.route('/')
 def index():
@@ -1401,8 +1407,12 @@ def api_update_config():
     if 'original_ignored_lines' in data:
         config['ORIGINAL_IGNORED_LINES'] = data['original_ignored_lines']
     
-
+    if 'umami_script_url' in data:
+        config['UMAMI_SCRIPT_URL'] = data['umami_script_url']
     
+    if 'umami_website_id' in data:
+        config['UMAMI_WEBSITE_ID'] = data['umami_website_id']
+
     save_config(config)
     return jsonify({'success': True})
 

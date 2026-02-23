@@ -112,6 +112,24 @@
                     <textarea id="original-ignored-lines" class="form-input" placeholder='JSON格式数组，例如：["线路1", "线路2"]'>{{ config['ORIGINAL_IGNORED_LINES']|tojson }}</textarea>
                 </div>
                 
+                <!-- Umami统计脚本URL -->
+                <div>
+                    <label class="block text-gray-700 font-medium mb-2" for="umami-script-url">
+                        <i class="fa fa-bar-chart mr-1"></i> Umami脚本URL (UMAMI_SCRIPT_URL)
+                    </label>
+                    <p class="text-sm text-gray-500 mb-2">Umami统计脚本的URL，例如：https://cloud.umami.is/script.js</p>
+                    <textarea id="umami-script-url" class="form-input" placeholder="输入Umami脚本URL">{{ config['UMAMI_SCRIPT_URL'] }}</textarea>
+                </div>
+                
+                <!-- Umami网站ID -->
+                <div>
+                    <label class="block text-gray-700 font-medium mb-2" for="umami-website-id">
+                        <i class="fa fa-id-card mr-1"></i> Umami网站ID (UMAMI_WEBSITE_ID)
+                    </label>
+                    <p class="text-sm text-gray-500 mb-2">Umami统计的网站ID，例如：12345678-1234-1234-1234-123456789012</p>
+                    <textarea id="umami-website-id" class="form-input" placeholder="输入Umami网站ID">{{ config['UMAMI_WEBSITE_ID'] }}</textarea>
+                </div>
+                
 
                 
                 <!-- 操作按钮区域 -->
@@ -248,6 +266,8 @@
         const link = document.getElementById('link-input').value;
         const mtrVer = document.getElementById('mtr-ver-select').value;
         const maxWildBlocks = parseInt(document.getElementById('max-wild-blocks').value);
+        const umamiScriptUrl = document.getElementById('umami-script-url').value;
+        const umamiWebsiteId = document.getElementById('umami-website-id').value;
         
         // 解析JSON配置项
         let transferAddition, wildAddition, stationTable, originalIgnoredLines;
@@ -277,7 +297,9 @@
                     wild_addition: wildAddition,
                     station_table: stationTable,
                     original_ignored_lines: originalIgnoredLines,
-                    route_mapping: routeMapping
+                    route_mapping: routeMapping,
+                    umami_script_url: umamiScriptUrl,
+                    umami_website_id: umamiWebsiteId
                 })
             });
             
