@@ -9,36 +9,36 @@
         
         {% if error %}
         <div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4">
-            <i class="fa fa-exclamation-circle mr-2"></i>{{ error }}
+            <i class="fa-solid fa-exclamation-circle mr-2"></i>{{ error }}
         </div>
         {% endif %}
         
         <form method="post" action="/admin">
             <div class="mb-4">
                 <label class="block text-gray-700 font-medium mb-2" for="password">
-                    <i class="fa fa-lock mr-1"></i> 密码
+                    <i class="fa-solid fa-lock mr-1"></i> 密码
                 </label>
                 <input type="password" id="password" name="password" class="form-input" placeholder="输入控制台密码" required>
             </div>
             
             <button type="submit" class="btn-primary w-full">
-                <i class="fa fa-sign-in mr-2"></i> 登录
+                <i class="fa-solid fa-right-to-bracket mr-2"></i> 登录
             </button>
         </form>
     </div>
 </div>
 {% else %}
 <!-- 控制台内容 -->
-<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+<div class="grid grid-cols-1 gap-6">
     <!-- 左侧：配置设置 -->
-    <div class="lg:col-span-1">
+    <div>
         <!-- 合并的配置设置卡片 -->
         <div class="card">
             <div class="flex justify-between items-center mb-6">
                 <h2 class="text-2xl font-bold">系统配置</h2>
                 <form method="post" action="/admin/logout" style="display: inline;">
                     <button type="submit" class="btn-secondary text-sm">
-                        <i class="fa fa-sign-out mr-1"></i> 退出登录
+                        <i class="fa-solid fa-right-from-bracket mr-1"></i> 退出登录
                     </button>
                 </form>
             </div>
@@ -48,15 +48,15 @@
                 <!-- 地图链接设置 -->
                 <div>
                     <label class="block text-gray-700 font-medium mb-2" for="link-input">
-                        <i class="fa fa-link mr-1"></i> 地图链接 (LINK)
+                        <i class="fa-solid fa-link mr-1"></i> 地图链接 (LINK)
                     </label>
-                    <textarea id="link-input" class="form-input" placeholder="输入MTR地图链接">{{ config['LINK'] }}</textarea>
+                    <textarea id="link-input" class="form-input" placeholder="输入MTR模组在线线路图网址">{{ config['LINK'] }}</textarea>
                 </div>
                 
                 <!-- MTR版本设置 -->
                 <div>
                     <label class="block text-gray-700 font-medium mb-2" for="mtr-ver-select">
-                        <i class="fa fa-code-fork mr-1"></i> MTR模组版本 (MTR_VER)
+                        <i class="fa-solid fa-code-fork mr-1"></i> MTR模组版本 (MTR_VER)
                     </label>
                     <div class="algorithm-tabs">
                         <div class="flex overflow-x-auto no-scrollbar">
@@ -70,57 +70,96 @@
                 <!-- 最大越野距离 -->
                 <div>
                     <label class="block text-gray-700 font-medium mb-2" for="max-wild-blocks">
-                        <i class="fa fa-map-marker mr-1"></i> 最大越野距离 (MAX_WILD_BLOCKS)
+                        <i class="fa-solid fa-map-marker-alt mr-1"></i> 最大越野距离 (MAX_WILD_BLOCKS)
                     </label>
-                    <p class="text-sm text-gray-500 mb-2">从A站到B站，非出站换乘（越野）的最远步行距离，默认值为1500</p>
+                    <p class="text-sm text-gray-500 mb-2">两个站点之间非出站换乘（越野）的最远步行距离，默认值为1500</p>
                     <input type="number" id="max-wild-blocks" class="form-input" value="{{ config['MAX_WILD_BLOCKS'] }}" min="0">
                 </div>
                 
                 <!-- 出站换乘增加 -->
                 <div>
                     <label class="block text-gray-700 font-medium mb-2" for="transfer-addition">
-                        <i class="fa fa-exchange mr-1"></i> 出站换乘定义 (TRANSFER_ADDITION)
+                        <i class="fa-solid fa-right-left mr-1"></i> 出站换乘定义 (TRANSFER_ADDITION)
                     </label>
-                    <p class="text-sm text-gray-500 mb-2">手动增加出站换乘，格式："车站: [出站换乘的车站, ...], ..."</p>
+                    <p class="text-sm text-gray-500 mb-2">手动增加出站换乘，格式："车站": ["出站换乘的车站", ...], ...</p>
                     <textarea id="transfer-addition" class="form-input" placeholder='JSON格式，例如：{"车站1": ["车站2", "车站3"], "车站4": ["车站5"]}'>{{ config['TRANSFER_ADDITION']|tojson }}</textarea>
                 </div>
                 
                 <!-- 非出站换乘增加 -->
                 <div>
                     <label class="block text-gray-700 font-medium mb-2" for="wild-addition">
-                        <i class="fa fa-tree mr-1"></i> 非出站换乘定义 (WILD_ADDITION)
+                        <i class="fa-solid fa-tree mr-1"></i> 非出站换乘定义 (WILD_ADDITION)
                     </label>
-                    <p class="text-sm text-gray-500 mb-2">手动增加非出站换乘（越野），格式："车站: [非出站换乘的车站, ...], ..."</p>
+                    <p class="text-sm text-gray-500 mb-2">手动增加非出站换乘（越野），格式："车站": ["非出站换乘的车站", ...], ...</p>
                     <textarea id="wild-addition" class="form-input" placeholder='JSON格式，例如：{"车站1": ["车站2", "车站3"], "车站4": ["车站5"]}'>{{ config['WILD_ADDITION']|tojson }}</textarea>
                 </div>
                 
                 <!-- 车站名称映射 -->
                 <div>
                     <label class="block text-gray-700 font-medium mb-2" for="station-table">
-                        <i class="fa fa-table mr-1"></i> 车站名称映射 (STATION_TABLE)
+                        <i class="fa-solid fa-table mr-1"></i> 车站名称映射 (STATION_TABLE)
                     </label>
-                    <p class="text-sm text-gray-500 mb-2">车站昵称到实际名称的映射，格式："车站昵称: 车站实际名称, ..."</p>
+                    <p class="text-sm text-gray-500 mb-2">车站昵称到实际名称的映射，格式："车站昵称": "车站实际名称", ...</p>
                     <textarea id="station-table" class="form-input" placeholder='JSON格式，例如：{"车站昵称": "车站实际名称", "昵称2": "实际名称2"}'>{{ config['STATION_TABLE']|tojson }}</textarea>
                 </div>
                 
                 <!-- 禁止乘坐的路线 -->
                 <div>
                     <label class="block text-gray-700 font-medium mb-2" for="original-ignored-lines">
-                        <i class="fa fa-ban mr-1"></i> 全局禁路线 (ORIGINAL_IGNORED_LINES)
+                        <i class="fa-solid fa-ban mr-1"></i> 全局禁路线 (ORIGINAL_IGNORED_LINES)
                     </label>
-                    <p class="text-sm text-gray-500 mb-2">未开通或禁止乘坐的路线列表</p>
+                    <p class="text-sm text-gray-500 mb-2">未开通或禁止乘坐的路线列表，格式：["线路1", "线路2", ...]</p>
                     <textarea id="original-ignored-lines" class="form-input" placeholder='JSON格式数组，例如：["线路1", "线路2"]'>{{ config['ORIGINAL_IGNORED_LINES']|tojson }}</textarea>
                 </div>
+                
+                <!-- Umami统计脚本URL -->
+                <div>
+                    <label class="block text-gray-700 font-medium mb-2" for="umami-script-url">
+                        <i class="fa-solid fa-chart-bar mr-1"></i> Umami脚本URL (UMAMI_SCRIPT_URL)
+                    </label>
+                    <p class="text-sm text-gray-500 mb-2">Umami统计脚本的URL，例如：https://cloud.umami.is/script.js</p>
+                    <textarea id="umami-script-url" class="form-input" placeholder="输入Umami脚本URL">{{ config['UMAMI_SCRIPT_URL'] }}</textarea>
+                </div>
+                
+                <!-- Umami网站ID -->
+                <div>
+                    <label class="block text-gray-700 font-medium mb-2" for="umami-website-id">
+                        <i class="fa-solid fa-id-card mr-1"></i> Umami网站ID (UMAMI_WEBSITE_ID)
+                    </label>
+                    <p class="text-sm text-gray-500 mb-2">Umami统计的网站ID，例如：12345678-1234-1234-1234-123456789012</p>
+                    <textarea id="umami-website-id" class="form-input" placeholder="输入Umami网站ID">{{ config['UMAMI_WEBSITE_ID'] }}</textarea>
+                </div>
+                
+
                 
                 <!-- 操作按钮区域 -->
                 <div>
                     <div class="flex space-x-3">
                         <button id="save-all" class="btn-primary">
-                            <i class="fa fa-save mr-2"></i> 保存配置
+                            <i class="fa-solid fa-save mr-2"></i> 保存配置
                         </button>
                         <button id="update-data" class="btn-green">
-                            <i class="fa fa-refresh mr-2"></i> 更新数据
+                            <i class="fa-solid fa-rotate-right mr-2"></i> 更新数据
                         </button>
+                        <button id="clear-cache" class="btn-red">
+                            <i class="fa-solid fa-trash mr-2"></i> 清除寻路缓存
+                        </button>
+                        <button id="clear-images" class="btn-red">
+                            <i class="fa-solid fa-image mr-2"></i> 清除结果图片
+                        </button>
+                    </div>
+                    
+                    <!-- 数据更新进度条 -->
+                    <div id="update-progress" class="mt-4 hidden">
+                        <h4 class="text-sm font-medium mb-2" style="color: var(--text-primary);">更新进度</h4>
+                        <div class="w-full rounded-full h-2.5 mb-2" style="background-color: var(--bg-tertiary);">
+                            <div id="progress-bar" class="h-2.5 rounded-full" style="background-color: var(--accent-primary); width: 0%"></div>
+                        </div>
+                        <div class="flex justify-between text-sm">
+                            <span id="progress-stage" style="color: var(--text-secondary);">准备中...</span>
+                            <span id="progress-percentage" style="color: var(--text-secondary);">0%</span>
+                        </div>
+                        <div id="progress-message" class="text-sm mt-1" style="color: var(--text-tertiary);"></div>
                     </div>
                     
                     <div id="update-status" class="mt-4 p-4 rounded-lg hidden"></div>
@@ -130,69 +169,65 @@
     </div>
     
     <!-- 右侧：系统信息 -->
-    <div class="lg:col-span-1">
+    <div>
         <div class="card">
             <h2 class="text-2xl font-bold mb-6">系统配置信息</h2>
             
             <div class="space-y-4">
                 <!-- 当前链接 -->
-                <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <div class="flex items-center justify-between p-3 rounded-lg" style="background-color: var(--bg-tertiary);">
                     <div>
-                        <h3 class="font-medium text-gray-700">当前地图链接</h3>
+                        <h3 class="font-medium" style="color: var(--text-primary);">当前地图链接</h3>
                     </div>
                     <div class="text-right">
-                        <p class="font-medium" id="current-link">{{ config['LINK'] or '未设置' }}</p>
+                        <p class="font-medium" id="current-link" style="color: var(--text-primary);">{{ config['LINK'] or '未设置' }}</p>
                     </div>
                 </div>
                 
                 <!-- 当前版本 -->
-                <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <div class="flex items-center justify-between p-3 rounded-lg" style="background-color: var(--bg-tertiary);">
                     <div>
-                        <h3 class="font-medium text-gray-700">当前MTR模组版本</h3>
+                        <h3 class="font-medium" style="color: var(--text-primary);">当前MTR模组版本</h3>
                     </div>
                     <div class="text-right">
-                        <p class="font-medium" id="current-mtr-ver">{{ config['MTR_VER'] }}</p>
+                        <p class="font-medium" id="current-mtr-ver" style="color: var(--text-primary);">{{ config['MTR_VER'] }}</p>
                     </div>
                 </div>
                 
                 <!-- 数据版本 -->
-                <div class="p-3 bg-gray-50 rounded-lg">
-                    <h3 class="font-medium text-gray-700 mb-3">数据版本</h3>
+                <div class="p-3 rounded-lg" style="background-color: var(--bg-tertiary);">
+                    <h3 class="font-medium mb-3" style="color: var(--text-primary);">数据版本</h3>
+                    
                     <div class="space-y-2">
-                        <h4 class="text-sm font-medium text-gray-700 mt-3 mb-2">V3 版本</h4>
+                        <h4 class="text-sm font-medium mt-3 mb-2" style="color: var(--text-primary);">V3 版本</h4>
                         <div class="flex justify-between">
-                            <span class="text-sm text-gray-600">车站数据版本</span>
-                            <span class="text-sm font-medium" id="station-version">{{ station_version or '未生成' }}</span>
+                            <span class="text-sm" style="color: var(--text-secondary);">车站数据版本</span>
+                            <span class="text-sm font-medium" id="station-version" style="color: var(--text-primary);">{{ station_version or '未生成' }}</span>
                         </div>
                         <div class="flex justify-between">
-                            <span class="text-sm text-gray-600">发车数据版本</span>
-                            <span class="text-sm font-medium" id="interval-version">{{ interval_version or '未生成' }}</span>
+                            <span class="text-sm" style="color: var(--text-secondary);">发车数据版本</span>
+                            <span class="text-sm font-medium" id="interval-version" style="color: var(--text-primary);">{{ interval_version or '未生成' }}</span>
                         </div>
                         
-                        <h4 class="text-sm font-medium text-gray-700 mt-3 mb-2">V4 版本</h4>
+                        <h4 class="text-sm font-medium mt-3 mb-2" style="color: var(--text-primary);">V4 版本</h4>
                         <div class="flex justify-between">
-                            <span class="text-sm text-gray-600">车站数据版本</span>
-                            <span class="text-sm font-medium" id="station-version-v4">{{ station_version_v4 or '未生成' }}</span>
+                            <span class="text-sm" style="color: var(--text-secondary);">车站数据版本</span>
+                            <span class="text-sm font-medium" id="station-version-v4" style="color: var(--text-primary);">{{ station_version_v4 or '未生成' }}</span>
                         </div>
                         <div class="flex justify-between">
-                            <span class="text-sm text-gray-600">发车数据版本</span>
-                            <span class="text-sm font-medium" id="route-version-v4">{{ route_version_v4 or '未生成' }}</span>
+                            <span class="text-sm" style="color: var(--text-secondary);">发车数据版本</span>
+                            <span class="text-sm font-medium" id="route-version-v4" style="color: var(--text-primary);">{{ route_version_v4 or '未生成' }}</span>
                         </div>
                     </div>
                 </div>
                 
-                <!-- 其他配置 -->
-                <div class="p-3 bg-gray-50 rounded-lg">
-                    <h3 class="font-medium text-gray-700 mb-3">其他配置</h3>
-                    <div class="grid grid-cols-2 gap-3">
-                        <div>
-                            <span class="text-sm text-gray-600 block mb-1">最大越野距离</span>
-                            <span class="text-sm font-medium">{{ config['MAX_WILD_BLOCKS'] }} blocks</span>
-                        </div>
-                        <div>
-                            <span class="text-sm text-gray-600 block mb-1">原始禁路线</span>
-                            <span class="text-sm font-medium">{{ config['ORIGINAL_IGNORED_LINES']|length }} 条</span>
-                        </div>
+                <!-- 寻路次数统计 -->
+                <div class="flex items-center justify-between p-3 rounded-lg" style="background-color: var(--bg-tertiary);">
+                    <div>
+                        <h3 class="font-medium" style="color: var(--text-primary);">寻路次数统计</h3>
+                    </div>
+                    <div class="text-right">
+                        <p class="font-medium" style="color: var(--text-primary);">{{ route_search_count or 0 }} 次</p>
                     </div>
                 </div>
             </div>
@@ -209,11 +244,42 @@
         const statusDiv = document.getElementById('update-status');
         statusDiv.className = `mt-4 p-4 rounded-lg ${isSuccess ? 'bg-green-50 border border-green-200 text-green-700' : 'bg-red-50 border border-red-200 text-red-700'}`;
         statusDiv.innerHTML = `
-            <i class="fa fa-${isSuccess ? 'check-circle' : 'exclamation-circle'} mr-2"></i>
+            <i class="fas ${isSuccess ? 'fa-check-circle' : 'fa-exclamation-circle'} mr-2"></i>
             ${message}
         `;
         statusDiv.classList.remove('hidden');
     }
+    
+    // 页面加载完成后添加事件监听器
+    document.addEventListener('DOMContentLoaded', function() {
+        // 1. 登录页面：密码输入框按回车提交表单
+        const passwordInput = document.getElementById('password');
+        if (passwordInput) {
+            passwordInput.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    e.stopPropagation(); // 阻止事件冒泡
+                    this.form.submit();
+                }
+            });
+        }
+        
+        // 2. 控制台页面：所有输入框按回车保存配置
+        const saveButton = document.getElementById('save-all');
+        if (saveButton) {
+            // 获取所有输入框元素，包括带有form-input类的元素
+            const inputElements = document.querySelectorAll('input, textarea');
+            inputElements.forEach(input => {
+                input.addEventListener('keydown', function(e) {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        e.stopPropagation(); // 阻止事件冒泡
+                        saveButton.click();
+                    }
+                });
+            });
+        }
+    });
     
     // MTR版本滑动选择器逻辑
     document.querySelectorAll('.algorithm-tab').forEach(tab => {
@@ -232,9 +298,13 @@
         const link = document.getElementById('link-input').value;
         const mtrVer = document.getElementById('mtr-ver-select').value;
         const maxWildBlocks = parseInt(document.getElementById('max-wild-blocks').value);
+        const umamiScriptUrl = document.getElementById('umami-script-url').value;
+        const umamiWebsiteId = document.getElementById('umami-website-id').value;
         
         // 解析JSON配置项
         let transferAddition, wildAddition, stationTable, originalIgnoredLines;
+        // 移除禁路线线路映射配置，使用默认空对象
+        const routeMapping = {};
         try {
             transferAddition = JSON.parse(document.getElementById('transfer-addition').value || '{}');
             wildAddition = JSON.parse(document.getElementById('wild-addition').value || '{}');
@@ -258,7 +328,10 @@
                     transfer_addition: transferAddition,
                     wild_addition: wildAddition,
                     station_table: stationTable,
-                    original_ignored_lines: originalIgnoredLines
+                    original_ignored_lines: originalIgnoredLines,
+                    route_mapping: routeMapping,
+                    umami_script_url: umamiScriptUrl,
+                    umami_website_id: umamiWebsiteId
                 })
             });
             
@@ -280,14 +353,75 @@
         }
     });
     
+    // 更新数据进度
+    let updateProgressInterval = null;
+    
+    // 更新进度显示
+    function updateProgressDisplay(progress) {
+        const progressBar = document.getElementById('progress-bar');
+        const progressStage = document.getElementById('progress-stage');
+        const progressPercentage = document.getElementById('progress-percentage');
+        const progressMessage = document.getElementById('progress-message');
+        
+        progressBar.style.width = `${progress.percentage}%`;
+        progressStage.textContent = progress.stage;
+        progressPercentage.textContent = `${progress.percentage}%`;
+        if (progress.message) {
+            progressMessage.textContent = progress.message;
+        }
+    }
+    
+    // 开始轮询更新进度
+    function startProgressPolling() {
+        // 清除之前的轮询
+        if (updateProgressInterval) {
+            clearInterval(updateProgressInterval);
+        }
+        
+        // 显示进度条
+        document.getElementById('update-progress').classList.remove('hidden');
+        
+        // 开始轮询
+        updateProgressInterval = setInterval(async () => {
+            try {
+                const response = await fetch('/api/update_progress');
+                const progress = await response.json();
+                updateProgressDisplay(progress);
+                
+                // 如果进度达到100%，停止轮询
+                if (progress.percentage >= 100) {
+                    clearInterval(updateProgressInterval);
+                }
+            } catch (error) {
+                console.error('获取更新进度错误:', error);
+            }
+        }, 500);
+    }
+    
+    // 停止轮询更新进度
+    function stopProgressPolling() {
+        if (updateProgressInterval) {
+            clearInterval(updateProgressInterval);
+            updateProgressInterval = null;
+        }
+        // 隐藏进度条
+        document.getElementById('update-progress').classList.add('hidden');
+    }
+    
     // 更新数据
     document.getElementById('update-data').addEventListener('click', async () => {
         const btn = document.getElementById('update-data');
         const originalText = btn.innerHTML;
-        btn.innerHTML = '<i class="fa fa-spinner fa-spin mr-2"></i> 更新中...';
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> 更新中...';
         btn.disabled = true;
         
+        // 隐藏之前的状态消息
+        document.getElementById('update-status').classList.add('hidden');
+        
         try {
+            // 开始轮询进度
+            startProgressPolling();
+            
             const response = await fetch('/api/update_data', {
                 method: 'POST',
                 headers: {
@@ -296,6 +430,10 @@
             });
             
             const result = await response.json();
+            
+            // 停止轮询
+            stopProgressPolling();
+            
             if (response.ok && result.success) {
                 showStatus('数据更新成功');
                 // 刷新页面以显示最新数据版本
@@ -306,6 +444,9 @@
                 showStatus(result.error || '更新失败', false);
             }
         } catch (error) {
+            // 停止轮询
+            stopProgressPolling();
+            
             showStatus('更新失败，请检查链接是否正确', false);
             console.error('更新数据错误:', error);
         } finally {
@@ -313,7 +454,66 @@
             btn.disabled = false;
         }
     });
+
+    // 清除缓存按钮事件监听
+    document.getElementById('clear-cache').addEventListener('click', async () => {
+        const btn = document.getElementById('clear-cache');
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> 清除中...';
+        btn.disabled = true;
+        
+        try {
+            const response = await fetch('/api/clear_cache', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            const result = await response.json();
+            if (response.ok && result.success) {
+                showStatus('缓存清除成功');
+            } else {
+                showStatus(result.error || '清除缓存失败', false);
+            }
+        } catch (error) {
+            showStatus('清除缓存失败，请稍后重试', false);
+            console.error('清除缓存错误:', error);
+        } finally {
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+        }
+    });
     
+    // 清除寻路结果图片按钮事件监听
+    document.getElementById('clear-images').addEventListener('click', async () => {
+        const btn = document.getElementById('clear-images');
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> 清除中...';
+        btn.disabled = true;
+        
+        try {
+            const response = await fetch('/api/clear_images', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            const result = await response.json();
+            if (response.ok && result.success) {
+                showStatus('寻路结果图片清除成功');
+            } else {
+                showStatus(result.error || '清除寻路结果图片失败', false);
+            }
+        } catch (error) {
+            showStatus('清除寻路结果图片失败，请稍后重试', false);
+            console.error('清除寻路结果图片错误:', error);
+        } finally {
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+        }
+    });
 
 </script>
 {% endblock %}

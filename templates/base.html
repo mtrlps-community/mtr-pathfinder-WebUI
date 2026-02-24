@@ -4,69 +4,281 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MTR Pathfinder WebUI</title>
+    
+    <!-- 内联脚本：立即应用主题，直接设置CSS变量 -->
+    <script>
+        // 立即执行，不依赖任何事件
+        (function() {
+            const root = document.documentElement;
+            const body = document.body;
+            
+            // 主题配置
+            const lightTheme = {
+                '--bg-primary': '#f3f4f6',
+                '--bg-secondary': '#ffffff',
+                '--bg-tertiary': '#e5e7eb',
+                '--text-primary': '#111827',
+                '--text-secondary': '#4b5563',
+                '--text-tertiary': '#6b7280',
+                '--border-color': '#d1d5db',
+                '--hover-bg': '#dbeafe',
+                '--active-bg': '#3b82f6',
+                '--active-text': '#ffffff',
+                '--card-bg': '#ffffff',
+                '--card-shadow': '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)',
+                '--btn-primary-bg': '#3b82f6',
+                '--btn-primary-hover': '#2563eb',
+                '--btn-secondary-bg': '#e5e7eb',
+                '--btn-secondary-hover': '#d1d5db',
+                '--btn-secondary-text': '#4b5563',
+                '--form-input-bg': '#ffffff',
+                '--form-input-border': '#d1d5db',
+                '--form-input-focus': '#3b82f6',
+                '--algorithm-tab-bg': '#e5e7eb',
+                '--algorithm-tab-hover': '#d1d5db',
+                '--algorithm-tab-text': '#6b7280',
+                '--result-item-border': '#e5e7eb',
+                '--station-node-bg': '#ffffff',
+                '--station-node-border': '#9ca3af',
+                '--error-bg': '#fee2e2',
+                '--error-border': '#fecaca',
+                '--error-text': '#dc2626',
+                '--accent-bg': '#dbeafe',
+                '--accent-primary': '#3b82f6'
+            };
+            
+            const darkTheme = {
+                '--bg-primary': '#111827',
+                '--bg-secondary': '#1f2937',
+                '--bg-tertiary': '#374151',
+                '--text-primary': '#f9fafb',
+                '--text-secondary': '#d1d5db',
+                '--text-tertiary': '#9ca3af',
+                '--border-color': '#374151',
+                '--hover-bg': '#4b5563',
+                '--active-bg': '#3b82f6',
+                '--active-text': '#ffffff',
+                '--card-bg': '#1f2937',
+                '--card-shadow': '0 1px 3px 0 rgba(0, 0, 0, 0.3), 0 1px 2px 0 rgba(0, 0, 0, 0.2)',
+                '--btn-primary-bg': '#3b82f6',
+                '--btn-primary-hover': '#2563eb',
+                '--btn-secondary-bg': '#374151',
+                '--btn-secondary-hover': '#4b5563',
+                '--btn-secondary-text': '#d1d5db',
+                '--form-input-bg': '#374151',
+                '--form-input-border': '#4b5563',
+                '--form-input-focus': '#3b82f6',
+                '--algorithm-tab-bg': '#374151',
+                '--algorithm-tab-hover': '#4b5563',
+                '--algorithm-tab-text': '#d1d5db',
+                '--result-item-border': '#374151',
+                '--station-node-bg': '#1f2937',
+                '--station-node-border': '#6b7280',
+                '--error-bg': '#370617',
+                '--error-border': '#991b1b',
+                '--error-text': '#fca5a5',
+                '--accent-bg': '#1e3a8a',
+                '--accent-primary': '#93c5fd'
+            };
+            
+            // 主题状态：light, dark, auto
+            let currentTheme = localStorage.getItem('theme') || 'light';
+            
+            // 获取系统主题媒体查询
+            const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+            
+            // 直接设置CSS变量
+            function setCSSVariables(theme) {
+                for (const [key, value] of Object.entries(theme)) {
+                    root.style.setProperty(key, value);
+                }
+            }
+            
+            // 应用主题
+            function applyTheme() {
+                let theme = lightTheme;
+                
+                if (currentTheme === 'auto') {
+                    // 自动模式：根据系统主题
+                    theme = mediaQuery.matches ? darkTheme : lightTheme;
+                } else if (currentTheme === 'dark') {
+                    // 深色模式
+                    theme = darkTheme;
+                } else {
+                    // 浅色模式
+                    theme = lightTheme;
+                }
+                
+                // 直接设置CSS变量
+                setCSSVariables(theme);
+            }
+            
+            // 立即应用主题
+            applyTheme();
+            
+            // 系统主题变化监听函数
+            function handleSystemThemeChange(e) {
+                // 只有在自动模式下，才跟随系统主题变化
+                if (currentTheme === 'auto') {
+                    setCSSVariables(e.matches ? darkTheme : lightTheme);
+                }
+            }
+            
+            // 添加系统主题变化监听器
+            mediaQuery.addEventListener('change', handleSystemThemeChange);
+            
+            // 保存主题偏好
+            window.saveTheme = function(theme) {
+                currentTheme = theme;
+                localStorage.setItem('theme', theme);
+                applyTheme();
+            };
+        })();
+    </script>
+    
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Font Awesome -->
-    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <!-- Font Awesome v7 from npmmirror -->
+    <link href="https://registry.npmmirror.com/@fortawesome/fontawesome-free/7.2.0/files/css/all.min.css" rel="stylesheet">
+    <!-- Umami Analytics -->
+    {% if config.UMAMI_SCRIPT_URL and config.UMAMI_WEBSITE_ID %}
+    <script defer src="{{ config.UMAMI_SCRIPT_URL }}" data-website-id="{{ config.UMAMI_WEBSITE_ID }}"></script>
+    {% endif %}
     <style>
+        
+        /* 基础样式应用 */
+        body {
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+        
+        /* 超链接样式 */
+        a {
+            color: var(--accent-primary);
+            transition: color 0.2s ease, background-color 0.2s ease;
+        }
+        
+        a:hover {
+            opacity: 0.8;
+        }
+        
+        /* 按钮式超链接 */
+        a.btn-link {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.5rem 1rem;
+            border-radius: 0.375rem;
+            background-color: var(--bg-tertiary);
+            color: var(--text-primary);
+        }
+        
+        a.btn-link:hover {
+            background-color: var(--hover-bg);
+        }
+        
+        /* 表格行悬停样式 */
+        tr:hover {
+            background-color: var(--hover-bg) !important;
+        }
+        
+        /* 统一表格样式 */
+        table {
+            border-collapse: collapse;
+            width: 100%;
+        }
+        
+        th,
+        td {
+            padding: 0.75rem 1rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        th {
+            font-weight: 600;
+            color: var(--text-primary);
+            background-color: var(--bg-tertiary);
+        }
+        
+        td {
+            color: var(--text-secondary);
+        }
+        
+        td.col-name {
+            color: var(--text-primary);
+        }
+        
+        /* 确保超链接在表格中显示正常 */
+        td a {
+            color: var(--accent-primary);
+        }
+        
+        /* 统一表单标签样式 */
+        label {
+            color: var(--text-primary) !important;
+        }
+        
         /* 自定义样式 */
         .nav-item {
             padding: 0.5rem 1rem;
-            color: #4b5563;
+            color: var(--text-secondary);
             transition: color 0.2s, background-color 0.2s;
             border-radius: 0.375rem;
         }
         .nav-item:hover {
-            background-color: #dbeafe;
+            background-color: var(--hover-bg);
+            color: var(--text-primary);
         }
         .nav-item.active {
-            background-color: #3b82f6;
-            color: #ffffff;
+            background-color: var(--active-bg);
+            color: var(--active-text);
         }
         .form-input {
             width: 100%;
             padding: 0.5rem 0.75rem;
-            border: 1px solid #d1d5db;
+            border: 1px solid var(--form-input-border);
             border-radius: 0.375rem;
             white-space: pre-wrap;
             word-wrap: break-word;
             resize: none;
             min-height: 2.5rem;
-            height: 2.5rem;
             line-height: 1.5;
             font-size: 1rem;
             overflow: hidden;
+            background-color: var(--form-input-bg);
+            color: var(--text-primary);
         }
         .form-input:focus {
-            outline: 2px solid #3b82f6;
+            outline: 2px solid var(--form-input-focus);
             outline-offset: 2px;
         }
         .form-checkbox {
             width: 1rem;
             height: 1rem;
-            color: #3b82f6;
-            border: 1px solid #d1d5db;
+            color: var(--form-input-focus);
+            border: 1px solid var(--form-input-border);
             border-radius: 0.25rem;
         }
         .btn-primary {
             padding: 0.5rem 1rem;
-            background-color: #3b82f6;
-            color: #ffffff;
+            background-color: var(--btn-primary-bg);
+            color: var(--active-text);
             border-radius: 0.375rem;
             transition: background-color 0.2s;
         }
         .btn-primary:hover {
-            background-color: #2563eb;
+            background-color: var(--btn-primary-hover);
         }
         .btn-secondary {
             padding: 0.5rem 1rem;
-            background-color: #e5e7eb;
-            color: #4b5563;
+            background-color: var(--btn-secondary-bg);
+            color: var(--btn-secondary-text);
             border-radius: 0.375rem;
             transition: background-color 0.2s;
         }
         .btn-secondary:hover {
-            background-color: #d1d5db;
+            background-color: var(--btn-secondary-hover);
         }
         .btn-green {
             padding: 0.5rem 1rem;
@@ -78,11 +290,22 @@
         .btn-green:hover {
             background-color: #059669;
         }
+        .btn-red {
+            padding: 0.5rem 1rem;
+            background-color: #ef4444;
+            color: #ffffff;
+            border-radius: 0.375rem;
+            transition: background-color 0.2s;
+        }
+        .btn-red:hover {
+            background-color: #dc2626;
+        }
         .card {
-            background-color: #ffffff;
+            background-color: var(--card-bg);
             border-radius: 0.5rem;
-            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+            box-shadow: var(--card-shadow);
             padding: 1.5rem;
+            color: var(--text-primary);
         }
         /* 算法选项卡样式 */
         .algorithm-tabs {
@@ -90,7 +313,7 @@
         }
         
         .algorithm-tabs .flex {
-            background-color: #e5e7eb;
+            background-color: var(--algorithm-tab-bg);
             border-radius: 0.375rem;
             padding: 0.25rem;
             gap: 0.25rem;
@@ -103,17 +326,17 @@
             border-radius: 0.25rem;
             cursor: pointer;
             transition: all 0.2s ease;
-            color: #6b7280;
+            color: var(--algorithm-tab-text);
             font-size: 0.9rem;
         }
         
         .algorithm-tab:hover {
-            background-color: #d1d5db;
+            background-color: var(--algorithm-tab-hover);
         }
         
         .algorithm-tab.active {
-            background-color: #3b82f6;
-            color: white;
+            background-color: var(--active-bg);
+            color: var(--active-text);
             font-weight: 500;
         }
         
@@ -130,18 +353,19 @@
             display: flex;
             align-items: center;
             padding: 0.5rem 0;
-            border-bottom: 1px solid #e5e7eb;
+            border-bottom: 1px solid var(--result-item-border);
         }
         .station-node {
             width: 2.5rem;
             height: 2.5rem;
             border-radius: 50%;
-            background-color: #ffffff;
-            border: 2px solid #9ca3af;
+            background-color: var(--station-node-bg);
+            border: 2px solid var(--station-node-border);
             display: flex;
             align-items: center;
             justify-content: center;
             font-weight: bold;
+            color: var(--text-primary);
         }
         .route-line {
             height: 0.5rem;
@@ -156,7 +380,7 @@
         
         .time-info h3 {
             margin-bottom: 12px;
-            color: #374151;
+            color: var(--text-primary);
             font-size: 1rem;
             font-weight: 600;
         }
@@ -170,16 +394,16 @@
         .time-item {
             display: flex;
             align-items: center;
-            background: white;
+            background: var(--card-bg);
             padding: 8px 12px;
             border-radius: 4px;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+            box-shadow: var(--card-shadow);
             transition: transform 0.2s ease, box-shadow 0.2s ease;
         }
         
         .time-item:hover {
             transform: translateY(-1px);
-            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
         }
         
         .time-item.total-time {
@@ -199,6 +423,10 @@
             margin-right: 8px;
         }
         
+        .time-icon i {
+            color: var(--text-primary);
+        }
+        
         .time-content {
             flex: 1;
         }
@@ -208,6 +436,7 @@
             font-size: 1.1rem;
             font-weight: 700;
             margin-bottom: 1px;
+            color: var(--text-primary);
         }
         
         /* 数据版本特殊样式 */
@@ -261,7 +490,7 @@
         }
         
         .time-content span {
-            color: #6c757d;
+            color: var(--text-tertiary);
             font-size: 0.75rem;
             font-weight: 500;
         }
@@ -279,14 +508,14 @@
         .station {
             font-weight: 700;
             font-size: 1.2rem;
-            color: #333;
+            color: var(--text-primary);
             margin-bottom: 8px;
             display: flex;
             align-items: center;
             padding: 8px 12px;
-            border: 1px solid #e5e7eb;
+            border: 1px solid var(--border-color);
             border-radius: 8px;
-            background-color: #ffffff;
+            background-color: var(--card-bg);
         }
         
         .station::before {
@@ -312,7 +541,7 @@
         
         /* 中间站 - 黑色空心圆圈 */
         .route-step:not(.start-station):not(.end-station) .station::before {
-            border-color: #333;
+            border-color: var(--text-primary);
             background-color: transparent;
         }
         
@@ -352,13 +581,13 @@
         }
         
         .direction-indicator {
-            background: linear-gradient(135deg, #e3f2fd, #bbdefb);
+            background: var(--bg-tertiary);
             margin-top: 2px;
-            color: #1e40af;
+            color: var(--text-primary);
         }
         
         .time-detail {
-            background: #f3f4f6;
+            background: var(--bg-tertiary);
             margin-top: 2px;
         }
         
@@ -382,11 +611,11 @@
             display: flex;
             align-items: center;
             padding: 2px 6px;
-            background: linear-gradient(135deg, #e3f2fd, #bbdefb);
+            background: var(--bg-tertiary);
             border-radius: 4px;
             margin-top: 2px;
             font-size: 0.85rem;
-            color: #1e40af;
+            color: var(--text-primary);
         }
         
         .direction-indicator::before {
@@ -399,7 +628,7 @@
             display: flex;
             align-items: center;
             padding: 2px 6px;
-            background: #f3f4f6;
+            background: var(--bg-tertiary);
             border-radius: 4px;
             margin-top: 2px;
             font-size: 0.85rem;
@@ -407,7 +636,7 @@
         
         .time-value {
             font-weight: 600;
-            color: #4a90e2;
+            color: var(--accent-primary);
             margin-left: 4px;
         }
         
@@ -456,7 +685,7 @@
         }
         
         /* 移动端适配 */
-        @media (max-width: 768px) {
+        @media (max-width: 767px) {
             /* 显示汉堡菜单按钮 */
             .mobile-menu-button {
                 display: block;
@@ -507,29 +736,29 @@
             line-height: 1.5;
             width: 100%;
             margin: 8px 0;
-            background: #f3f4f6;
+            background: var(--bg-tertiary);
         }
         
         .departure-time, .arrival-time {
-            background: linear-gradient(135deg, #e3f2fd, #bbdefb);
+            background: var(--bg-tertiary);
             font-size: 0.85rem;
-            color: #4a90e2;
+            color: var(--accent-primary);
             font-weight: 600;
         }
         
         .route-departure-time, .route-arrival-time {
             font-size: 0.85rem;
-            color: #6c757d;
-            background: #f3f4f6;
+            color: var(--text-secondary);
+            background: var(--bg-tertiary);
         }
         
         .version-info {
             margin-top: 25px;
             padding: 15px;
-            background: #f8f9fa;
+            background: var(--bg-tertiary);
             border-radius: 8px;
             font-size: 0.9rem;
-            color: #6c757d;
+            color: var(--text-tertiary);
             text-align: center;
         }
         
@@ -539,34 +768,44 @@
         }
     </style>
 </head>
-<body class="bg-gray-100 min-h-screen">
+<body class="bg-gray-100 min-h-screen m-0 p-0" style="background-color: var(--bg-primary);">
     <!-- 导航栏 -->
-    <nav class="bg-white shadow-md" style="position: relative;">
+    <nav class="bg-white dark:bg-gray-800 shadow-md" style="position: relative; background-color: var(--bg-secondary);">
         <div class="container mx-auto px-4 py-3 flex justify-between items-center">
-            <div class="flex items-center space-x-2">
-                <i class="fa fa-subway text-blue-500 text-2xl"></i>
-                <h1 class="text-xl font-bold text-gray-800">MTR Pathfinder</h1>
+            <div class="flex items-center space-x-4">
+                <!-- 标题区域 -->
+                <div class="flex items-center space-x-2" id="title-container" style="cursor: pointer;">
+                    <i class="fa-solid fa-train text-blue-500 text-xl"></i>
+                    <h1 class="text-xl font-bold" style="color: var(--text-primary);">MTR Pathfinder</h1>
+                </div>
+                
+                <!-- 深色模式切换按钮 - 紧挨标题但不进入标题div -->
+                <button id="theme-toggle" class="text-gray-600 hover:text-gray-800 focus:outline-none" style="color: var(--text-secondary);">
+                    <i class="fa-solid text-lg fa-moon"></i>
+                </button>
             </div>
             
-            <!-- 汉堡菜单按钮 -->
-            <button class="mobile-menu-button md:hidden text-gray-600 hover:text-gray-800 focus:outline-none">
-                <i class="fa fa-bars text-xl"></i>
-            </button>
-            
-            <!-- 导航链接 -->
-            <div class="nav-links">
-                <a href="/" class="nav-item {{ 'active' if request.path == '/' else '' }}">
-                    <i class="fa fa-search mr-1"></i> 寻路
-                </a>
-                <a href="/stations" class="nav-item {{ 'active' if request.path == '/stations' else '' }}">
-                    <i class="fa fa-map-marker mr-1"></i> 车站列表
-                </a>
-                <a href="/routes" class="nav-item {{ 'active' if request.path == '/routes' else '' }}">
-                    <i class="fa fa-train mr-1"></i> 线路列表
-                </a>
-                <a href="/admin" class="nav-item {{ 'active' if request.path == '/admin' else '' }}">
-                    <i class="fa fa-cog mr-1"></i> 控制台
-                </a>
+            <div class="flex items-center space-x-4">
+                <!-- 汉堡菜单按钮 -->
+                <button class="mobile-menu-button md:hidden text-gray-600 hover:text-gray-800 focus:outline-none" style="color: var(--text-secondary);">
+                    <i class="fa-solid fa-bars text-lg"></i>
+                </button>
+                
+                <!-- 导航链接 -->
+                <div class="nav-links">
+                    <a href="/" class="nav-item {{ 'active' if request.path == '/' else '' }}">
+                        <i class="fa-solid fa-search mr-1"></i> 寻路
+                    </a>
+                    <a href="/stations" class="nav-item {{ 'active' if request.path == '/stations' else '' }}">
+                        <i class="fa-solid fa-map-marker-alt mr-1"></i> 车站列表
+                    </a>
+                    <a href="/routes" class="nav-item {{ 'active' if request.path == '/routes' else '' }}">
+                        <i class="fa-solid fa-train mr-1"></i> 线路列表
+                    </a>
+                    <a href="/admin" class="nav-item {{ 'active' if request.path == '/admin' else '' }}">
+                        <i class="fa-solid fa-gear mr-1"></i> 控制台
+                    </a>
+                </div>
             </div>
         </div>
     </nav>
@@ -578,8 +817,8 @@
     </main>
 
     <!-- 页脚 -->
-    <footer class="bg-white shadow-inner mt-8 py-6">
-        <div class="container mx-auto px-4 text-center text-gray-600">
+    <footer class="bg-white dark:bg-gray-800 shadow-inner mt-8 py-6" style="background-color: var(--bg-secondary);">
+        <div class="container mx-auto px-4 text-center" style="color: var(--text-secondary);">
             <p>MTR Pathfinder WebUI &copy; {{ 2026 }}</p>
         </div>
     </footer>
@@ -634,26 +873,46 @@
             });
             
             // 监听paste和cut事件
-            document.addEventListener('paste', function(e) {
-                if (e.target && e.target.classList.contains('form-input')) {
-                    setTimeout(() => autoResizeTextarea(e.target), 0);
-                }
-            });
-            
-            document.addEventListener('cut', function(e) {
-                if (e.target && e.target.classList.contains('form-input')) {
-                    setTimeout(() => autoResizeTextarea(e.target), 0);
-                }
-            });
+        document.addEventListener('paste', function(e) {
+            if (e.target && e.target.classList.contains('form-input')) {
+                setTimeout(() => autoResizeTextarea(e.target), 0);
+            }
         });
         
-        // 当页面完全加载（包括图片等资源）后再次调整高度
-        window.addEventListener('load', function() {
-            processAllTextareas();
+        document.addEventListener('cut', function(e) {
+            if (e.target && e.target.classList.contains('form-input')) {
+                setTimeout(() => autoResizeTextarea(e.target), 0);
+            }
         });
         
-        // 移动端菜单功能
+        // 监听enter键，直接提交表单
+        document.addEventListener('keydown', function(e) {
+            if (e.target && e.target.classList.contains('form-input') && e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                const form = document.getElementById('route-form');
+                if (form) {
+                    form.dispatchEvent(new Event('submit'));
+                }
+            }
+        });
+    });
+    
+    // 当页面完全加载（包括图片等资源）后再次调整高度
+    window.addEventListener('load', function() {
+        processAllTextareas();
+    });
+    
+    // 主题切换功能 - 处理主题切换和UI交互
+    (function() {
+        // 主题状态：light, dark, auto
+        let currentTheme = localStorage.getItem('theme') || 'light';
+        
+        // 获取系统主题媒体查询
+        const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+        
+        // 等DOM加载完成后，初始化主题切换按钮和移动端菜单
         document.addEventListener('DOMContentLoaded', function() {
+            // 移动端菜单功能
             const mobileMenuButton = document.querySelector('.mobile-menu-button');
             const navLinks = document.querySelector('.nav-links');
             
@@ -662,7 +921,64 @@
                     navLinks.classList.toggle('show');
                 });
             }
+            
+            // 标题点击回到主界面功能
+            const titleContainer = document.getElementById('title-container');
+            if (titleContainer) {
+                titleContainer.addEventListener('click', function() {
+                    window.location.href = '/';
+                });
+            }
+            
+            // 初始化主题切换按钮
+            const themeToggle = document.getElementById('theme-toggle');
+            
+            // 更新主题显示（包括图标）
+            function updateIcon() {
+                if (themeToggle) {
+                    const icon = themeToggle.querySelector('i');
+                    icon.classList.remove('fa-moon', 'fa-sun', 'fa-circle-half-stroke');
+                    
+                    if (currentTheme === 'auto') {
+                        icon.classList.add('fa-circle-half-stroke');
+                    } else if (currentTheme === 'dark') {
+                        icon.classList.add('fa-sun');
+                    } else {
+                        icon.classList.add('fa-moon');
+                    }
+                }
+            }
+            
+            // 主题切换按钮点击事件
+            if (themeToggle) {
+                themeToggle.addEventListener('click', function() {
+                    // 循环切换主题：light → dark → auto → light
+                    switch (currentTheme) {
+                        case 'light':
+                            currentTheme = 'dark';
+                            break;
+                        case 'dark':
+                            currentTheme = 'auto';
+                            break;
+                        case 'auto':
+                            currentTheme = 'light';
+                            break;
+                        default:
+                            currentTheme = 'light';
+                    }
+                    
+                    // 使用全局函数保存主题并应用
+                    window.saveTheme(currentTheme);
+                    
+                    // 更新图标
+                    updateIcon();
+                });
+                
+                // 初始化图标
+                updateIcon();
+            }
         });
+    })();
     </script>
     </body>
 </html>

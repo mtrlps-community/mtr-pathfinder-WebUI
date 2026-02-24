@@ -1,0 +1,368 @@
+{% extends 'base.html' %}
+
+{% block scripts %}
+<script>
+    // 设置颜色盒的背景颜色
+    function setColorBoxes() {
+        const colorBoxes = document.querySelectorAll('.color-box');
+        colorBoxes.forEach(function(box) {
+            const color = box.getAttribute('data-color');
+            if (color) {
+                const hexColor = '#' + parseInt(color).toString(16).padStart(6, '0');
+                box.style.backgroundColor = hexColor;
+            }
+        });
+    }
+    
+    // 折叠/展开站点列表
+    function toggleStations(stationsId) {
+        const stationsDiv = document.getElementById(stationsId);
+        const icon = document.getElementById(stationsId.replace('stations-', 'stations-icon-'));
+        
+        if (stationsDiv.classList.contains('hidden')) {
+            stationsDiv.classList.remove('hidden');
+            icon.style.transform = 'rotate(180deg)';
+        } else {
+            stationsDiv.classList.add('hidden');
+            icon.style.transform = 'rotate(0deg)';
+        }
+    }
+    
+    // 折叠/展开交路列表
+    function toggleBranches(branchesId) {
+        const branchesDiv = document.getElementById(branchesId);
+        const icon = document.getElementById(branchesId.replace('branches-', 'branches-icon-'));
+        
+        if (branchesDiv.classList.contains('hidden')) {
+            branchesDiv.classList.remove('hidden');
+            icon.style.transform = 'rotate(180deg)';
+        } else {
+            branchesDiv.classList.add('hidden');
+            icon.style.transform = 'rotate(0deg)';
+        }
+    }
+    
+    // 折叠/展开连接车站列表
+    function toggleConnections() {
+        const connectionsDiv = document.getElementById('connections-list');
+        const icon = document.getElementById('connections-icon');
+        
+        if (connectionsDiv.classList.contains('hidden')) {
+            connectionsDiv.classList.remove('hidden');
+            icon.style.transform = 'rotate(180deg)';
+        } else {
+            connectionsDiv.classList.add('hidden');
+            icon.style.transform = 'rotate(0deg)';
+        }
+    }
+    
+    // 全部展开交路列表
+    function expandAllBranches() {
+        // 获取所有交路列表容器（只选择div元素，不选择图标）
+        const branchesDivs = document.querySelectorAll('div[id^="branches-"]');
+        
+        branchesDivs.forEach(div => {
+            // 展开列表
+            div.classList.remove('hidden');
+            // 获取对应的图标
+            const iconId = div.id.replace('branches-', 'branches-icon-');
+            const icon = document.getElementById(iconId);
+            if (icon) {
+                // 旋转图标
+                icon.style.transform = 'rotate(180deg)';
+            }
+        });
+    }
+    
+    // 全部收起交路列表
+    function collapseAllBranches() {
+        // 获取所有交路列表容器（只选择div元素，不选择图标）
+        const branchesDivs = document.querySelectorAll('div[id^="branches-"]');
+        
+        branchesDivs.forEach(div => {
+            // 收起列表
+            div.classList.add('hidden');
+            // 获取对应的图标
+            const iconId = div.id.replace('branches-', 'branches-icon-');
+            const icon = document.getElementById(iconId);
+            if (icon) {
+                // 旋转图标
+                icon.style.transform = 'rotate(0deg)';
+            }
+        });
+    }
+    
+    // 页面加载完成后设置颜色盒
+    document.addEventListener('DOMContentLoaded', function() {
+        setColorBoxes();
+    });
+</script>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2 class="text-2xl font-bold mb-6">车站详情</h2>
+    
+    <!-- 车站基本信息 -->
+    <div class="mb-8">
+        <h3 class="text-xl font-semibold mb-4">基本信息</h3>
+        <div class="space-y-4">
+            <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
+            <!--车站名称 + 车站ID + 车站颜色（各占6列） -->
+                <div class="md:col-span-6 p-2 rounded-md" style="background-color: var(--bg-tertiary);">
+                    <div class="flex justify-between items-center">
+                        <span style="color: var(--text-secondary);">车站名称</span>
+                        <span class="font-medium" style="color: var(--text-primary);">{{ station.get('name', 'N/A') }}</span>
+                    </div>
+                </div>
+                <div class="md:col-span-6 p-2 rounded-md" style="background-color: var(--bg-tertiary);">
+                    <div class="flex justify-between items-center">
+                        <span style="color: var(--text-secondary);">车站ID</span>
+                        <span class="font-medium" style="color: var(--text-primary);">{{ station.get('id', 'N/A') }}</span>
+                    </div>
+                </div>
+                <div class="md:col-span-6 p-2 rounded-md" style="background-color: var(--bg-tertiary);">
+                    <div class="flex justify-between items-center">
+                        <span style="color: var(--text-secondary);">车站颜色</span>
+                        <div class="flex items-center">
+                            <div class="w-4 h-4 rounded-full mr-2 color-box" data-color="{{ station.get('color', '') }}"></div>
+                            <span class="font-medium" style="color: var(--text-primary);">
+                                {% if station.get('color') %}
+                                    #{{ '{:06x}'.format(station['color']) }}
+                                {% else %}
+                                    N/A
+                                {% endif %}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+            <!--收费区域编号 + 坐标（各占3列） -->
+                <div class="md:col-span-3 p-2 rounded-md" style="background-color: var(--bg-tertiary);">
+                    <div class="flex justify-between items-center">
+                        <span style="color: var(--text-secondary);">收费区域编号</span>
+                        <span class="font-medium" style="color: var(--text-primary);">
+                            ({{ station.get('zone1', 0) }}, {{ station.get('zone2', 0) }}, {{ station.get('zone3', 0) }})
+                        </span>
+                    </div>
+                </div>
+                <div class="md:col-span-3 p-2 rounded-md" style="background-color: var(--bg-tertiary);">
+                    <div class="flex justify-between items-center">
+                        <span style="color: var(--text-secondary);">坐标</span>
+                        <span class="font-medium" style="color: var(--text-primary);">X: {{ station.get('x', 0)|round(0)|int }}, Z: {{ station.get('z', 0)|round(0)|int }}</span>
+                    </div>
+                </div>
+            
+            <!--站台数 + 连接车站数 + 经过线路数 + 经过交路数（各占3列） -->
+                <div class="md:col-span-3 p-2 rounded-md" style="background-color: var(--bg-tertiary);">
+                    <div class="flex justify-between items-center">
+                        <span style="color: var(--text-secondary);">站台数</span>
+                        <span class="font-medium" style="color: var(--text-primary);">
+                            {% set unique_platforms = namespace(platforms=[]) %}
+                            {% for group in grouped_routes %}
+                                {% for route in group.routes %}
+                                    {% if 'current_platform' in route and route['current_platform'] not in unique_platforms.platforms %}
+                                        {% set _ = unique_platforms.platforms.append(route['current_platform']) %}
+                                    {% endif %}
+                                {% endfor %}
+                            {% endfor %}
+                            {{ unique_platforms.platforms|length }}
+                        </span>
+                    </div>
+                </div>
+                <div class="md:col-span-3 p-2 rounded-md" style="background-color: var(--bg-tertiary);">
+                    <div class="flex justify-between items-center">
+                        <span style="color: var(--text-secondary);">连接车站数</span>
+                        <span class="font-medium" style="color: var(--text-primary);">{{ station.get('connections', [])|length }}</span>
+                    </div>
+                </div>
+                <div class="md:col-span-3 p-2 rounded-md" style="background-color: var(--bg-tertiary);">
+                    <div class="flex justify-between items-center">
+                        <span style="color: var(--text-secondary);">经过线路数</span>
+                        <span class="font-medium" style="color: var(--text-primary);">{{ grouped_routes|length }}</span>
+                    </div>
+                </div>
+                <div class="md:col-span-3 p-2 rounded-md" style="background-color: var(--bg-tertiary);">
+                    <div class="flex justify-between items-center">
+                        <span style="color: var(--text-secondary);">经过交路数</span>
+                        <span class="font-medium" style="color: var(--text-primary);">
+                            {% set total_branches = namespace(value=0) %}
+                            {% for group in grouped_routes %}
+                                {% set total_branches.value = total_branches.value + group.routes|length %}
+                            {% endfor %}
+                            {{ total_branches.value }}
+                        </span>
+                    </div>
+                </div>
+        </div>
+    </div>
+    
+    <!-- 连接车站 -->
+    {% if connected_stations %}
+    <div class="mb-8 mt-8">
+        <div class="flex justify-between items-center cursor-pointer mb-2" onclick="toggleConnections()">
+            <h3 class="text-xl font-semibold" style="color: var(--text-primary);">连接车站</h3>
+            <i class="fa-solid fa-chevron-down transition-transform duration-300" id="connections-icon" style="color: var(--text-tertiary);"></i>
+        </div>
+        <div class="flex flex-wrap gap-2 hidden" id="connections-list">
+            {% for connected_station in connected_stations %}
+            <a href="/stations/{{ connected_station.id }}" class="inline-flex items-center rounded-full px-4 py-2 transition-colors text-sm" style="background-color: var(--bg-tertiary); border: 1px solid var(--border-color);">
+                {% if 'color' in connected_station %}
+                <div class="w-3 h-3 rounded-full mr-2 color-box" data-color="{{ connected_station.color }}"></div>
+                {% endif %}
+                <span class="font-medium" style="color: var(--text-primary);">{{ connected_station.name }}</span>
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- 经过车站的线路 -->
+    {% if grouped_routes %}
+    <div class="mb-8 mt-8">
+    <div>
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-xl font-semibold" style="color: var(--text-primary);">经过线路</h3>
+            <div class="flex gap-2">
+                <button onclick="expandAllBranches()" class="text-sm px-3 py-1 rounded-md transition-colors" style="background-color: var(--bg-tertiary); color: var(--text-secondary);" onmouseover="this.style.backgroundColor='var(--hover-bg)'" onmouseout="this.style.backgroundColor='var(--bg-tertiary)'">
+                    全部展开
+                </button>
+                <button onclick="collapseAllBranches()" class="text-sm px-3 py-1 rounded-md transition-colors" style="background-color: var(--bg-tertiary); color: var(--text-secondary);" onmouseover="this.style.backgroundColor='var(--hover-bg)'" onmouseout="this.style.backgroundColor='var(--bg-tertiary)'">
+                    全部收起
+                </button>
+            </div>
+        </div>
+        <div class="space-y-4">
+            {% for group in grouped_routes %}
+            <div class="rounded-md p-4 hover:shadow-md transition-shadow" style="background-color: var(--card-bg); border: 1px solid var(--border-color);">
+                <!-- 主线路信息 -->
+                <div class="flex flex-wrap justify-between items-center cursor-pointer" onclick="toggleBranches('branches-{{ loop.index }}')">
+                    <div class="flex items-center">
+                        {% if 'color' in group.main_route %}
+                        <div class="w-4 h-4 rounded-full mr-2 color-box" data-color="{{ group.main_route['color'] }}"></div>
+                        {% endif %}
+                        <h4 class="font-medium" style="color: var(--text-primary);">
+                            {{ group.main_route.get('name', 'N/A') }}
+                        </h4>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <span class="text-xs px-2 py-1 rounded-full" style="background-color: var(--bg-tertiary); color: var(--text-secondary);">
+                            {% set route_type = group.main_route.get('type', 'N/A') %}
+                            {% if route_type == 'train_normal' %}
+                                列车
+                            {% elif route_type == 'train_high_speed' %}
+                                高铁
+                            {% elif route_type == 'train_light_rail' %}
+                                轻轨
+                            {% elif route_type == 'boat_normal' %}
+                                轮渡
+                            {% elif route_type == 'boat_light_rail' %}
+                                邮轮
+                            {% elif route_type == 'boat_high_speed' %}
+                                快船
+                            {% elif route_type == 'cable_car_normal' %}
+                                缆车
+                            {% elif route_type == 'airplane_normal' %}
+                                飞机
+                            {% else %}
+                                {{ route_type }}
+                            {% endif %}
+                        </span>
+                        <i class="fa-solid fa-chevron-down transition-transform duration-300" id="branches-icon-{{ loop.index }}" style="transform: rotate(180deg); color: var(--text-tertiary);"></i>
+                    </div>
+                </div>
+                
+                <!-- 交路列表 -->
+                <div class="mt-3 space-y-3" id="branches-{{ loop.index }}">
+                    {% for route in group.routes %}
+                    <div class="border-l-2 pl-3" style="border-left-color: var(--border-color);">
+                        <div class="flex flex-wrap justify-between items-center mb-2">
+                            <div class="flex items-center">
+                                <h5 class="font-medium text-sm">
+                                    <a href="/routes/{{ route.get('id', '') }}" style="color: var(--accent-primary);">
+                                        {% if route.get('route_number') %}
+                                            {{ route.get('route_number') }}
+                                        {% else %}
+                                            主线
+                                        {% endif %}
+                                        {% if 'number' in route and route['number'] %}
+                                            <span class="ml-2 text-xs px-2 py-0.5 rounded-full" style="background-color: var(--bg-tertiary); color: var(--text-secondary);">
+                                                {{ route['number'] }}
+                                            </span>
+                                        {% endif %}
+                                    </a>
+                                </h5>
+                                {% if route.get('stations') and route.get('stations')|length >= 2 %}
+                                <span class="text-xs ml-2" style="color: var(--text-tertiary);">
+                                    {{ route.stations[0].get('name', 'N/A') }} → {{ route.stations[-1].get('name', 'N/A') }}
+                                </span>
+                                {% endif %}
+                            </div>
+                            <div class="flex items-center space-x-2">
+                                {% if 'current_platform' in route %}
+                                <span class="text-xs px-2 py-1 rounded-full" style="background-color: var(--bg-tertiary); color: var(--text-secondary);">
+                                    站台 {{ route['current_platform'] }}
+                                </span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+                            <div>
+                                <span style="color: var(--text-tertiary);">线路ID:</span> {{ route.get('id', 'N/A') }}
+                            </div>
+                            <div>
+                                <span style="color: var(--text-tertiary);">站点数量:</span> {{ route.get('stations', [])|length }}
+                            </div>
+                            <div>
+                                <span style="color: var(--text-tertiary);">状态:</span> 
+                                {% if route.get('hidden', False) %}
+                                    <span class="text-red-600">隐藏</span>
+                                {% else %}
+                                    <span class="text-green-600">显示</span>
+                                {% endif %}
+                            </div>
+                            {% if 'circularState' in route and route['circularState'] != 'NONE' %}
+                            <div>
+                                <span style="color: var(--text-tertiary);">环线状态:</span> {{ route['circularState'] }}
+                            </div>
+                            {% endif %}
+                        </div>
+                        
+                        <!-- 线路站点列表 -->
+                        {% if route.get('stations') %}
+                        <div class="mt-2">
+                            <div class="flex items-center justify-between cursor-pointer" onclick="toggleStations('stations-{{ route.get('id', '0') }}')">
+                                <span class="text-xs block mb-1" style="color: var(--text-secondary);">站点列表</span>
+                                <i class="fa-solid fa-chevron-down transition-transform duration-300" id="stations-icon-{{ route.get('id', '0') }}" style="color: var(--text-tertiary);"></i>
+                            </div>
+                            <div class="space-y-1 hidden" id="stations-{{ route.get('id', '0') }}">
+                                {% for station in route['stations'] %}
+                                <a href="/stations/{{ station.get('id', '') }}" class="flex items-center text-xs px-3 py-2 rounded-full transition-colors"
+                                    style="
+                                        {% if station.get('id') == station_id %}
+                                            background-color: var(--accent-bg); color: var(--accent-primary); font-weight: medium; border: 2px solid var(--accent-primary);
+                                        {% else %}
+                                            background-color: var(--bg-tertiary); color: var(--text-primary);
+                                        {% endif %}">
+                                    {{ station.get('name', 'N/A') }}
+                                </a>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% else %}
+    <div class="bg-gray-50 p-6 rounded-md text-center">
+        <i class="fa-solid fa-train text-3xl text-gray-400 mb-2"></i>
+        <p class="text-gray-500">该车站未关联任何线路</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

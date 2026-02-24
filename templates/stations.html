@@ -2,104 +2,63 @@
 
 {% block content %}
 <div class="card">
-    <h2 class="text-2xl font-bold mb-6">车站列表</h2>
+    <h2 class="text-2xl font-bold mb-6">车站列表 <span class="text-sm text-gray-500 font-normal">（共 {{ stations|length }} 个车站）</span></h2>
     
-    <!-- 搜索、筛选和列选择 -->
-    <div class="space-y-4 mb-6">
-        <!-- 搜索和排序 -->
-        <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-            <div class="relative w-full md:w-64">
-                <textarea id="station-search" placeholder="搜索车站名称" class="form-input pl-10"></textarea>
-                <i class="fa fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
-            </div>
-            <div class="flex space-x-2">
-                <select id="station-sort" class="form-input">
-                    <option value="name">按名称排序</option>
-                    <option value="id">按ID排序</option>
-                </select>
-                <button id="sort-direction" class="btn-secondary">
-                    <i class="fa fa-sort-amount-asc"></i>
-                </button>
-            </div>
+    <!-- 搜索和排序 -->
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+        <div class="relative w-full md:w-64">
+            <textarea id="station-search" placeholder="搜索车站名称" class="form-input pl-10"></textarea>
+            <i class="fa-solid fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
         </div>
-        
-        <!-- 列选择 -->
-        <div class="column-selection bg-gray-50 p-3 rounded-md">
-            <div class="flex items-center space-x-4 flex-wrap">
-                <span class="text-sm font-medium text-gray-700">显示列：</span>
-                <label class="flex items-center text-sm">
-                    <input type="checkbox" id="show-id" class="form-checkbox" checked>
-                    <span class="ml-1 text-gray-700">ID</span>
-                </label>
-                <label class="flex items-center text-sm">
-                    <input type="checkbox" id="show-name" class="form-checkbox" checked>
-                    <span class="ml-1 text-gray-700">名称</span>
-                </label>
-                <label class="flex items-center text-sm">
-                    <input type="checkbox" id="show-routes" class="form-checkbox" checked>
-                    <span class="ml-1 text-gray-700">线路</span>
-                </label>
-                <label class="flex items-center text-sm">
-                    <input type="checkbox" id="show-coords" class="form-checkbox" checked>
-                    <span class="ml-1 text-gray-700">坐标</span>
-                </label>
-                <label class="flex items-center text-sm">
-                    <input type="checkbox" id="show-connections" class="form-checkbox" checked>
-                    <span class="ml-1 text-gray-700">连接</span>
-                </label>
-            </div>
+        <div class="flex space-x-2">
+            <select id="station-sort" class="form-input">
+                <option value="default" selected>按数据文件默认排序</option>
+                <option value="name">按名称排序</option>
+                <option value="id">按ID排序</option>
+                <option value="lines">按线路数量排序</option>
+                <option value="branches">按交路数量排序</option>
+            </select>
+            <button id="sort-direction" class="btn-secondary">
+                <i class="fa-solid fa-sort-amount-asc"></i>
+            </button>
         </div>
     </div>
     
     <!-- 车站表格 -->
     <div class="overflow-x-auto">
-        <table class="min-w-full bg-white border border-gray-200">
+        <table class="min-w-full" style="background-color: var(--card-bg); border: 1px solid var(--border-color);">
             <thead>
-                <tr class="bg-gray-50">
-                    <th class="col-id py-3 px-4 text-left text-sm font-semibold text-gray-700 border-b">ID</th>
-                    <th class="col-name py-3 px-4 text-left text-sm font-semibold text-gray-700 border-b">名称</th>
-                    <th class="col-routes py-3 px-4 text-left text-sm font-semibold text-gray-700 border-b">线路</th>
-                    <th class="col-coords py-3 px-4 text-left text-sm font-semibold text-gray-700 border-b">坐标</th>
-                    <th class="col-connections py-3 px-4 text-left text-sm font-semibold text-gray-700 border-b">连接</th>
+                <tr>
+                    <th class="col-id whitespace-nowrap">ID</th>
+                    <th class="col-name">名称</th>
+                    <th class="col-lines whitespace-nowrap">线路数量</th>
+                    <th class="col-lines whitespace-nowrap">交路数量</th>
                 </tr>
             </thead>
             <tbody id="station-table-body">
                 {% if stations %}
                     {% for station in stations %}
-                        <tr class="hover:bg-gray-50 transition-colors">
-                            <td class="col-id py-3 px-4 border-b text-sm text-gray-600">
+                        <tr>
+                            <td class="col-id whitespace-nowrap" style="width: 150px;">
                                 {{ station.get('id', 'N/A') }}
                             </td>
-                            <td class="col-name py-3 px-4 border-b text-sm font-medium">
-                                {{ station.get('name', 'N/A') }}
+                            <td class="col-name font-medium">
+                                <a href="/stations/{{ station.get('id', 'N/A') }}">
+                                    {{ station.get('name', 'N/A') }}
+                                </a>
                             </td>
-                            <td class="col-routes py-3 px-4 border-b text-sm text-gray-600">
-                                {% if 'routes' in station %}
-                                    {{ station['routes']|length }}
-                                {% else %}
-                                    0
-                                {% endif %}
+                            <td class="col-lines whitespace-nowrap" style="width: 100px;">
+                                {{ station.get('line_count', 0) }}
                             </td>
-                            <td class="col-coords py-3 px-4 border-b text-sm text-gray-600">
-                                {% if 'x' in station and 'z' in station %}
-                                    X: {{ '%.1f'|format(station['x']) }}, Z: {{ '%.1f'|format(station['z']) }}
-                                {% else %}
-                                    N/A
-                                {% endif %}
-                            </td>
-                            <td class="col-connections py-3 px-4 border-b text-sm text-gray-600">
-                                {% if 'connections' in station %}
-                                    {{ station['connections']|length }}
-                                {% else %}
-                                    0
-                                {% endif %}
+                            <td class="col-lines whitespace-nowrap" style="width: 100px;">
+                                {{ station.get('branch_count', 0) }}
                             </td>
                         </tr>
                     {% endfor %}
                 {% else %}
                     <tr>
-                        <td colspan="5" class="py-12 text-center text-gray-500">
-                            <i class="fa fa-map-marker text-4xl mb-2"></i>
+                        <td colspan="4" class="py-12 text-center" style="color: var(--text-tertiary);">
+                            <i class="fa-solid fa-map-marker-alt text-3xl mb-2"></i>
                             <p>暂无车站数据，请先在控制台更新数据</p>
                         </td>
                     </tr>
@@ -113,133 +72,224 @@
 {% block scripts %}
 <script>
     // 车站数据
-    const stationsData = JSON.parse('{{ stations|tojson|safe }}');
+    let stationsData = {{ stations|tojson }};
+    // 确保stationsData是数组
+    if (!Array.isArray(stationsData)) {
+        stationsData = [];
+    }
     let filteredStations = [...stationsData];
-    let sortField = 'name';
+    let sortField = 'default';
     let sortDirection = 'asc';
+    // 控制是否显示所有车站
+    let showAllStations = false;
+    // 每页显示数量
+    const stationsPerPage = 100;
+    
+    // 搜索功能
+    function searchStations() {
+        const searchInput = document.getElementById('station-search');
+        const query = searchInput ? searchInput.value.toLowerCase().trim() : '';
+        
+        // 重置显示所有车站标志
+        showAllStations = false;
+        
+        if (!query) {
+            // 搜索词为空，显示所有车站
+            filteredStations = stationsData && Array.isArray(stationsData) ? [...stationsData] : [];
+        } else {
+            // 搜索词不为空，过滤车站
+            filteredStations = stationsData.filter(station => {
+                // 检查车站名称是否包含搜索词
+                const stationName = station.name ? station.name.toLowerCase() : '';
+                return stationName.includes(query);
+            });
+        }
+        
+        // 如果当前排序方式不是默认排序，重新排序
+        if (sortField !== 'default') {
+            sortStations();
+        } else {
+            renderTable();
+        }
+    }
     
     // 渲染表格 - 显示所有数据
     function renderTable() {
         const tbody = document.getElementById('station-table-body');
         
-        if (filteredStations.length === 0) {
-            tbody.innerHTML = `
+        if (!tbody) {
+            console.error('Table body element not found');
+            return;
+        }
+        
+        if (!filteredStations || filteredStations.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="4" class="py-12 text-center" style="color: var(--text-tertiary);">
+                            <i class="fa-solid fa-search text-3xl mb-2" style="color: var(--text-tertiary);"></i>
+                            <p style="color: var(--text-secondary);">未找到匹配的车站</p>
+                        </td>
+                    </tr>
+                `;
+            } else {
+            // 确定要显示的车站数量
+            const displayCount = showAllStations ? filteredStations.length : Math.min(stationsPerPage, filteredStations.length);
+            const stationsToDisplay = filteredStations.slice(0, displayCount);
+            
+            // 生成表格行
+            let rows = stationsToDisplay.map(station => `
                 <tr>
-                    <td colspan="5" class="py-12 text-center text-gray-500">
-                        <i class="fa fa-search text-4xl mb-2"></i>
-                        <p>未找到匹配的车站</p>
-                    </td>
-                </tr>
-            `;
-        } else {
-            tbody.innerHTML = filteredStations.map(station => `
-                <tr class="hover:bg-gray-50 transition-colors">
-                    <td class="col-id py-3 px-4 border-b text-sm text-gray-600">
+                    <td class="col-id whitespace-nowrap" style="width: 150px;">
                         ${station.id || 'N/A'}
                     </td>
-                    <td class="col-name py-3 px-4 border-b text-sm font-medium">
-                        ${station.name || 'N/A'}
+                    <td class="col-name font-medium">
+                        <a href="/stations/${station.id || 'N/A'}">
+                            ${station.name || 'N/A'}
+                        </a>
                     </td>
-                    <td class="col-routes py-3 px-4 border-b text-sm text-gray-600">
-                        ${station.routes ? station.routes.length : 0}
+                    <td class="col-lines whitespace-nowrap" style="width: 100px;">
+                        ${station.line_count || 0}
                     </td>
-                    <td class="col-coords py-3 px-4 border-b text-sm text-gray-600">
-                        ${station.x && station.z ? `X: ${station.x.toFixed(1)}, Z: ${station.z.toFixed(1)}` : 'N/A'}
-                    </td>
-                    <td class="col-connections py-3 px-4 border-b text-sm text-gray-600">
-                        ${station.connections ? station.connections.length : 0}
+                    <td class="col-lines whitespace-nowrap" style="width: 100px;">
+                        ${station.branch_count || 0}
                     </td>
                 </tr>
             `).join('');
+            
+            // 如果还有剩余车站，添加展开按钮
+            if (filteredStations.length > stationsPerPage && !showAllStations) {
+                rows += `
+                    <tr>
+                        <td colspan="4" class="py-4 text-center">
+                            <button id="expand-stations-btn" class="btn-secondary">
+                                <i class="fa-solid fa-chevron-down mr-1"></i> 展开剩余 ${filteredStations.length - stationsPerPage} 个车站
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }
+            
+            tbody.innerHTML = rows;
+            
+            // 添加展开按钮事件监听器
+            const expandBtn = document.getElementById('expand-stations-btn');
+            if (expandBtn) {
+                expandBtn.addEventListener('click', () => {
+                    showAllStations = true;
+                    renderTable();
+                });
+            }
         }
-        // 应用列显示设置
-        updateColumnVisibility();
     }
     
-    // 搜索功能
-    document.getElementById('station-search').addEventListener('input', (e) => {
-        const query = e.target.value.toLowerCase();
-        filteredStations = stationsData.filter(station => 
-            station.name.toLowerCase().includes(query)
-        );
-        renderTable();
-    });
-    
     // 排序功能
-    document.getElementById('station-sort').addEventListener('change', (e) => {
-        sortField = e.target.value;
-        sortStations();
-    });
-    
-    document.getElementById('sort-direction').addEventListener('click', (e) => {
-        sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
-        // 只更新内部i元素的className，而不是整个按钮
-        const icon = e.target.querySelector('i');
-        if (icon) {
-            icon.className = `fa fa-sort-amount-${sortDirection === 'asc' ? 'asc' : 'desc'}`;
+    document.addEventListener('DOMContentLoaded', function() {
+        // 搜索事件监听
+        const searchInput = document.getElementById('station-search');
+        if (searchInput) {
+            searchInput.addEventListener('input', searchStations);
+        } else {
+            console.error('Search input element not found');
         }
-        sortStations();
+        
+        // 排序选择器事件监听
+        const sortSelect = document.getElementById('station-sort');
+        if (sortSelect) {
+            sortSelect.addEventListener('change', function(e) {
+                sortField = e.target.value;
+                sortStations();
+            });
+        } else {
+            console.error('Sort select element not found');
+        }
+        
+        // 排序方向按钮事件监听
+        const sortDirectionBtn = document.getElementById('sort-direction');
+        if (sortDirectionBtn) {
+            sortDirectionBtn.addEventListener('click', function(e) {
+                sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+                // 只更新内部i元素的className，而不是整个按钮
+                const icon = e.target.querySelector('i') || e.target;
+                if (icon) {
+                    icon.className = `fa-solid fa-sort-amount-${sortDirection === 'asc' ? 'asc' : 'desc'}`;
+                }
+                sortStations();
+            });
+        } else {
+            console.error('Sort direction button not found');
+        }
     });
     
     function sortStations() {
-        filteredStations.sort((a, b) => {
-            let aVal = a[sortField] || '';
-            let bVal = b[sortField] || '';
+        // 确保filteredStations是数组
+        if (!Array.isArray(filteredStations)) {
+            filteredStations = [];
+            return;
+        }
+        
+        // 重置显示所有车站标志
+        showAllStations = false;
+        
+        // 如果选择默认排序
+        if (sortField === 'default') {
+            // 先获取当前搜索条件下的原始顺序
+            const searchInput = document.getElementById('station-search');
+            const query = searchInput ? searchInput.value.toLowerCase().trim() : '';
+            let originalOrderStations = [];
             
-            if (typeof aVal === 'string' && typeof bVal === 'string') {
-                aVal = aVal.toLowerCase();
-                bVal = bVal.toLowerCase();
+            if (!query) {
+                // 搜索词为空，使用所有原始数据
+                originalOrderStations = stationsData && Array.isArray(stationsData) ? [...stationsData] : [];
+            } else {
+                // 搜索词不为空，过滤原始数据
+                originalOrderStations = stationsData.filter(station => {
+                    const stationName = station.name ? station.name.toLowerCase() : '';
+                    return stationName.includes(query);
+                });
             }
             
-            if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
-            if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
-            return 0;
-        });
+            // 根据排序方向调整顺序
+            if (sortDirection === 'asc') {
+                // 正序：使用原始顺序
+                filteredStations = [...originalOrderStations];
+            } else {
+                // 倒序：使用原始顺序的逆序
+                filteredStations = [...originalOrderStations].reverse();
+            }
+        } else {
+            // 其他排序方式
+            filteredStations.sort((a, b) => {
+                let aVal, bVal;
+                
+                if (sortField === 'lines') {
+                    // 按线路数量排序
+                    aVal = a.line_count || 0;
+                    bVal = b.line_count || 0;
+                } else if (sortField === 'branches') {
+                    // 按交路数量排序
+                    aVal = a.branch_count || 0;
+                    bVal = b.branch_count || 0;
+                } else {
+                    // 按名称或ID排序
+                    aVal = a[sortField] || '';
+                    bVal = b[sortField] || '';
+                    
+                    if (typeof aVal === 'string' && typeof bVal === 'string') {
+                        aVal = aVal.toLowerCase();
+                        bVal = bVal.toLowerCase();
+                    }
+                }
+                
+                if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
+                if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
+                return 0;
+            });
+        }
+        
         renderTable();
     }
     
-    // 列显示/隐藏功能
-    function updateColumnVisibility() {
-        // ID列
-        const showId = document.getElementById('show-id').checked;
-        document.querySelectorAll('.col-id').forEach(col => {
-            col.style.display = showId ? '' : 'none';
-        });
-        
-        // 名称列
-        const showName = document.getElementById('show-name').checked;
-        document.querySelectorAll('.col-name').forEach(col => {
-            col.style.display = showName ? '' : 'none';
-        });
-        
-        // 线路列
-        const showRoutes = document.getElementById('show-routes').checked;
-        document.querySelectorAll('.col-routes').forEach(col => {
-            col.style.display = showRoutes ? '' : 'none';
-        });
-        
-        // 坐标列
-        const showCoords = document.getElementById('show-coords').checked;
-        document.querySelectorAll('.col-coords').forEach(col => {
-            col.style.display = showCoords ? '' : 'none';
-        });
-        
-        // 连接列
-        const showConnections = document.getElementById('show-connections').checked;
-        document.querySelectorAll('.col-connections').forEach(col => {
-            col.style.display = showConnections ? '' : 'none';
-        });
-    }
-    
-    // 添加事件监听器
-    document.getElementById('show-id').addEventListener('change', updateColumnVisibility);
-    document.getElementById('show-name').addEventListener('change', updateColumnVisibility);
-    document.getElementById('show-routes').addEventListener('change', updateColumnVisibility);
-    document.getElementById('show-coords').addEventListener('change', updateColumnVisibility);
-    document.getElementById('show-connections').addEventListener('change', updateColumnVisibility);
-    
     // 初始化
     renderTable();
-    updateColumnVisibility();
 </script>
 {% endblock %}
