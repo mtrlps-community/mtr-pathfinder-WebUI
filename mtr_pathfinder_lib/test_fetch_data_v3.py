@@ -8,7 +8,7 @@ MTR_VER: int = 4
 LINK: str = 'https://letsplay.minecrafttransitrailway.com/system-map'
 
 link_hash = hashlib.md5(LINK.encode('utf-8')).hexdigest()
-LOCAL_FILE_PATH = f'mtr-station-data-{link_hash}-mtr{MTR_VER}-v3.json'
+LOCAL_FILE_PATH = f'mtr-original-data-{link_hash}-mtr{MTR_VER}-v3.json'
 INTERVAL_PATH = f'mtr-route-interval-data-{link_hash}-mtr{MTR_VER}-v3.json'
 
 fetch_data(LINK, LOCAL_FILE_PATH, MTR_VER)

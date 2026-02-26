@@ -26,7 +26,7 @@ ORIGINAL_IGNORED_LINES: list = []
 
 link_hash = hashlib.md5(LINK.encode('utf-8')).hexdigest()
 # 文件设置
-LOCAL_FILE_PATH = f'mtr-station-data-{link_hash}-mtr{MTR_VER}-v3.json'
+LOCAL_FILE_PATH = f'mtr-original-data-{link_hash}-mtr{MTR_VER}-v3.json'
 INTERVAL_PATH = f'mtr-route-interval-data-{link_hash}-mtr{MTR_VER}-v3.json'
 BASE_PATH = 'mtr_pathfinder_data'
 PNG_PATH = 'mtr_pathfinder_data'

@@ -6,18 +6,17 @@ import re
 from datetime import datetime
 
 from mtr_pathfinder_lib.mtr_pathfinder import (
+    main as mtr_main_v3,
+    save_image as save_image_v3,
     fetch_data as fetch_data_v3,
     gen_route_interval as gen_route_interval_v3,
-    create_graph as create_graph_v3,
-    find_shortest_route as find_shortest_route_v3,
-    save_image as save_image_v3,
-    main as mtr_main_v3,
-    RouteType as RouteTypeV3,
+    RouteType as RouteTypeV3
 )
 
 from mtr_pathfinder_lib.mtr_pathfinder_v4 import (
     main as mtr_main_v4,
     save_image as save_image_v4,
+    fetch_data as fetch_data_v4,
     gen_departure as gen_departure_v4
 )
 
@@ -131,8 +130,8 @@ def update_file_paths():
     if config['LINK']:
         link_hash = hashlib.md5(config['LINK'].encode('utf-8')).hexdigest()
         # 为v3和v4版本分别生成不同的文件路径
-        config['LOCAL_FILE_PATH_V3'] = f'mtr-station-data-{link_hash}-mtr{config["MTR_VER"]}-v3.json'
-        config['LOCAL_FILE_PATH_V4'] = f'mtr-station-data-{link_hash}-mtr4-v4.json'
+        config['LOCAL_FILE_PATH_V3'] = f'mtr-original-data-{link_hash}-mtr{config["MTR_VER"]}-v3.json'
+        config['LOCAL_FILE_PATH_V4'] = f'mtr-original-data-{link_hash}-mtr4-v4.json'
         config['DEP_PATH_V3'] = f'mtr-departure-data-{link_hash}-mtr{config["MTR_VER"]}-v3.json'
         config['DEP_PATH_V4'] = f'mtr-route-departure-data-{link_hash}-mtr4-v4.json'
         config['INTERVAL_PATH_V3'] = f'mtr-route-interval-data-{link_hash}-mtr{config["MTR_VER"]}-v3.json'
@@ -919,19 +918,17 @@ def api_find_route():
                 'image_base64': None
             }
             
-            # 4. 初始化图片基础64字符串
-            image_base64 = None
         else:
-            # 使用v3版程序的寻路功能，完全集成mtr_pathfinder.py的main函数逻辑
+            # 使用v3版程序的寻路功能，直接调用main函数
             
             # 更新进度
             search_progress.update({
                 'percentage': 75,
-                'stage': '(1/14)寻路计算-V3',
-                'message': '提取寻路参数...'
+                'stage': '寻路计算-V3',
+                'message': '准备调用寻路算法...'
             })
             
-            # 提取参数
+            # 构建调用main函数所需的参数
             LINK = config['LINK']
             LOCAL_FILE_PATH = config['LOCAL_FILE_PATH_V3']
             INTERVAL_PATH = config['INTERVAL_PATH_V3']
@@ -939,63 +936,52 @@ def api_find_route():
             IN_THEORY = algorithm == 'theory'
             DETAIL = data.get('detail', True)
             
-            search_progress.update({
-                'percentage': 75,
-                'stage': '(2/14)寻路计算-V3',
-                'message': '判定MTR模组版本...'
-            })
-
-            # 原封不动地集成mtr_pathfinder.py的main函数逻辑
-            if MTR_VER not in [3, 4]:
-                return jsonify({'error': 'MTR_VER should be 3 or 4'}), 500
-
-            search_progress.update({
-                'percentage': 75,
-                'stage': '(3/14)寻路计算-V3',
-                'message': '合并原始和当前传入的禁路线参数...'
-            })
-
-            # 合并禁路线
-            IGNORED_LINES = data.get('ignored_lines', []) + config['ORIGINAL_IGNORED_LINES']
+            # 调用mtr_pathfinder.py的main函数，gen_image=False
+            result_gen_image_false = mtr_main_v3(
+                station1=data['start'],
+                station2=data['end'],
+                LINK=LINK,
+                LOCAL_FILE_PATH=LOCAL_FILE_PATH,
+                INTERVAL_PATH=INTERVAL_PATH,
+                BASE_PATH=BASE_PATH,
+                PNG_PATH=PNG_PATH,
+                MAX_WILD_BLOCKS=config['MAX_WILD_BLOCKS'],
+                TRANSFER_ADDITION=config['TRANSFER_ADDITION'],
+                WILD_ADDITION=config['WILD_ADDITION'],
+                STATION_TABLE=config['STATION_TABLE'],
+                ORIGINAL_IGNORED_LINES=config['ORIGINAL_IGNORED_LINES'],
+                UPDATE_DATA=False,
+                GEN_ROUTE_INTERVAL=False,
+                IGNORED_LINES=data.get('ignored_lines', []),
+                ONLY_LINES=data.get('only_lines', []),
+                AVOID_STATIONS=data.get('avoid_stations', []),
+                CALCULATE_HIGH_SPEED=not data.get('disable_high_speed', False),
+                CALCULATE_BOAT=not data.get('disable_boat', False),
+                CALCULATE_WALKING_WILD=data.get('enable_wild', False),
+                ONLY_LRT=data.get('only_lrt', False),
+                IN_THEORY=IN_THEORY,
+                DETAIL=DETAIL,
+                MTR_VER=MTR_VER,
+                gen_image=False
+            )
             
-            search_progress.update({
-                'percentage': 75,
-                'stage': '(4/14)寻路计算-V3',
-                'message': '处理车站名称映射...'
-            })
-
-            # 处理车站名称映射
-            STATION_TABLE = {x.lower(): y.lower() for x, y in config['STATION_TABLE'].items()}
+            # 检查寻路结果
+            if result_gen_image_false in [False, None]:
+                if result_gen_image_false is False:
+                    return jsonify({'error': '找不到路线，请尝试调整选项'}), 400
+                else:
+                    return jsonify({'error': '车站名称不正确，请检查输入'}), 400
             
-            search_progress.update({
-                'percentage': 75,
-                'stage': '(5/14)寻路计算-V3',
-                'message': '处理线路图链接格式...'
-            })
+            # 提取main函数返回的数据
+            ert, shortest_distance = result_gen_image_false
             
-            # 处理LINK格式
-            if LINK.endswith('/index.html'):
-                LINK = LINK.rstrip('/index.html')
-
-            search_progress.update({
-                'percentage': 75,
-                'stage': '(6/14)寻路计算-V3',
-                'message': '提取寻路参数...'
-            })
-
-            # 加载数据文件
+            # 加载数据文件，用于处理ert数据和获取版本信息
             if os.path.exists(LOCAL_FILE_PATH):
                 with open(LOCAL_FILE_PATH, encoding='utf-8') as f:
                     data_file = json.load(f)
             else:
                 return jsonify({'error': '车站数据不存在，请先更新数据'}), 400
-
-            search_progress.update({
-                'percentage': 75,
-                'stage': '(7/14)寻路计算-V3',
-                'message': '获取数据文件版本信息...'
-            })
-
+            
             # 获取版本信息
             version1 = ''
             version2 = ''
@@ -1007,26 +993,15 @@ def api_find_route():
                 version2 = datetime.fromtimestamp(
                     os.path.getmtime(INTERVAL_PATH)
                 ).strftime('%Y%m%d-%H%M')
-
-            search_progress.update({
-                'percentage': 75,
-                'stage': '(8/14)寻路计算-V3',
-                'message': '设置寻路算法类型...'
-            })
-
+            
             # 设置寻路类型
             route_type = RouteTypeV3.IN_THEORY if IN_THEORY else RouteTypeV3.WAITING
-
-            search_progress.update({
-                'percentage': 75,
-                'stage': '(9/14)寻路计算-V3',
-                'message': '检查缓存调用...'
-            })
-
+            
             # 检查是否使用了缓存
             used_cache = False
+            cached_graph = None  # 缓存的图
             cache_conditions_met = (True and \
-                                  IGNORED_LINES == config['ORIGINAL_IGNORED_LINES'] and \
+                                  data.get('ignored_lines', []) == [] and \
                                   not data.get('disable_boat', False) and \
                                   not data.get('only_lrt', False) and \
                                   not data.get('only_lines', []) and \
@@ -1036,6 +1011,7 @@ def api_find_route():
             if cache_conditions_met:
                 # 生成与 create_graph 函数完全一致的缓存文件名
                 import hashlib
+                import pickle
                 m = hashlib.md5()
                 for s in config['ORIGINAL_IGNORED_LINES']:
                     m.update(s.encode('utf-8'))
@@ -1051,71 +1027,43 @@ def api_find_route():
                     f'-{version1}-{version2}-{m.hexdigest()}-{__version__}.dat'
                 
                 # 检查缓存文件是否实际存在
-                used_cache = os.path.exists(filename)
-
+                if os.path.exists(filename):
+                    used_cache = True
+                    # 加载缓存图
+                    with open(filename, 'rb') as f:
+                        tup = pickle.load(f)
+                        cached_graph = tup[0]
+            
+            # 更新进度
             search_progress.update({
                 'percentage': 75,
-                'stage': '(10/14)寻路计算-V3',
-                'message': '构建站点连接图...'
+                'stage': '寻路计算-V3',
+                'message': '处理寻路结果...'
             })
-
-            # 创建图
-            G = create_graph_v3(
-                data_file,
-                IGNORED_LINES,
-                data.get('only_lines', []),
-                not data.get('disable_high_speed', False),
-                not data.get('disable_boat', False),
-                data.get('enable_wild', False),
-                data.get('only_lrt', False),
-                data.get('avoid_stations', []),
-                route_type,
-                config['ORIGINAL_IGNORED_LINES'],
-                INTERVAL_PATH,
-                version1, version2,
-                LOCAL_FILE_PATH,
-                STATION_TABLE,
-                config['WILD_ADDITION'],
-                config['TRANSFER_ADDITION'],
-                config['MAX_WILD_BLOCKS'],
-                MTR_VER,
-                True
-            )
-
-            search_progress.update({
-                'percentage': 75,
-                'stage': '(11/14)寻路计算-V3',
-                'message': '查找最短路径...'
-            })
-
-            # 查找最短路径
-            shortest_path, shortest_distance, waiting_time, riding_time, ert = find_shortest_route_v3(
-                G, data['start'], data['end'],
-                data_file, STATION_TABLE, MTR_VER, route_type
-            )
-
-            search_progress.update({
-                'percentage': 75,
-                'stage': '(12/14)寻路计算-V3',
-                'message': '检查返回的寻路结果...'
-            })
-
-            # 检查寻路结果
-            if shortest_path in [False, None]:
-                if shortest_path is False:
-                    return jsonify({'error': '找不到路线，请尝试调整选项'}), 400
-                else:
-                    return jsonify({'error': '车站名称不正确，请检查输入'}), 400
-
-            search_progress.update({
-                'percentage': 75,
-                'stage': '(13/14)寻路计算-V3',
-                'message': '处理返回给前端的结果...'
-            })
-
-            # 1. 处理gen_image=False的结果，构建前端需要的格式
-            # 将车站字符串转换为车站列表
-            station_names = shortest_path.split(' ->\n')
+            
+            # 重新获取完整的寻路结果，包括shortest_path、waiting_time和riding_time
+            # 这里需要重新调用find_shortest_route，因为main函数(gen_image=False)没有返回这些信息
+            # 但我们可以从ert中提取一些信息
+            
+            # 从ert中获取waiting_time和riding_time
+            # 注意：ert的格式是[(start_station, end_station, line_color, line_name, end_info, dep_time, arr_time, type, platform, route_info)]
+            riding_time = sum(segment[6] - segment[5] for segment in ert) if ert else 0
+            if ert:
+                # 计算waiting_time：总用时 - 乘车时间
+                total_time = ert[-1][6] - ert[0][5] if len(ert) > 0 else 0
+                waiting_time = total_time - riding_time
+            else:
+                waiting_time = 0
+            
+            # 构建车站列表
+            station_names = []
+            if ert:
+                # 添加起点站
+                station_names.append(ert[0][0])
+                # 添加线路和站点
+                for segment in ert:
+                    station_names.append(segment[3])  # 线路名称
+                    station_names.append(segment[1])  # 终点站
             
             # 处理ert数据，将route_id转换为线路名称，以便前端使用禁路线功能
             processed_ert = []
@@ -1124,7 +1072,8 @@ def api_find_route():
                 processed_segment = route_segment.copy()
                 
                 # 获取route_id和线路名称
-                route_id = route_segment[10][0]  # route_id是列表中的第一个元素
+                route_info = route_segment[9]  # route_info是第10个元素(索引9)
+                route_id = route_info[0] if route_info else None  # route_id是列表中的第一个元素
                 route_name = route_segment[3]  # 当前的线路名称
                 
                 # 如果有route_id，尝试获取更完整的线路名称
@@ -1148,9 +1097,10 @@ def api_find_route():
                 waiting_time  # 等车时间 (元素4)
             ]
 
+            # 更新进度
             search_progress.update({
                 'percentage': 75,
-                'stage': '(14/14)寻路计算-V3',
+                'stage': '寻路计算-V3',
                 'message': '准备图片生成所需数据...'
             })
 
@@ -1623,7 +1573,6 @@ def api_update_data():
             
             # 2. 生成v4版程序所需的数据
             # 调用v4版的fetch_data函数
-            from mtr_pathfinder_lib.mtr_pathfinder_v4 import fetch_data as fetch_data_v4
             fetch_data_v4(
                 config['LINK'],
                 config['LOCAL_FILE_PATH_V4'],
@@ -1739,4 +1688,4 @@ if __name__ == '__main__':
     # 检查并更新数据文件
     check_and_update_data()
     
-    app.run(debug=True, port=5000)
+    app.run(debug=False, port=5000)

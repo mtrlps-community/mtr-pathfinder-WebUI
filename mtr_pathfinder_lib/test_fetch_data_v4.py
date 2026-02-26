@@ -8,7 +8,7 @@ LINK: str = 'https://letsplay.minecrafttransitrailway.com/system-map'
 MAX_WILD_BLOCKS: int = 1500
 
 link_hash = hashlib.md5(LINK.encode('utf-8')).hexdigest()
-LOCAL_FILE_PATH = f'mtr-station-data-{link_hash}-mtr4-v4.json'
+LOCAL_FILE_PATH = f'mtr-original-data-{link_hash}-mtr4-v4.json'
 DEP_PATH = f'mtr-route-departure-data-{link_hash}-mtr4-v4.json'
 
 fetch_data(LINK, LOCAL_FILE_PATH, MAX_WILD_BLOCKS)
