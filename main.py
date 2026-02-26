@@ -1117,11 +1117,33 @@ def api_find_route():
             # 将车站字符串转换为车站列表
             station_names = shortest_path.split(' ->\n')
             
+            # 处理ert数据，将route_id转换为线路名称，以便前端使用禁路线功能
+            processed_ert = []
+            for route_segment in ert:
+                # 复制原始路线段数据
+                processed_segment = route_segment.copy()
+                
+                # 获取route_id和线路名称
+                route_id = route_segment[10][0]  # route_id是列表中的第一个元素
+                route_name = route_segment[3]  # 当前的线路名称
+                
+                # 如果有route_id，尝试获取更完整的线路名称
+                if route_id and data_file:
+                    for route in data_file[0]['routes']:
+                        if route['id'] == route_id:
+                            # 找到匹配的线路，使用完整的线路名称
+                            full_route_name = route['name']
+                            # 更新路线段中的线路名称
+                            processed_segment[3] = full_route_name
+                            break
+                
+                processed_ert.append(processed_segment)
+            
             # 构建符合前端期望的结果数组
             formatted_result = [
                 shortest_distance,  # 总用时 (元素0)
                 station_names,  # 车站列表 (元素1)
-                ert,  # 路线详情 (元素2)
+                processed_ert,  # 处理后的路线详情 (元素2)
                 riding_time,  # 乘车时间 (元素3)
                 waiting_time  # 等车时间 (元素4)
             ]
@@ -1142,7 +1164,7 @@ def api_find_route():
                 'status': 'ready',
                 'algorithm': algorithm,
                 'data': {
-                    'every_route_time': ert,
+                    'every_route_time': processed_ert,
                     'version1': version1,
                     'version2': version2,
                     'route_type': route_type,

@@ -1194,8 +1194,8 @@
             // 使用更灵活的方式解析，适应不同长度的routeDetail数组
             if (routeDetail.length >= 11) {
                 // v3版本 - 完整格式
-                var [, , color = '#4a90e2', routeName = '', terminus = '', duration = 0, segmentWaitingTime = 0, depInterval = 0, trainType = 'train_normal', plat = '', tempOriginalRouteName = ''] = routeDetail;
-                originalRouteName = tempOriginalRouteName;
+                var [, , color = '#4a90e2', routeName = '', terminus = '', duration = 0, segmentWaitingTime = 0, depInterval = 0, trainType = 'train_normal', plat = '', extraInfo = ''] = routeDetail;
+                originalRouteName = routeName; // 直接使用路线名作为原始路线名
                 platform = plat;
                 departureInterval = depInterval;
             } else {
@@ -1203,10 +1203,10 @@
                 // 提取已知位置的字段
                 var [, , color = '#4a90e2', routeName = '', terminus = '', duration = 0, segmentWaitingTime = 0, trainType = 'train_normal'] = routeDetail;
                 
-                // 尝试提取站台编号和原始路线名，不管数组长度如何
-                // 对于v4版本，站台编号在第9个位置（索引8），原始路线名在第10个位置（索引9）
+                // 尝试提取站台编号，不管数组长度如何
+                // 对于v4版本，站台编号在第9个位置（索引8）
                 platform = routeDetail[8] || '';
-                originalRouteName = routeDetail[9] || routeName;
+                originalRouteName = routeName; // 直接使用路线名作为原始路线名
             }
             
             // 处理路线名称，只保留中文和英文，去除方向和分隔符
