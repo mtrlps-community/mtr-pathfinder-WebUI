@@ -737,8 +737,8 @@ def api_find_route():
     global search_progress
     search_progress = {
         'percentage': 0,
-        'stage': '准备中...',
-        'message': '正在初始化寻路参数...'
+        'stage': '初始化',
+        'message': '传入寻路参数...'
     }
     
     # 声明全局变量
@@ -761,8 +761,8 @@ def api_find_route():
     # 更新进度
     search_progress.update({
         'percentage': 25,
-        'stage': '(1/4)验证参数',
-        'message': '正在验证输入参数...'
+        'stage': '数据验证',
+        'message': '检查数据文件是否存在...'
     })
     
     # 检查数据文件是否存在
@@ -782,8 +782,8 @@ def api_find_route():
     # 更新进度
     search_progress.update({
         'percentage': 50,
-        'stage': '(2/4)数据验证',
-        'message': '数据文件验证通过，准备开始寻路...'
+        'stage': '算法判定',
+        'message': '根据传入参数选择相应的寻路算法...'
     })
     
     try:
@@ -794,8 +794,8 @@ def api_find_route():
             # 更新进度
             search_progress.update({
                 'percentage': 75,
-                'stage': '(3/4)寻路计算',
-                'message': '正在使用实时算法计算路径...'
+                'stage': '()寻路计算-v4',
+                'message': '处理出发时间...'
             })
             
             # 处理出发时间参数
@@ -806,6 +806,12 @@ def api_find_route():
             if dep_time_seconds is None and client_time is not None:
                 dep_time_seconds = (client_time + 10) % 86400
             
+            search_progress.update({
+                'percentage': 75,
+                'stage': '()寻路计算-v4',
+                'message': '调用寻路算法...'
+            })
+
             # 1. 生成gen_image=False条件下的数组结果
             result_gen_image_false = mtr_main_v4(
                 station1=data['start'],
@@ -882,13 +888,10 @@ def api_find_route():
                 waiting_time  # 等车时间 (元素4)
             ]
             
-            # 2. 继续处理图片生成的相关逻辑
-            # 生成图片，直接调用save_image函数，避免重复寻路计算
-            search_progress.update({
-                'percentage': 85,
-                'stage': '(4/4)生成图片',
-                'message': '寻路计算完成，正在生成路线图片...'
-            })
+            # 3. 将寻路结果和生成图片所需数据存储在缓存中，供后续图片生成使用
+            # 生成唯一标识符
+            import uuid
+            image_id = str(uuid.uuid4())
             
             # 获取数据版本信息
             version1 = ''
@@ -902,44 +905,30 @@ def api_find_route():
                     os.path.getmtime(config['DEP_PATH_V4'])
                 ).strftime('%Y%m%d-%H%M')
             
-            # 直接调用save_image_v4函数生成图片，使用已经生成的every_route_time
-            from mtr_pathfinder_lib.mtr_pathfinder_v4 import RouteType as RouteTypeV4
-            image_result = save_image_v4(
-                route_type=RouteTypeV4.REAL_TIME,
-                every_route_time=every_route_time,
-                BASE_PATH=BASE_PATH,
-                version1=version1,
-                version2=version2,
-                PNG_PATH=PNG_PATH,
-                departure_time=dep_time_seconds,
-                show=False
-            )
+            # 存储寻路结果和生成图片所需数据
+            image_cache[image_id] = {
+                'status': 'ready',
+                'algorithm': algorithm,
+                'data': {
+                    'every_route_time': every_route_time,
+                    'version1': version1,
+                    'version2': version2,
+                    'dep_time_seconds': dep_time_seconds
+                },
+                'image_path': None,
+                'image_base64': None
+            }
             
-            # 3. 保存图片到文件系统
+            # 4. 初始化图片基础64字符串
             image_base64 = None
-            if image_result and image_result not in [False, None]:
-                if isinstance(image_result, tuple) and len(image_result) == 2:
-                    # v4版save_image_v4函数返回的图片格式：(image object, base64 str)
-                    image, image_base64 = image_result
-                    
-                    # 保存图片到文件系统，方便前端获取
-                    output_dir = 'generated_images'
-                    if not os.path.exists(output_dir):
-                        os.makedirs(output_dir)
-                    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-                    image_path = os.path.join(output_dir, f'path_result_{timestamp}.png')
-                    image.save(image_path)
-                    
-                    # 更新最新图片路径
-                    latest_image_path = image_path
         else:
             # 使用v3版程序的寻路功能，完全集成mtr_pathfinder.py的main函数逻辑
             
             # 更新进度
             search_progress.update({
                 'percentage': 75,
-                'stage': '(3/4)寻路计算',
-                'message': '正在使用最短路径算法计算最优路线...'
+                'stage': '(1/14)寻路计算-V3',
+                'message': '提取寻路参数...'
             })
             
             # 提取参数
@@ -950,29 +939,62 @@ def api_find_route():
             IN_THEORY = algorithm == 'theory'
             DETAIL = data.get('detail', True)
             
+            search_progress.update({
+                'percentage': 75,
+                'stage': '(2/14)寻路计算-V3',
+                'message': '判定MTR模组版本...'
+            })
+
             # 原封不动地集成mtr_pathfinder.py的main函数逻辑
             if MTR_VER not in [3, 4]:
                 return jsonify({'error': 'MTR_VER should be 3 or 4'}), 500
 
-            # 合并忽略线路
+            search_progress.update({
+                'percentage': 75,
+                'stage': '(3/14)寻路计算-V3',
+                'message': '合并原始和当前传入的禁路线参数...'
+            })
+
+            # 合并禁路线
             IGNORED_LINES = data.get('ignored_lines', []) + config['ORIGINAL_IGNORED_LINES']
             
-            # 转换车站表格式
+            search_progress.update({
+                'percentage': 75,
+                'stage': '(4/14)寻路计算-V3',
+                'message': '处理车站名称映射...'
+            })
+
+            # 处理车站名称映射
             STATION_TABLE = {x.lower(): y.lower() for x, y in config['STATION_TABLE'].items()}
+            
+            search_progress.update({
+                'percentage': 75,
+                'stage': '(5/14)寻路计算-V3',
+                'message': '处理线路图链接格式...'
+            })
             
             # 处理LINK格式
             if LINK.endswith('/index.html'):
                 LINK = LINK.rstrip('/index.html')
 
-            # 检查并加载数据文件
-            if not os.path.exists(LOCAL_FILE_PATH):
-                return jsonify({'error': '车站数据不存在，请先更新数据'}), 400
-            with open(LOCAL_FILE_PATH, encoding='utf-8') as f:
-                data_file = json.load(f)
+            search_progress.update({
+                'percentage': 75,
+                'stage': '(6/14)寻路计算-V3',
+                'message': '提取寻路参数...'
+            })
 
-            # 检查路线间隔文件
-            if not os.path.exists(INTERVAL_PATH):
-                return jsonify({'error': '间隔数据不存在，请先更新数据'}), 400
+            # 加载数据文件
+            if os.path.exists(LOCAL_FILE_PATH):
+                with open(LOCAL_FILE_PATH, encoding='utf-8') as f:
+                    data_file = json.load(f)
+            else:
+                return jsonify({'error': '车站数据不存在，请先更新数据'}), 400
+
+            search_progress.update({
+                'percentage': 75,
+                'stage': '(7/14)寻路计算-V3',
+                'message': '获取数据文件版本信息...'
+            })
 
             # 获取版本信息
             version1 = ''
@@ -986,8 +1008,20 @@ def api_find_route():
                     os.path.getmtime(INTERVAL_PATH)
                 ).strftime('%Y%m%d-%H%M')
 
-            # 设置路线类型
+            search_progress.update({
+                'percentage': 75,
+                'stage': '(8/14)寻路计算-V3',
+                'message': '设置寻路算法类型...'
+            })
+
+            # 设置寻路类型
             route_type = RouteTypeV3.IN_THEORY if IN_THEORY else RouteTypeV3.WAITING
+
+            search_progress.update({
+                'percentage': 75,
+                'stage': '(9/14)寻路计算-V3',
+                'message': '检查缓存调用...'
+            })
 
             # 检查是否使用了缓存
             used_cache = False
@@ -1019,6 +1053,12 @@ def api_find_route():
                 # 检查缓存文件是否实际存在
                 used_cache = os.path.exists(filename)
 
+            search_progress.update({
+                'percentage': 75,
+                'stage': '(10/14)寻路计算-V3',
+                'message': '构建站点连接图...'
+            })
+
             # 创建图
             G = create_graph_v3(
                 data_file,
@@ -1042,11 +1082,23 @@ def api_find_route():
                 True
             )
 
+            search_progress.update({
+                'percentage': 75,
+                'stage': '(11/14)寻路计算-V3',
+                'message': '查找最短路径...'
+            })
+
             # 查找最短路径
             shortest_path, shortest_distance, waiting_time, riding_time, ert = find_shortest_route_v3(
                 G, data['start'], data['end'],
                 data_file, STATION_TABLE, MTR_VER
             )
+
+            search_progress.update({
+                'percentage': 75,
+                'stage': '(12/14)寻路计算-V3',
+                'message': '检查返回的寻路结果...'
+            })
 
             # 检查寻路结果
             if shortest_path in [False, None]:
@@ -1054,6 +1106,12 @@ def api_find_route():
                     return jsonify({'error': '找不到路线，请尝试调整选项'}), 400
                 else:
                     return jsonify({'error': '车站名称不正确，请检查输入'}), 400
+
+            search_progress.update({
+                'percentage': 75,
+                'stage': '(13/14)寻路计算-V3',
+                'message': '处理返回给前端的结果...'
+            })
 
             # 1. 处理gen_image=False的结果，构建前端需要的格式
             # 将车站字符串转换为车站列表
@@ -1067,53 +1125,41 @@ def api_find_route():
                 riding_time,  # 乘车时间 (元素3)
                 waiting_time  # 等车时间 (元素4)
             ]
-            
-            # 2. 继续处理图片生成的相关逻辑
-            # 生成图片，直接调用save_image函数，避免重复寻路计算
+
             search_progress.update({
-                'percentage': 85,
-                'stage': '(4/4)生成图片',
-                'message': '寻路计算完成，正在生成路线图片...'
+                'percentage': 75,
+                'stage': '(14/14)寻路计算-V3',
+                'message': '准备图片生成所需数据...'
             })
+
+            # 3. 将寻路结果和生成图片所需数据存储在缓存中，供后续图片生成使用
+            # 生成唯一标识符
+            import uuid
+            image_id = str(uuid.uuid4())
             
-            # 调用save_image函数生成图片
-            image_result = save_image_v3(
-                route_type=route_type,
-                every_route_time=ert,
-                shortest_distance=shortest_distance,
-                riding_time=riding_time,
-                waiting_time=waiting_time,
-                BASE_PATH=BASE_PATH,
-                version1=version1,
-                version2=version2,
-                DETAIL=DETAIL,
-                PNG_PATH=PNG_PATH,
-                show=False
-            )
-            
-            # 3. 保存图片到文件系统
-            image_base64 = None
-            if image_result and image_result not in [False, None]:
-                if isinstance(image_result, tuple) and len(image_result) == 2:
-                    # v3版save_image函数返回的图片格式：(image object, base64 str)
-                    image, image_base64 = image_result
-                    
-                    # 保存图片到文件系统，方便前端获取
-                    output_dir = 'generated_images'
-                    if not os.path.exists(output_dir):
-                        os.makedirs(output_dir)
-                    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-                    image_path = os.path.join(output_dir, f'path_result_{timestamp}.png')
-                    image.save(image_path)
-                    
-                    # 更新最新图片路径
-                    latest_image_path = image_path
+            # 存储寻路结果和生成图片所需数据
+            image_cache[image_id] = {
+                'status': 'ready',
+                'algorithm': algorithm,
+                'data': {
+                    'every_route_time': ert,
+                    'version1': version1,
+                    'version2': version2,
+                    'route_type': route_type,
+                    'shortest_distance': shortest_distance,
+                    'riding_time': riding_time,
+                    'waiting_time': waiting_time,
+                    'DETAIL': DETAIL
+                },
+                'image_path': None,
+                'image_base64': None
+            }
         
         # 更新进度为100%
         search_progress.update({
             'percentage': 100,
             'stage': '完成',
-            'message': '路径计算完成！'
+            'message': '路径计算完成'
         })
         
         # 计算寻路用时
@@ -1143,24 +1189,12 @@ def api_find_route():
                 os.path.getmtime(config['INTERVAL_PATH_V3'])
             ).strftime('%Y%m%d-%H%M')
         
-        # 初始化used_cache变量，实时寻路模式下默认为False
-        used_cache = False
+        # 实时寻路模式下默认为False，其他模式保持之前计算出的值
+        if algorithm == 'real':
+            used_cache = False
         
-        # 生成唯一标识符
-        import uuid
-        image_id = str(uuid.uuid4())
-        
-        # 直接将生成好的图片数据存储在缓存中
-        if image_base64:
-            image_cache[image_id] = {
-                'status': 'success',
-                'data': image_base64
-            }
-        else:
-            image_cache[image_id] = {
-                'status': 'failed',
-                'error': '图片生成失败'
-            }
+        # 图片将由/api/generate_image路由生成，这里只需要将状态设置为ready
+        image_cache[image_id]['status'] = 'ready'
         
         # 返回调整后的结果，包含寻路模式、计算用时、数据版本和缓存标志
         return jsonify({
@@ -1248,6 +1282,113 @@ latest_image_path = ''
 # 图片缓存，用于存储生成的图片数据
 image_cache = {}
 
+@app.route('/api/generate_image', methods=['POST'])
+def api_generate_image():
+    """生成结果图片"""
+    global latest_image_path
+    try:
+        # 获取请求数据
+        data = request.json
+        image_id = data.get('image_id')
+        
+        # 验证必要参数
+        if not image_id:
+            return jsonify({'error': '缺少必要参数image_id'}), 400
+        
+        # 检查缓存中是否有该图片的数据
+        if image_id not in image_cache:
+            return jsonify({'error': '找不到图片数据'}), 404
+        
+        # 从缓存中获取图片数据
+        image_info = image_cache[image_id]
+        
+        # 如果图片已经生成完成，直接返回成功
+        if image_info['status'] in ['success', 'failed']:
+            return jsonify({'status': image_info['status'], 'image_id': image_id})
+        
+        # 确保输出目录存在
+        import os
+        output_dir = 'generated_images'
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+        
+        # 生成唯一的图片文件名
+        from datetime import datetime
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        image_path = os.path.join(output_dir, f'path_result_{timestamp}.png')
+        
+        # 标记图片为生成中
+        image_cache[image_id]['status'] = 'generating'
+        
+        # 根据算法选择不同的图片生成实现
+        algorithm = image_info['algorithm']
+        image_data = image_info['data']
+        generated_image_base64 = None
+        
+        if algorithm == 'real':
+            # 使用v4版程序生成图片
+            from mtr_pathfinder_lib.mtr_pathfinder_v4 import RouteType as RouteTypeV4
+            image_result = save_image_v4(
+                route_type=RouteTypeV4.REAL_TIME,
+                every_route_time=image_data['every_route_time'],
+                BASE_PATH=BASE_PATH,
+                version1=image_data['version1'],
+                version2=image_data['version2'],
+                PNG_PATH=PNG_PATH,
+                departure_time=image_data['dep_time_seconds'],
+                show=False
+            )
+        else:
+            # 使用v3版程序生成图片
+            image_result = save_image_v3(
+                route_type=image_data['route_type'],
+                every_route_time=image_data['every_route_time'],
+                shortest_distance=image_data['shortest_distance'],
+                riding_time=image_data['riding_time'],
+                waiting_time=image_data['waiting_time'],
+                BASE_PATH=BASE_PATH,
+                version1=image_data['version1'],
+                version2=image_data['version2'],
+                DETAIL=image_data['DETAIL'],
+                PNG_PATH=PNG_PATH,
+                show=False
+            )
+        
+        # 处理图片生成结果
+        if image_result and image_result not in [False, None]:
+            if isinstance(image_result, tuple) and len(image_result) == 2:
+                # v3版和v4版save_image函数返回的图片格式：(image object, base64 str)
+                image, generated_image_base64 = image_result
+                image.save(image_path)
+                
+                # 更新最新图片路径
+                latest_image_path = image_path
+                
+                # 更新缓存中的图片信息
+                image_cache[image_id]['status'] = 'success'
+                image_cache[image_id]['image_path'] = image_path
+                image_cache[image_id]['image_base64'] = generated_image_base64
+                
+                return jsonify({'status': 'success', 'image_id': image_id})
+            else:
+                # 图片生成失败
+                image_cache[image_id]['status'] = 'failed'
+                image_cache[image_id]['error'] = '图片生成失败，格式不正确'
+                return jsonify({'status': 'failed', 'error': '图片生成失败，格式不正确', 'image_id': image_id}), 500
+        else:
+            # 图片生成失败
+            image_cache[image_id]['status'] = 'failed'
+            image_cache[image_id]['error'] = '图片生成失败'
+            return jsonify({'status': 'failed', 'error': '图片生成失败', 'image_id': image_id}), 500
+    except Exception as e:
+        import traceback
+        print(f"生成图片错误: {traceback.format_exc()}")
+        # 更新缓存中的图片信息
+        if image_id in image_cache:
+            image_cache[image_id]['status'] = 'failed'
+            image_cache[image_id]['error'] = f'图片生成失败: {str(e)}'
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/get_image', methods=['GET'])
 def api_get_image():
     """获取生成的结果图片"""
@@ -1268,9 +1409,9 @@ def api_get_image():
             elif image_info['status'] == 'failed':
                 # 如果图片生成失败，返回错误信息
                 return jsonify({'status': 'failed', 'error': image_info.get('error', '图片生成失败')}), 500
-            elif image_info['data']:
+            elif image_info['image_base64']:
                 # 如果图片生成成功，返回图片数据
-                image_base64 = image_info['data']
+                image_base64 = image_info['image_base64']
                 
                 # 解析base64数据
                 import base64

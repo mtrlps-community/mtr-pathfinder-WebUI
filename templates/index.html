@@ -1940,6 +1940,29 @@
         // 重试间隔（毫秒）
         const retryInterval = 1000;
         
+        try {
+            // 首先调用api_generate_image路由触发图片生成
+            const generateResponse = await fetch('/api/generate_image', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ image_id: imageId })
+            });
+            
+            if (!generateResponse.ok) {
+                const generateResult = await generateResponse.json();
+                console.error('触发图片生成失败:', generateResult.error);
+                imageLoading.classList.add('hidden');
+                return;
+            }
+        } catch (error) {
+            console.error('触发图片生成失败:', error);
+            imageLoading.classList.add('hidden');
+            return;
+        }
+        
+        // 定期检查图片生成状态
         for (let retry = 0; retry < maxRetries; retry++) {
             try {
                 // 检查图片生成状态
