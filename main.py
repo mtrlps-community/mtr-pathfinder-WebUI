@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify, send_file, send_from_directory, session, redirect, url_for
+from flask import Flask, render_template, request, jsonify, send_from_directory, session, redirect
 import os
 import json
 import hashlib
@@ -40,6 +40,9 @@ data_update_progress = {
 
 # 寻路次数统计
 route_search_count = 0
+
+# 数据检查标志位，确保只运行一次
+data_checked = False
 
 # 配置文件路径
 CONFIG_PATH = 'config.json'
@@ -1016,6 +1019,46 @@ def api_find_route():
             IN_THEORY = algorithm == 'theory'
             DETAIL = data.get('detail', True)
             
+            # 加载数据文件，用于处理ert数据和获取版本信息
+            if os.path.exists(LOCAL_FILE_PATH):
+                with open(LOCAL_FILE_PATH, encoding='utf-8') as f:
+                    data_file = json.load(f)
+            else:
+                return jsonify({'error': '车站数据不存在，请先更新数据'}), 400
+            
+            # 获取版本信息
+            version1 = ''
+            version2 = ''
+            if os.path.exists(LOCAL_FILE_PATH):
+                version1 = time.strftime('%Y%m%d-%H%M',
+                                        time.gmtime(os.path.getmtime(LOCAL_FILE_PATH)))
+            if os.path.exists(INTERVAL_PATH):
+                version2 = time.strftime('%Y%m%d-%H%M',
+                                        time.gmtime(os.path.getmtime(INTERVAL_PATH)))
+            
+            # 设置寻路类型
+            route_type = RouteTypeV3.IN_THEORY if IN_THEORY else RouteTypeV3.WAITING
+            
+            # 生成与 create_graph 函数完全一致的缓存文件名
+            import hashlib
+            m = hashlib.md5()
+            # 注意：缓存文件名必须考虑原始禁路线，因为原始禁路线不同，生成的图也不同
+            for s in config['ORIGINAL_IGNORED_LINES']:
+                m.update(s.encode('utf-8'))
+            
+            # 确定配置参数
+            CALCULATE_HIGH_SPEED = not data.get('disable_high_speed', False)
+            CALCULATE_WALKING_WILD = data.get('enable_wild', False)
+            __version__ = '130'  # 与 mtr_pathfinder.py 中的版本号保持一致
+            
+            # 生成缓存文件名
+            filename = f'mtr_pathfinder_temp{os.sep}' + \
+                f'3{int(CALCULATE_HIGH_SPEED)}{int(CALCULATE_WALKING_WILD)}' + \
+                f'-{version1}-{version2}-{m.hexdigest()}-{__version__}.dat'
+            
+            # 在调用寻路函数之前，检查缓存文件是否已经存在
+            cache_file_existed_before = os.path.exists(filename)
+            
             search_progress.update({
                 'percentage': 20,
                 'stage': '寻路计算-V3',
@@ -1087,42 +1130,10 @@ def api_find_route():
                     return jsonify({'error': '车站名称不正确，请检查输入'}), 400
             
             search_progress.update({
-                'percentage': 45,
-                'stage': '寻路计算-V3',
-                'message': '加载数据文件...'
-            })
-            
-            # 加载数据文件，用于处理ert数据和获取版本信息
-            if os.path.exists(LOCAL_FILE_PATH):
-                with open(LOCAL_FILE_PATH, encoding='utf-8') as f:
-                    data_file = json.load(f)
-            else:
-                return jsonify({'error': '车站数据不存在，请先更新数据'}), 400
-            
-            search_progress.update({
-                'percentage': 50,
-                'stage': '寻路计算-V3',
-                'message': '获取数据文件版本信息...'
-            })
-            
-            # 获取版本信息
-            version1 = ''
-            version2 = ''
-            if os.path.exists(LOCAL_FILE_PATH):
-                version1 = time.strftime('%Y%m%d-%H%M',
-                                        time.gmtime(os.path.getmtime(LOCAL_FILE_PATH)))
-            if os.path.exists(INTERVAL_PATH):
-                version2 = time.strftime('%Y%m%d-%H%M',
-                                        time.gmtime(os.path.getmtime(INTERVAL_PATH)))
-            
-            search_progress.update({
                 'percentage': 55,
                 'stage': '寻路计算-V3',
                 'message': '设置寻路类型...'
             })
-            
-            # 设置寻路类型
-            route_type = RouteTypeV3.IN_THEORY if IN_THEORY else RouteTypeV3.WAITING
             
             search_progress.update({
                 'percentage': 60,
@@ -1153,25 +1164,13 @@ def api_find_route():
                                   avoid_stations_ok and \
                                   route_type_ok)
                
-            # 生成与 create_graph 函数完全一致的缓存文件名
-            import hashlib
-            m = hashlib.md5()
-            # 注意：缓存文件名必须考虑原始禁路线，因为原始禁路线不同，生成的图也不同
-            for s in config['ORIGINAL_IGNORED_LINES']:
-                m.update(s.encode('utf-8'))
-            
-            # 确定配置参数
-            CALCULATE_HIGH_SPEED = not data.get('disable_high_speed', False)
-            CALCULATE_WALKING_WILD = data.get('enable_wild', False)
-            __version__ = '130'  # 与 mtr_pathfinder.py 中的版本号保持一致
-            
-            # 生成缓存文件名
-            filename = f'mtr_pathfinder_temp{os.sep}' + \
-                f'3{int(CALCULATE_HIGH_SPEED)}{int(CALCULATE_WALKING_WILD)}' + \
-                f'-{version1}-{version2}-{m.hexdigest()}-{__version__}.dat'
-            
-            # 简化缓存逻辑：只要满足缓存条件且缓存文件存在，就认为使用了缓存
-            used_cache = cache_conditions_met and os.path.exists(filename)
+            # 正确的缓存逻辑：
+            # 1. 只有当缓存条件满足，并且
+            # 2. 调用寻路函数之前缓存文件已经存在，并且
+            # 3. 调用寻路函数之后缓存文件仍然存在
+            # 才认为使用了缓存
+            # 这确保了只有当程序真正从缓存中读取数据时，才会被判定为使用缓存
+            used_cache = cache_conditions_met and cache_file_existed_before
             
             # 更新进度
             search_progress.update({
@@ -1200,7 +1199,12 @@ def api_find_route():
                     for route in data_file[0]['routes']:
                         if route['id'] == route_id:
                             # 找到匹配的线路，使用完整的线路名称
-                            full_route_name = route['name']
+                            original_route_name = route['name']
+                            # 处理线路名称：移除交路编号(||后的内容)，将|替换为空格
+                            # 与原程序保持一致：添加线路编号 + 处理后的线路名称
+                            route_name_part = original_route_name.split('||')[0].strip()
+                            full_route_name = (route.get('number', '') + ' ' + route_name_part).strip()
+                            full_route_name = full_route_name.replace('|', ' ')
                             # 更新路线段中的线路名称
                             processed_segment[3] = full_route_name
                             break
@@ -1238,11 +1242,11 @@ def api_find_route():
             for group in route_groups:
                 unique_segments.append(group[0])
             
-            # 计算总乘车时间：所有线路的乘车时间之和
-            riding_time = sum(segment[5] for segment in processed_ert) if processed_ert else 0
-            
             # 计算总等待时间：只计算每个路线组的等待时间（避免重复计算"或"路线的等待时间）
             waiting_time = sum(segment[6] for segment in unique_segments) if unique_segments else 0
+            
+            # 计算总乘车时间：总用时 - 等车时间（符合用户期望的计算方式）
+            riding_time = shortest_distance - waiting_time if shortest_distance >= waiting_time else 0
             
             # 总用时 = 最短路线的总时间（已经在shortest_distance中返回）
             
@@ -1694,139 +1698,18 @@ def api_update_config():
     save_config(config)
     return jsonify({'success': True})
 
-@app.route('/api/update_data', methods=['POST'])
-def api_update_data():
-    # 更新数据
-    if not config['LINK']:
-        return jsonify({'error': '未设置地图链接'}), 400
-    
-    # 重置数据更新进度
-    global data_update_progress
-    data_update_progress = {
-        'percentage': 0,
-        'stage': '准备中...',
-        'message': '正在准备数据更新...'
-    }
-    
-    try:
-        import sys
-        from io import StringIO
-        
-        # 保存原始stdin
-        original_stdin = sys.stdin
-        # 创建模拟输入流，自动返回'y'
-        mock_stdin = StringIO('y\n' * 20)  # 提供足够的'y'响应
-        sys.stdin = mock_stdin
-        
-        try:
-            # 1. 生成v3版程序所需的数据 - 阶段1
-            data_update_progress.update({
-                'percentage': 0,
-                'stage': '生成V3车站数据',
-                'message': '正在生成V3版车站数据...'
-            })
-            
-            # 调用v3版的fetch_data函数
-            fetch_data_v3(
-                config['LINK'],
-                config['LOCAL_FILE_PATH_V3'],
-                config['MTR_VER']
-            )
-            
-            # 阶段1完成，进入阶段2
-            data_update_progress.update({
-                'percentage': 25,
-                'stage': '生成V3间隔数据',
-                'message': '正在生成V3版间隔数据...'
-            })
-            
-            # 生成v3版的间隔数据文件
-            gen_route_interval_v3(
-                config['LOCAL_FILE_PATH_V3'],
-                config['INTERVAL_PATH_V3'],
-                config['LINK'],
-                config['MTR_VER']
-            )
-            
-            # 阶段2完成，进入阶段3
-            data_update_progress.update({
-                'percentage': 50,
-                'stage': '生成V4车站数据',
-                'message': '正在生成V4版车站数据...'
-            })
-            
-            # 2. 生成v4版程序所需的数据
-            # 调用v4版的fetch_data函数
-            fetch_data_v4(
-                config['LINK'],
-                config['LOCAL_FILE_PATH_V4'],
-                config['MAX_WILD_BLOCKS']
-            )
-            
-            # 阶段3完成，进入阶段4
-            data_update_progress.update({
-                'percentage': 75,
-                'stage': '生成V4发车数据',
-                'message': '正在生成V4版发车数据...'
-            })
-            
-            # 生成v4版的发车数据
-            gen_departure_v4(
-                config['LINK'],
-                config['DEP_PATH_V4']
-            )
-            
-            # 数据更新完成
-            data_update_progress.update({
-                'percentage': 100,
-                'stage': '完成',
-                'message': '数据更新完成！'
-            })
-        finally:
-            # 恢复原始stdin
-            sys.stdin = original_stdin
-        
-        return jsonify({'success': True})
-    except Exception as e:
-        # 更新失败时设置错误状态
-        data_update_progress.update({
-            'percentage': 0,
-            'stage': '错误',
-            'message': f'更新失败: {str(e)}'
-        })
-        return jsonify({'error': str(e)}), 500
-def check_and_update_data():
-    """检查数据文件是否存在，如果不存在则自动更新数据"""
-    import os
+def _update_data():
+    """内部函数：执行数据更新逻辑，被api_update_data和check_and_update_data调用"""
     import sys
     from io import StringIO
     
-    print("检查数据文件是否存在...")
-    
-    # 检查必要的数据文件是否存在
-    required_files = [
-        config['LOCAL_FILE_PATH_V3'],
-        config['INTERVAL_PATH_V3'],
-        config['LOCAL_FILE_PATH_V4'],
-        config['DEP_PATH_V4']
-    ]
-    
-    # 检查是否有任何文件不存在
-    files_exist = all(os.path.exists(file_path) for file_path in required_files)
-    
-    if files_exist:
-        print("所有数据文件已存在，无需更新")
-        return True
-    
-    print("检测到缺失的数据文件，正在自动更新...")
+    # 保存原始stdin
+    original_stdin = sys.stdin
+    # 创建模拟输入流，自动返回'y'
+    mock_stdin = StringIO('y\n' * 20)  # 提供足够的'y'响应
+    sys.stdin = mock_stdin
     
     try:
-        # 保存原始stdin
-        original_stdin = sys.stdin
-        # 创建模拟输入流，自动返回'y'
-        mock_stdin = StringIO('y\n' * 20)  # 提供足够的'y'响应
-        sys.stdin = mock_stdin
-        
         # 1. 生成v3版程序所需的数据
         print("正在生成V3版车站数据...")
         fetch_data_v3(
@@ -1867,9 +1750,85 @@ def check_and_update_data():
         # 恢复原始stdin
         sys.stdin = original_stdin
 
+@app.route('/api/update_data', methods=['POST'])
+def api_update_data():
+    # 更新数据
+    if not config['LINK']:
+        return jsonify({'error': '未设置地图链接'}), 400
+    
+    # 重置数据更新进度
+    global data_update_progress
+    data_update_progress = {
+        'percentage': 0,
+        'stage': '准备中...',
+        'message': '正在准备数据更新...'
+    }
+    
+    try:
+        # 调用内部数据更新函数
+        success = _update_data()
+        
+        if success:
+            # 数据更新完成
+            data_update_progress.update({
+                'percentage': 100,
+                'stage': '完成',
+                'message': '数据更新完成！'
+            })
+            return jsonify({'success': True})
+        else:
+            # 更新失败时设置错误状态
+            data_update_progress.update({
+                'percentage': 0,
+                'stage': '错误',
+                'message': '数据更新失败'
+            })
+            return jsonify({'error': '数据更新失败'}), 500
+    except Exception as e:
+        # 更新失败时设置错误状态
+        data_update_progress.update({
+            'percentage': 0,
+            'stage': '错误',
+            'message': f'更新失败: {str(e)}'
+        })
+        return jsonify({'error': str(e)}), 500
+
+@app.before_request
+def check_and_update_data():
+    """检查数据文件是否存在，如果不存在则自动更新数据，确保只运行一次"""
+    global data_checked
+    
+    # 如果已经检查过数据，直接返回
+    if data_checked:
+        return
+    
+    # 设置标志位为True，确保只运行一次
+    data_checked = True
+    
+    import os
+    
+    print("检查数据文件是否存在...")
+    
+    # 检查必要的数据文件是否存在
+    required_files = [
+        config['LOCAL_FILE_PATH_V3'],
+        config['INTERVAL_PATH_V3'],
+        config['LOCAL_FILE_PATH_V4'],
+        config['DEP_PATH_V4']
+    ]
+    
+    # 检查是否有任何文件不存在
+    files_exist = all(os.path.exists(file_path) for file_path in required_files)
+    
+    if files_exist:
+        print("所有数据文件已存在，无需更新")
+        return
+    
+    print("检测到缺失的数据文件，正在自动更新...")
+    
+    # 调用内部数据更新函数
+    _update_data()
+
 
 if __name__ == '__main__':
-    # 检查并更新数据文件
-    check_and_update_data()
-    
     app.run(debug=True, port=5000)

@@ -1,0 +1,39 @@
+# 排除Windows特定文件
+*.dll
+*.exe
+# 排除Python缓存
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+# 排除IDE和编辑器文件
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+# 排除版本控制文件
+.git/
+.gitignore
+# 排除临时文件
+*.tmp
+*.temp
+# 排除日志文件
+*.log
+# 排除环境配置
+.env
+.env.local
+.env.*.local
+# 排除虚拟环境
+venv/
+env/
+.venv/
+# 排除文档
+README.md
+
+mtr_pathfinder_temp/
+generated_images/
+# 排除测试文件
+*test*.py
+# 排除数据文件
+*.json

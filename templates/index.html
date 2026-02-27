@@ -1220,10 +1220,12 @@
             if (!isWalk && algorithm !== 'theory' && detail) {
                 // 非实时模式下显示等车时间
                 if (algorithm !== 'real') {
+                    // 确保等车时间不为负数
+                    const displayWaitingTime = Math.max(segmentWaitingTime, 0);
                     const waitingDiv = document.createElement('div');
                     waitingDiv.className = 'time-detail';
                     // 非实时模式使用路线详情中的等车时间
-                    waitingDiv.innerHTML = `<span><i class="fa-solid fa-hourglass mr-1"></i> 等车时间</span><span class="time-value">${formatTime(segmentWaitingTime)}</span>`;
+                    waitingDiv.innerHTML = `<span><i class="fa-solid fa-hourglass mr-1"></i> 等车时间</span><span class="time-value">${formatTime(displayWaitingTime)}</span>`;
                     routeInfoDiv.appendChild(waitingDiv);
                 }
             }
@@ -1647,6 +1649,10 @@
                         if (prevRouteIndex >= 0 && routeDetails[prevRouteIndex]) {
                             const prevArrivalTime = routeDetails[prevRouteIndex][6] || 0;
                             lineWaitingTime = departureTime - prevArrivalTime;
+                            // 确保等车时间为非负数
+                            if (lineWaitingTime < 0) {
+                                lineWaitingTime = 0;
+                            }
                         }
                     } else if (i === 0 && stationNames.length > 2) {
                         // 第一条路线：本线路出站时间 - 计划出发时间
@@ -1656,9 +1662,16 @@
                         const depTime = depTimeInput && depTimeInput.value ? parseInt(depTimeInput.value) : 10;
                         const plannedDepartureTime = (currentSeconds + depTime) % 86400;
                         lineWaitingTime = departureTime - plannedDepartureTime;
-                        // 确保等车时间为非负数（处理跨天情况）
+                        // 确保等车时间为非负数
+                        // 只有当出站时间远小于计划出发时间（超过12小时）时，才认为是跨天情况
                         if (lineWaitingTime < 0) {
-                            lineWaitingTime += 86400;
+                            // 如果出站时间小于计划出发时间但差距不大，直接设置为0
+                            // 只有差距超过12小时才认为是跨天情况
+                            if (lineWaitingTime < -43200) {
+                                lineWaitingTime += 86400;
+                            } else {
+                                lineWaitingTime = 0;
+                            }
                         }
                     }
                     
@@ -1865,8 +1878,8 @@
     
     // 格式化时间函数 (秒转 h:mm:ss 或 mm:ss)
     function formatTime(seconds) {
-        // 确保seconds是数字类型
-        const totalSeconds = Math.round(Number(seconds) || 0);
+        // 确保seconds是数字类型，并且为非负数
+        const totalSeconds = Math.max(Math.round(Number(seconds) || 0), 0);
         
         const hours = Math.floor(totalSeconds / 3600);
         const minutes = Math.floor((totalSeconds % 3600) / 60);

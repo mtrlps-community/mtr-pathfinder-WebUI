@@ -1105,7 +1105,7 @@ def remove_duplicate(data, ert):
     all_routes = data[0]['routes']
     new_ert = []
     removed_legs = []
-    for i in range(len(ert) - 1):
+    for i in range(len(ert)):
         if i in removed_legs:
             continue
 
@@ -1149,6 +1149,7 @@ def remove_duplicate(data, ert):
                     dwell = sum(dwells[i1 + 1:i2])
                     old_leg[k][4] = old_leg[k][4][:3]
                     old_leg[k][5] += dwell
+                    break
 
         new_ert.append(old_leg)
 
@@ -1363,7 +1364,10 @@ def save_image(route_type: RouteType, every_route_time: list,
     pattern = []
     last_sta = ()
     time_img = Image.open(PNG_PATH + os.sep + 'time.png')
+    # 保存最后一个route_data，用于循环结束后添加终点站
+    last_route_data = None
     for route_data in every_route_time:
+        last_route_data = route_data
         now_sta = (route_data[0], route_data[1])
         route_img = Image.open(PNG_PATH + os.sep + f'{route_data[8]}.png')
         if route_data[4][0] is True:
@@ -1432,7 +1436,9 @@ def save_image(route_type: RouteType, every_route_time: list,
 
         last_sta = (route_data[0], route_data[1])
 
-    pattern.append((ImagePattern.STATION, route_data[1], route_data[2]))
+    # 确保last_route_data已定义，然后添加终点站
+    if last_route_data:
+        pattern.append((ImagePattern.STATION, last_route_data[1], last_route_data[2]))
 
     return generate_image(pattern, shortest_distance, riding_time,
                           waiting_time, route_type, BASE_PATH,

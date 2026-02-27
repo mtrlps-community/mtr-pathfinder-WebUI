@@ -22,7 +22,7 @@ WILD_ADDITION: dict[str, list[str]] = {}
 # "车站昵称: 车站实际名称, ..."
 STATION_TABLE: dict[str, str] = {}
 # 禁止乘坐的路线（未开通的路线）
-ORIGINAL_IGNORED_LINES: list = []
+ORIGINAL_IGNORED_LINES: list = ["花越綫"]
 
 link_hash = hashlib.md5(LINK.encode('utf-8')).hexdigest()
 # 文件设置
