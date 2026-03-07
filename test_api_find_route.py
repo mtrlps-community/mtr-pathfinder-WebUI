@@ -7,7 +7,7 @@ API_URL = 'http://localhost:5000/api/find_route'
 params = {
     # 出发、到达车站
     'start': 'Spawn',
-    'end': 'Sundogs',
+    'end': 'Lake City',
     
     # 寻路参数
     'algorithm': 'default',  # default, theory, real

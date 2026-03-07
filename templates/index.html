@@ -1189,7 +1189,8 @@
             if (routeDetail.length >= 11) {
                 // v3版本 - 完整格式
                 var [, , color = '#4a90e2', routeName = '', terminus = '', duration = 0, segmentWaitingTime = 0, depInterval = 0, trainType = 'train_normal', plat = '', extraInfo = ''] = routeDetail;
-                originalRouteName = routeName; // 直接使用路线名作为原始路线名
+                // v3版本中，原始路线名在索引10位置
+                originalRouteName = routeDetail[10] || routeName;
                 platform = plat;
                 departureInterval = depInterval;
             } else {
@@ -1200,7 +1201,8 @@
                 // 尝试提取站台编号，不管数组长度如何
                 // 对于v4版本，站台编号在第9个位置（索引8）
                 platform = routeDetail[8] || '';
-                originalRouteName = routeName; // 直接使用路线名作为原始路线名
+                // v4版本中，原始路线名在索引9位置
+                originalRouteName = routeDetail[9] || routeName;
             }
             
             // 处理路线名称，只保留中文和英文，去除方向和分隔符
@@ -1326,23 +1328,44 @@
                 });
                 
                 // 点击事件：添加到禁路线
-            routeCloseBtn.addEventListener('click', function() {
-                const ignoredLinesInput = document.getElementById('ignored-lines');
-                const currentValue = ignoredLinesInput.value;
-                
-                // 使用后端返回的原始路线名称，并进行处理
-                let routeToAdd = originalRouteName;
-                
-                // 处理原始路线名称：
-                // 1. 删去||后面的方向信息
-                // 2. 只保留第一条|前面的内容，使用一种语言的线路名
-                routeToAdd = routeToAdd.split('||')[0].split('|')[0].trim();
+                routeCloseBtn.addEventListener('click', function(e) {
+                    // 调试信息
+                    console.log('叉按钮被点击了！');
+                    console.log('按钮元素:', this);
+                    console.log('事件对象:', e);
+                    
+                    const ignoredLinesInput = document.getElementById('ignored-lines');
+                    console.log('禁路线输入框:', ignoredLinesInput);
+                    
+                    const currentValue = ignoredLinesInput.value;
+                    console.log('当前禁路线值:', currentValue);
+                    
+                    // 使用后端返回的原始路线名称，并进行处理
+                    let routeToAdd = originalRouteName;
+                    console.log('原始路线名称:', originalRouteName);
+                    
+                    // 处理原始路线名称：确保是字符串
+                    if (Array.isArray(routeToAdd)) {
+                        // 如果是数组，使用routeName代替
+                        routeToAdd = routeName;
+                        console.log('使用routeName代替数组:', routeToAdd);
+                    }
+                    
+                    // 处理原始路线名称：
+                    // 1. 删去||后面的方向信息
+                    // 2. 只保留第一条|前面的内容，使用一种语言的线路名
+                    routeToAdd = routeToAdd.split('||')[0].split('|')[0].trim();
+                    console.log('处理后的路线名称:', routeToAdd);
                     
                     // 检查是否已存在
                     const lines = currentValue.split(/[,;；]/).map(line => line.trim()).filter(Boolean);
+                    console.log('当前禁路线列表:', lines);
+                    
                     if (!lines.includes(routeToAdd)) {
+                        console.log('路线不在列表中，添加到禁路线');
                         lines.push(routeToAdd);
                         ignoredLinesInput.value = lines.join(';');
+                        console.log('更新后的禁路线值:', ignoredLinesInput.value);
                         // 触发自动调整高度
                         if (window.autoResizeTextarea) {
                             window.autoResizeTextarea(ignoredLinesInput);
@@ -1350,7 +1373,10 @@
                         // 更新简码
                         if (typeof updateShortcode === 'function') {
                             updateShortcode();
+                            console.log('简码已更新');
                         }
+                    } else {
+                        console.log('路线已在禁路线列表中，无需添加');
                     }
                 });
                 
@@ -1753,61 +1779,97 @@
                     `;
                 }
                 
-                // 添加叉按钮
-            const routeCloseBtn = document.createElement('button');
-            routeCloseBtn.className = 'route-close-btn';
-            routeCloseBtn.innerHTML = '&times;';
-            routeCloseBtn.style.cssText = `
-                background: none;
-                border: none;
-                width: auto;
-                height: auto;
-                cursor: pointer;
-                font-size: 1rem;
-                line-height: 1;
-                opacity: 0.7;
-                transition: color 0.2s;
-                margin-left: 8px;
-            `;
-                
-                // 确保按钮文字颜色与线路标签一致
-                routeCloseBtn.style.color = textColor;
-                
-                // 悬停效果
-                routeCloseBtn.addEventListener('mouseenter', function() {
-                    this.style.opacity = 1;
-                    this.style.color = '#ef4444';
-                });
-                routeCloseBtn.addEventListener('mouseleave', function() {
-                    this.style.opacity = 0.7;
-                    this.style.color = textColor;
-                });
-                
-                // 点击事件：添加到禁路线
-                routeCloseBtn.addEventListener('click', function() {
-                    const ignoredLinesInput = document.getElementById('ignored-lines');
-                    const currentValue = ignoredLinesInput.value;
-                    const routeValue = processedRouteInfo;
-                    
-                    // 检查是否已存在
-                    const lines = currentValue.split(/[,;；]/).map(line => line.trim()).filter(Boolean);
-                    if (!lines.includes(routeValue)) {
-                        lines.push(routeValue);
-                        ignoredLinesInput.value = lines.join(';');
-                        // 触发自动调整高度
-                        if (window.autoResizeTextarea) {
-                            window.autoResizeTextarea(ignoredLinesInput);
-                        }
-                        // 更新简码
-                        if (typeof updateShortcode === 'function') {
-                            updateShortcode();
-                        }
-                    }
-                });
-                
                 // 直接添加内容到routeTag
                 routeTag.appendChild(routeLeftContent);
-                routeTag.appendChild(routeCloseBtn);
+                
+                // 非步行路线才添加叉按钮
+                if (!isWalk) {
+                    // 添加叉按钮
+                    const routeCloseBtn = document.createElement('button');
+                    routeCloseBtn.className = 'route-close-btn';
+                    routeCloseBtn.innerHTML = '&times;';
+                    routeCloseBtn.style.cssText = `
+                        background: none;
+                        border: none;
+                        width: auto;
+                        height: auto;
+                        cursor: pointer;
+                        font-size: 1rem;
+                        line-height: 1;
+                        opacity: 0.7;
+                        transition: color 0.2s;
+                        margin-left: 8px;
+                    `;
+                    
+                    // 确保按钮文字颜色与线路标签一致
+                    routeCloseBtn.style.color = textColor;
+                    
+                    // 悬停效果
+                    routeCloseBtn.addEventListener('mouseenter', function() {
+                        this.style.opacity = 1;
+                        this.style.color = '#ef4444';
+                    });
+                    routeCloseBtn.addEventListener('mouseleave', function() {
+                        this.style.opacity = 0.7;
+                        this.style.color = textColor;
+                    });
+                    
+                    // 点击事件：添加到禁路线
+                    routeCloseBtn.addEventListener('click', function(e) {
+                        // 调试信息
+                        console.log('gen_route_interval_v3 叉按钮被点击了！');
+                        console.log('按钮元素:', this);
+                        console.log('事件对象:', e);
+                        
+                        const ignoredLinesInput = document.getElementById('ignored-lines');
+                        console.log('禁路线输入框:', ignoredLinesInput);
+                        
+                        const currentValue = ignoredLinesInput.value;
+                        console.log('当前禁路线值:', currentValue);
+                        
+                        // 使用原始路线信息，而不是显示名称
+                        let routeToAdd = routeInfo;
+                        console.log('原始路线名称:', routeInfo);
+                        
+                        // 处理原始路线名称：确保是字符串
+                        if (Array.isArray(routeToAdd)) {
+                            // 如果是数组，使用processedRouteInfo代替
+                            routeToAdd = processedRouteInfo;
+                            console.log('使用processedRouteInfo代替数组:', routeToAdd);
+                        }
+                        
+                        // 处理原始路线名称：
+                        // 1. 删去||后面的方向信息
+                        // 2. 只保留第一条|前面的内容，使用一种语言的线路名
+                        routeToAdd = routeToAdd.split('||')[0].split('|')[0].trim();
+                        console.log('处理后的路线名称:', routeToAdd);
+                        
+                        // 检查是否已存在
+                        const lines = currentValue.split(/[,;；]/).map(line => line.trim()).filter(Boolean);
+                        console.log('当前禁路线列表:', lines);
+                        
+                        if (!lines.includes(routeToAdd)) {
+                            console.log('路线不在列表中，添加到禁路线');
+                            lines.push(routeToAdd);
+                            ignoredLinesInput.value = lines.join(';');
+                            console.log('更新后的禁路线值:', ignoredLinesInput.value);
+                            // 触发自动调整高度
+                            if (window.autoResizeTextarea) {
+                                window.autoResizeTextarea(ignoredLinesInput);
+                            }
+                            // 更新简码
+                            if (typeof updateShortcode === 'function') {
+                                updateShortcode();
+                                console.log('简码已更新');
+                            }
+                        } else {
+                            console.log('路线已在禁路线列表中，无需添加');
+                        }
+                    });
+                    
+                    routeTag.appendChild(routeCloseBtn);
+                }
+                
                 routeInfoDiv.appendChild(routeTag);
                 
                 // 只有非步行路线才显示方向指示器
