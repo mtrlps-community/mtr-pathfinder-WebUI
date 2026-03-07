@@ -109,8 +109,9 @@
                     <label class="block text-gray-700 font-medium mb-2" for="dep-time">
                         <i class="fa-solid fa-clock mr-1"></i> 出发时间
                     </label>
-                    <p class="text-sm text-gray-500 mb-2">从0时起经过的秒数，如36000代表上午10:00:00出发</p>
-                    <input type="number" id="dep-time" name="dep_time" class="form-input" min="0" max="86400" placeholder="留空则设为当前时间后10秒">
+                    <p class="text-sm text-gray-500 mb-2">指定一个具体的出发时间，如果留空则设为当前时间后10秒</p>
+                    <input type="time" id="dep-time" class="form-input" placeholder="选择出发时间" step="1">
+                    <input type="hidden" id="dep-time-seconds" name="dep_time">
                 </div>
                 
                 <!-- 寻路选项 -->
@@ -260,6 +261,13 @@
         { value: 'theory', label: '不考虑等车时间（V3-NetworkX）' },
         { value: 'real', label: '根据实时运行数据（V4-CSA）' }
     ];
+    
+    // 时间转换函数：将HH:MM:SS格式转换为秒数
+    function timeToSeconds(timeStr) {
+        if (!timeStr) return '';
+        const [hours, minutes, seconds] = timeStr.split(':').map(Number);
+        return hours * 3600 + minutes * 60 + (seconds || 0);
+    }
     
     // 简码功能
     document.addEventListener('DOMContentLoaded', function() {
@@ -617,6 +625,7 @@
     const algorithmInput = document.getElementById('algorithm');
     const depTimeContainer = document.getElementById('dep-time-container');
     const depTimeInput = document.getElementById('dep-time');
+    const depTimeSecondsInput = document.getElementById('dep-time-seconds');
     
     // 控制出发时间设置的显示/隐藏
     function toggleDepTimeDisplay() {
@@ -626,6 +635,12 @@
             depTimeContainer.style.display = 'none';
         }
     }
+    
+    // 时间选择器事件监听
+    depTimeInput.addEventListener('change', function() {
+        const seconds = timeToSeconds(this.value);
+        depTimeSecondsInput.value = seconds;
+    });
     
     algorithmTabs.forEach(tab => {
         tab.addEventListener('click', function() {
@@ -809,6 +824,12 @@
         // 开始轮询进度
         startProgressPolling();
         
+        // 先更新隐藏字段的秒数
+        if (depTimeInput.value) {
+            const seconds = timeToSeconds(depTimeInput.value);
+            depTimeSecondsInput.value = seconds;
+        }
+        
         // 收集表单数据
         const formData = new FormData(routeForm);
         const data = {
@@ -945,6 +966,9 @@
             
             // 确保routeDetails是数组，避免TypeError
             const routeDetails = Array.isArray(routeResult[2]) ? routeResult[2] : [];
+            
+            // 设置全局变量，用于后续更新总用时
+            window.currentRouteData = routeResult;
         
         // 处理结果图片
         const imageLoading = document.getElementById('image-loading');
@@ -1129,7 +1153,7 @@
             
             // 遍历每个路线信息
             routeInfoElements.forEach(routeInfo => {
-                // 提取乘车时间或步行时间
+                // 提取乘车时间或步行时间，包括隐藏的时间元素
                 const timeDetails = routeInfo.querySelectorAll('.time-detail');
                 timeDetails.forEach(detail => {
                     const timeValue = detail.querySelector('.time-value');
@@ -1226,19 +1250,27 @@
             // 检查是否为步行路线
             const isWalk = trainType === 'walk' || processedRouteName.toLowerCase().includes('walk') || processedRouteName.includes('步行');
             
+            // 确保等车时间不为负数
+            const displayWaitingTime = Math.max(segmentWaitingTime, 0);
+            
             // 只有非步行路线、不是理论模式且在详细模式下才显示等车时间
             // 实时模式下的等车时间已经显示在出站时间上方
             if (!isWalk && algorithm !== 'theory' && detail) {
                 // 非实时模式下显示等车时间
                 if (algorithm !== 'real') {
-                    // 确保等车时间不为负数
-                    const displayWaitingTime = Math.max(segmentWaitingTime, 0);
                     const waitingDiv = document.createElement('div');
                     waitingDiv.className = 'time-detail';
                     // 非实时模式使用路线详情中的等车时间
                     waitingDiv.innerHTML = `<span><i class="fa-solid fa-hourglass mr-1"></i> 等车时间</span><span class="time-value">${formatTime(displayWaitingTime)}</span>`;
                     routeInfoDiv.appendChild(waitingDiv);
                 }
+            } else if (!isWalk && algorithm !== 'theory') {
+                // 非详细模式下，添加隐藏的等车时间元素，用于更新总用时
+                const waitingDiv = document.createElement('div');
+                waitingDiv.className = 'time-detail waiting-time-hidden';
+                waitingDiv.style.display = 'none';
+                waitingDiv.innerHTML = `<span>等车时间</span><span class="time-value">${formatTime(displayWaitingTime)}</span>`;
+                routeInfoDiv.appendChild(waitingDiv);
             }
             
             // 创建路线标签，使用正确的颜色
@@ -1698,11 +1730,22 @@
                         }
                     } else if (i === 0 && stationNames.length > 2) {
                         // 第一条路线：本线路出站时间 - 计划出发时间
-                        const now = new Date();
-                        const currentSeconds = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
-                        const depTimeInput = document.getElementById('dep-time');
-                        const depTime = depTimeInput && depTimeInput.value ? parseInt(depTimeInput.value) : 10;
-                        const plannedDepartureTime = (currentSeconds + depTime) % 86400;
+                        let plannedDepartureTime = 0;
+                        
+                        // 获取用户指定的出发时间（秒数）
+                        const depTimeSecondsInput = document.getElementById('dep-time-seconds');
+                        const userDepTime = depTimeSecondsInput && depTimeSecondsInput.value ? parseInt(depTimeSecondsInput.value) : null;
+                        
+                        if (userDepTime !== null) {
+                            // 用户指定了出发时间，直接使用
+                            plannedDepartureTime = userDepTime;
+                        } else {
+                            // 用户未指定出发时间，使用当前时间+10秒
+                            const now = new Date();
+                            const currentSeconds = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
+                            plannedDepartureTime = (currentSeconds + 10) % 86400;
+                        }
+                        
                         lineWaitingTime = departureTime - plannedDepartureTime;
                         // 确保等车时间为非负数
                         // 只有当出站时间远小于计划出发时间（超过12小时）时，才认为是跨天情况
