@@ -1370,50 +1370,35 @@
                 
                 // 点击事件：添加到禁路线
                 routeCloseBtn.addEventListener('click', function(e) {
-                    // 调试信息
-                    console.log('叉按钮被点击了！');
-                    console.log('按钮元素:', this);
-                    console.log('事件对象:', e);
-                    
                     const ignoredLinesInput = document.getElementById('ignored-lines');
-                    console.log('禁路线输入框:', ignoredLinesInput);
-                    
                     const currentValue = ignoredLinesInput.value;
-                    console.log('当前禁路线值:', currentValue);
                     
                     // 使用后端提供的禁路线字符串
                     let routeToAdd = banRouteString;
-                    console.log('后端提供的禁路线字符串:', banRouteString);
                     
                     // 如果后端没有提供禁路线字符串，则使用旧方法处理
                     if (!routeToAdd) {
                         // 使用后端返回的原始路线名称，并进行处理
                         routeToAdd = originalRouteName;
-                        console.log('使用原始路线名称作为备选:', originalRouteName);
                         
                         // 处理原始路线名称：确保是字符串
                         if (Array.isArray(routeToAdd)) {
                             // 如果是数组，使用routeName代替
                             routeToAdd = routeName;
-                            console.log('使用routeName代替数组:', routeToAdd);
                         }
                         
                         // 处理原始路线名称：
                         // 1. 删去||后面的方向信息
                         // 2. 只保留第一条|前面的内容，使用一种语言的线路名
                         routeToAdd = routeToAdd.split('||')[0].split('|')[0].trim();
-                        console.log('处理后的路线名称:', routeToAdd);
                     }
                     
                     // 检查是否已存在
                     const lines = currentValue.split(/[,;；]/).map(line => line.trim()).filter(Boolean);
-                    console.log('当前禁路线列表:', lines);
                     
                     if (!lines.includes(routeToAdd)) {
-                        console.log('路线不在列表中，添加到禁路线');
                         lines.push(routeToAdd);
                         ignoredLinesInput.value = lines.join(';');
-                        console.log('更新后的禁路线值:', ignoredLinesInput.value);
                         // 触发自动调整高度
                         if (window.autoResizeTextarea) {
                             window.autoResizeTextarea(ignoredLinesInput);
@@ -1421,10 +1406,7 @@
                         // 更新简码
                         if (typeof updateShortcode === 'function') {
                             updateShortcode();
-                            console.log('简码已更新');
                         }
-                    } else {
-                        console.log('路线已在禁路线列表中，无需添加');
                     }
                 });
                 
@@ -1875,16 +1857,8 @@
                     
                     // 点击事件：添加到禁路线
                     routeCloseBtn.addEventListener('click', function(e) {
-                        // 调试信息
-                        console.log('gen_route_interval_v3 叉按钮被点击了！');
-                        console.log('按钮元素:', this);
-                        console.log('事件对象:', e);
-                        
                         const ignoredLinesInput = document.getElementById('ignored-lines');
-                        console.log('禁路线输入框:', ignoredLinesInput);
-                        
                         const currentValue = ignoredLinesInput.value;
-                        console.log('当前禁路线值:', currentValue);
                         
                         // 尝试从当前路线详细信息中获取后端提供的禁路线字符串
                         let banRouteString = '';
@@ -1895,37 +1869,30 @@
                         
                         // 使用后端提供的禁路线字符串（如果有），否则使用原始路线信息
                         let routeToAdd = banRouteString;
-                        console.log('后端提供的禁路线字符串:', banRouteString);
                         
                         // 如果后端没有提供禁路线字符串，则使用旧方法处理
                         if (!routeToAdd) {
                             // 使用原始路线信息，而不是显示名称
                             routeToAdd = routeInfo;
-                            console.log('使用原始路线信息作为备选:', routeInfo);
                             
                             // 处理原始路线名称：确保是字符串
                             if (Array.isArray(routeToAdd)) {
                                 // 如果是数组，使用processedRouteInfo代替
                                 routeToAdd = processedRouteInfo;
-                                console.log('使用processedRouteInfo代替数组:', routeToAdd);
                             }
                             
                             // 处理原始路线名称：
                             // 1. 删去||后面的方向信息
                             // 2. 只保留第一条|前面的内容，使用一种语言的线路名
                             routeToAdd = routeToAdd.split('||')[0].split('|')[0].trim();
-                            console.log('处理后的路线名称:', routeToAdd);
                         }
                         
                         // 检查是否已存在
                         const lines = currentValue.split(/[,;；]/).map(line => line.trim()).filter(Boolean);
-                        console.log('当前禁路线列表:', lines);
                         
                         if (!lines.includes(routeToAdd)) {
-                            console.log('路线不在列表中，添加到禁路线');
                             lines.push(routeToAdd);
                             ignoredLinesInput.value = lines.join(';');
-                            console.log('更新后的禁路线值:', ignoredLinesInput.value);
                             // 触发自动调整高度
                             if (window.autoResizeTextarea) {
                                 window.autoResizeTextarea(ignoredLinesInput);
@@ -1933,10 +1900,7 @@
                             // 更新简码
                             if (typeof updateShortcode === 'function') {
                                 updateShortcode();
-                                console.log('简码已更新');
                             }
-                        } else {
-                            console.log('路线已在禁路线列表中，无需添加');
                         }
                     });
                     
