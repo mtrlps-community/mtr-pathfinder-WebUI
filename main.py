@@ -1194,6 +1194,16 @@ def api_find_route():
                 route_id = route_info[0] if route_info else None  # route_id是列表中的第一个元素
                 route_name = route_segment[3]  # 当前的线路名称
                 
+                # 获取原始路线名称（用于提取禁路线字符串）
+                original_route_name = route_segment[9] if len(route_segment) > 9 else ''
+                
+                # 提取禁路线字符串：从原始路线名称中截取第一个|前面的内容
+                ban_route_string = ''
+                if original_route_name:
+                    # 先去除||后的方向信息，再取第一个|前面的内容
+                    ban_route_part = original_route_name.split('||')[0].strip()
+                    ban_route_string = ban_route_part.split('|')[0].strip()
+                
                 # 如果有route_id，尝试获取更完整的线路名称
                 if route_id and data_file:
                     for route in data_file[0]['routes']:
@@ -1207,7 +1217,14 @@ def api_find_route():
                             full_route_name = full_route_name.replace('|', ' ')
                             # 更新路线段中的线路名称
                             processed_segment[3] = full_route_name
+                            
+                            # 重新提取禁路线字符串，确保准确性
+                            ban_route_part = original_route_name.split('||')[0].strip()
+                            ban_route_string = ban_route_part.split('|')[0].strip()
                             break
+                
+                # 将禁路线字符串添加到路线段中（作为第12个元素）
+                processed_segment.append(ban_route_string)
                 
                 processed_ert.append(processed_segment)
             
