@@ -1189,7 +1189,8 @@
             if (routeDetail.length >= 11) {
                 // v3版本 - 完整格式
                 var [, , color = '#4a90e2', routeName = '', terminus = '', duration = 0, segmentWaitingTime = 0, depInterval = 0, trainType = 'train_normal', plat = '', extraInfo = ''] = routeDetail;
-                originalRouteName = routeName; // 直接使用路线名作为原始路线名
+                // v3版本中，原始路线名在索引10位置
+                originalRouteName = routeDetail[10] || routeName;
                 platform = plat;
                 departureInterval = depInterval;
             } else {
@@ -1200,7 +1201,8 @@
                 // 尝试提取站台编号，不管数组长度如何
                 // 对于v4版本，站台编号在第9个位置（索引8）
                 platform = routeDetail[8] || '';
-                originalRouteName = routeName; // 直接使用路线名作为原始路线名
+                // v4版本中，原始路线名在索引9位置
+                originalRouteName = routeDetail[9] || routeName;
             }
             
             // 处理路线名称，只保留中文和英文，去除方向和分隔符
@@ -1326,17 +1328,39 @@
                 });
                 
                 // 点击事件：添加到禁路线
-            routeCloseBtn.addEventListener('click', function() {
-                const ignoredLinesInput = document.getElementById('ignored-lines');
-                const currentValue = ignoredLinesInput.value;
-                
-                // 使用后端返回的原始路线名称，并进行处理
-                let routeToAdd = originalRouteName;
-                
-                // 处理原始路线名称：
-                // 1. 删去||后面的方向信息
-                // 2. 只保留第一条|前面的内容，使用一种语言的线路名
-                routeToAdd = routeToAdd.split('||')[0].split('|')[0].trim();
+                routeCloseBtn.addEventListener('click', function(event) {
+                    event.stopPropagation(); // 防止事件冒泡
+                    
+                    const ignoredLinesInput = document.getElementById('ignored-lines');
+                    if (!ignoredLinesInput) return;
+                    
+                    const currentValue = ignoredLinesInput.value;
+                    
+                    // 使用实际的路线名称routeName，而不是originalRouteName（它是ID列表）
+                    let routeToAdd = routeName;
+                    
+                    // 处理路线名称：
+                    // 1. 首先确保去除任何可能的HTML标签
+                    routeToAdd = routeToAdd.replace(/<[^>]*>/g, '');
+                    // 2. 只截取||之前的所有内容
+                    routeToAdd = routeToAdd.split('||')[0];
+                    // 3. 去除首尾空格
+                    routeToAdd = routeToAdd.trim();
+                    
+                    if (routeToAdd === '') return;
+                    
+                    // 4. 重建路线名称，将空格替换回单斜杠|（针对典型的中文|英文格式）
+                    // 检查是否包含中文和英文混合
+                    if (/[\u4e00-\u9fa5]/.test(routeToAdd) && /[a-zA-Z]/.test(routeToAdd)) {
+                        // 找到第一个英文字母的位置
+                        const firstEnglishIndex = routeToAdd.search(/[a-zA-Z]/);
+                        if (firstEnglishIndex > 0) {
+                            // 从第一个英文字母前分割，将中文和英文用|连接
+                            const chinesePart = routeToAdd.substring(0, firstEnglishIndex).trim();
+                            const englishPart = routeToAdd.substring(firstEnglishIndex).trim();
+                            routeToAdd = `${chinesePart}|${englishPart}`;
+                        }
+                    }
                     
                     // 检查是否已存在
                     const lines = currentValue.split(/[,;；]/).map(line => line.trim()).filter(Boolean);
@@ -1754,21 +1778,21 @@
                 }
                 
                 // 添加叉按钮
-            const routeCloseBtn = document.createElement('button');
-            routeCloseBtn.className = 'route-close-btn';
-            routeCloseBtn.innerHTML = '&times;';
-            routeCloseBtn.style.cssText = `
-                background: none;
-                border: none;
-                width: auto;
-                height: auto;
-                cursor: pointer;
-                font-size: 1rem;
-                line-height: 1;
-                opacity: 0.7;
-                transition: color 0.2s;
-                margin-left: 8px;
-            `;
+                const routeCloseBtn = document.createElement('button');
+                routeCloseBtn.className = 'route-close-btn';
+                routeCloseBtn.innerHTML = '&times;';
+                routeCloseBtn.style.cssText = `
+                    background: none;
+                    border: none;
+                    width: auto;
+                    height: auto;
+                    cursor: pointer;
+                    font-size: 1rem;
+                    line-height: 1;
+                    opacity: 0.7;
+                    transition: color 0.2s;
+                    margin-left: 8px;
+                `;
                 
                 // 确保按钮文字颜色与线路标签一致
                 routeCloseBtn.style.color = textColor;
@@ -1783,27 +1807,75 @@
                     this.style.color = textColor;
                 });
                 
-                // 点击事件：添加到禁路线
-                routeCloseBtn.addEventListener('click', function() {
-                    const ignoredLinesInput = document.getElementById('ignored-lines');
-                    const currentValue = ignoredLinesInput.value;
-                    const routeValue = processedRouteInfo;
-                    
-                    // 检查是否已存在
-                    const lines = currentValue.split(/[,;；]/).map(line => line.trim()).filter(Boolean);
-                    if (!lines.includes(routeValue)) {
-                        lines.push(routeValue);
-                        ignoredLinesInput.value = lines.join(';');
-                        // 触发自动调整高度
-                        if (window.autoResizeTextarea) {
-                            window.autoResizeTextarea(ignoredLinesInput);
+                // 使用立即执行函数创建闭包，保存当前循环迭代的变量值
+                (function(routeInfo, currentStation, nextStation, routeDetails) {
+                    // 点击事件：添加到禁路线
+                    routeCloseBtn.addEventListener('click', function(event) {
+                        event.stopPropagation(); // 防止事件冒泡
+                        
+                        const ignoredLinesInput = document.getElementById('ignored-lines');
+                        if (!ignoredLinesInput) return;
+                        
+                        const currentValue = ignoredLinesInput.value;
+                        
+                        // 尝试从routeDetails中找到原始路线信息，获取包含原始单斜杠的路线名称
+                        let routeToAdd = routeInfo;
+                        
+                        // 遍历routeDetails，寻找匹配的路线
+                        for (const detail of routeDetails) {
+                            if (Array.isArray(detail)) {
+                                const detailStart = detail[0] || '';
+                                const detailEnd = detail[1] || '';
+                                
+                                // 使用标准化名称进行匹配
+                                if (normalizeStationName(detailStart) === normalizeStationName(currentStation) && 
+                                    normalizeStationName(detailEnd) === normalizeStationName(nextStation)) {
+                                    // 找到了匹配的原始路线信息，使用其路线名称（包含原始单斜杠|）
+                                    routeToAdd = detail[3] || routeInfo;
+                                    break;
+                                }
+                            }
                         }
-                        // 更新简码
-                        if (typeof updateShortcode === 'function') {
-                            updateShortcode();
+                        
+                        // 处理路线名称：
+                        // 1. 首先确保去除任何可能的HTML标签
+                        routeToAdd = routeToAdd.replace(/<[^>]*>/g, '');
+                        // 2. 只截取||之前的所有内容
+                        routeToAdd = routeToAdd.split('||')[0];
+                        // 3. 去除首尾空格
+                        routeToAdd = routeToAdd.trim();
+                        
+                        if (routeToAdd === '') return;
+                        
+                        // 4. 重建路线名称，将空格替换回单斜杠|（针对典型的中文|英文格式）
+                        // 检查是否包含中文和英文混合
+                        if (/[\u4e00-\u9fa5]/.test(routeToAdd) && /[a-zA-Z]/.test(routeToAdd)) {
+                            // 找到第一个英文字母的位置
+                            const firstEnglishIndex = routeToAdd.search(/[a-zA-Z]/);
+                            if (firstEnglishIndex > 0) {
+                                // 从第一个英文字母前分割，将中文和英文用|连接
+                                const chinesePart = routeToAdd.substring(0, firstEnglishIndex).trim();
+                                const englishPart = routeToAdd.substring(firstEnglishIndex).trim();
+                                routeToAdd = `${chinesePart}|${englishPart}`;
+                            }
                         }
-                    }
-                });
+                        
+                        // 检查是否已存在
+                        const lines = currentValue.split(/[,;；]/).map(line => line.trim()).filter(Boolean);
+                        if (!lines.includes(routeToAdd)) {
+                            lines.push(routeToAdd);
+                            ignoredLinesInput.value = lines.join(';');
+                            // 触发自动调整高度
+                            if (window.autoResizeTextarea) {
+                                window.autoResizeTextarea(ignoredLinesInput);
+                            }
+                            // 更新简码
+                            if (typeof updateShortcode === 'function') {
+                                updateShortcode();
+                            }
+                        }
+                    });
+                })(routeInfo, currentStation, nextStation, routeDetails);
                 
                 // 直接添加内容到routeTag
                 routeTag.appendChild(routeLeftContent);
