@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify, send_from_directory, session, redirect
+from flask import Flask, render_template, request, jsonify, send_from_directory, session, redirect, render_template_string
 import os
 import json
 import hashlib
@@ -20,6 +20,9 @@ from mtr_pathfinder_lib.mtr_pathfinder_v4 import (
     fetch_data as fetch_data_v4,
     gen_departure as gen_departure_v4
 )
+
+# 导入时刻表功能模块
+from mtr_pathfinder_lib.mtr_timetable import *
 
 app = Flask(__name__)
 app.secret_key = 'your-secret-key'
@@ -157,6 +160,196 @@ def inject_config():
 @app.route('/favicon.ico')
 def favicon():
     return send_from_directory('.', 'favicon.ico', mimetype='image/x-icon')
+
+# 静态文件路由
+@app.route('/static/<path:filename>')
+def static_files(filename):
+    return send_from_directory('static', filename)
+
+# 检查数据文件是否存在，如果不存在则自动生成
+def check_and_generate_data():
+    # 定义需要检查的数据文件
+    required_files = [
+        config['LOCAL_FILE_PATH_V3'],
+        config['LOCAL_FILE_PATH_V4'],
+        config['DEP_PATH_V4'],
+        'station_timetable_data.dat',
+        'train_timetable_data.dat'
+    ]
+    
+    # 检查是否有文件缺失
+    missing_files = []
+    for file_path in required_files:
+        if not os.path.exists(file_path):
+            missing_files.append(file_path)
+    
+    # 如果有缺失的文件，运行generate_data.py生成数据
+    if missing_files:
+        print(f"缺少数据文件: {missing_files}")
+        print("正在自动生成数据...")
+        
+        # 直接在主程序中生成缺失的数据
+        try:
+            # 检查是否需要生成V3或V4数据文件
+            if config['LOCAL_FILE_PATH_V3'] in missing_files or config['LOCAL_FILE_PATH_V4'] in missing_files or config['DEP_PATH_V4'] in missing_files:
+                print("正在更新基础数据文件...")
+                # 使用内部的_update_data函数来生成基础数据
+                _update_data()
+            
+            # 检查是否需要生成时刻表数据文件
+            if 'station_timetable_data.dat' in missing_files or 'train_timetable_data.dat' in missing_files:
+                print("正在生成时刻表数据文件...")
+                
+                # 确保基础数据文件已经存在
+                if not os.path.exists(config['LOCAL_FILE_PATH_V4']):
+                    print("V4数据文件不存在，正在生成...")
+                    _update_data()
+                
+                if not os.path.exists(config['DEP_PATH_V4']):
+                    print("V4发车数据文件不存在，正在生成...")
+                    _update_data()
+                
+                # 读取V4数据文件
+                with open(config['LOCAL_FILE_PATH_V4'], 'r', encoding='utf-8') as f:
+                    data_v4 = json.load(f)
+                
+                # 读取发车数据
+                with open(config['DEP_PATH_V4'], 'r', encoding='utf-8') as f:
+                    dep_data = json.load(f)
+                
+                # 生成时刻表数据
+                station_route_dep = {}
+                all_route_dep = {}
+                trains = {}
+                station_train_id = {}
+                ignored_lines = config['ORIGINAL_IGNORED_LINES']
+                
+                for route_id, departures in dep_data.items():
+                    if route_id not in data_v4['routes']:
+                        continue
+                    
+                    route = data_v4['routes'][route_id]
+                    route_name = route['name']
+                    
+                    if route_name in ignored_lines:
+                        continue
+                    
+                    # 提取英文名称
+                    try:
+                        eng_name = route_name.split('|')[1].split('|')[0]
+                        if eng_name == '':
+                            eng_name = route_name.split('|')[0]
+                    except IndexError:
+                        eng_name = route_name.split('|')[0]
+                    
+                    durations = route.get('durations', [])
+                    if not durations:
+                        continue
+                    
+                    if route_id not in trains:
+                        trains[route_id] = []
+                    
+                    # 获取车站短代码
+                    station_ids = []
+                    for station in route['stations']:
+                        if station['id'] in data_v4['stations']:
+                            station_ids.append(data_v4['stations'][station['id']]['station'])
+                        else:
+                            station_ids.append('')
+                    
+                    # 确保durations长度与车站数量匹配
+                    if len(station_ids) - 1 < len(durations):
+                        durations = durations[:len(station_ids) - 1]
+                    
+                    if len(station_ids) - 1 > len(durations):
+                        continue
+                    
+                    # 处理发车时间
+                    departures_new = []
+                    for dep in departures:
+                        if dep < 0:
+                            dep += 86400
+                        elif dep >= 86400:
+                            dep -= 86400
+                        departures_new.append(dep)
+                    
+                    real_ids = [x['id'] for x in route['stations']]
+                    dwells = [x.get('dwellTime', 0) for x in route['stations']]
+                    
+                    if len(dwells) > 0:
+                        dep = -round(dwells[-1] / 1000)
+                    else:
+                        dep = 0
+                    
+                    timetable = []
+                    for i in range(len(station_ids) - 1, 0, -1):
+                        station1 = station_ids[i - 1]
+                        station2 = station_ids[i]
+                        _station1 = real_ids[i - 1]
+                        _station2 = real_ids[i]
+                        
+                        if not station1 or not station2:
+                            continue
+                        
+                        dur = round(durations[i - 1] / 1000)
+                        arr_time = dep
+                        dep_time = dep - dur
+                        dwell = round(dwells[i - 1] / 1000)
+                        dep -= dur
+                        dep -= dwell
+                        
+                        if station1 == station2:
+                            continue
+                        
+                        timetable.insert(0, arr_time)
+                        timetable.insert(0, dep_time)
+                        
+                        if _station1 not in station_train_id:
+                            station_train_id[_station1] = 1
+                        
+                        if _station1 not in station_route_dep:
+                            station_route_dep[_station1] = {}
+                        
+                        if eng_name not in station_route_dep[_station1]:
+                            station_route_dep[_station1][eng_name] = []
+                        
+                        if _station1 not in all_route_dep:
+                            all_route_dep[_station1] = {}
+                        
+                        for idx, dep_time_val in enumerate(departures_new):
+                            new_dep = (dep_time + dep_time_val + 8 * 60 * 60) % 86400
+                            train_id = station_train_id[_station1]
+                            station_route_dep[_station1][eng_name].append(
+                                (route_id, new_dep, (idx, train_id))
+                            )
+                            all_route_dep[_station1][train_id] = (
+                                route_id, idx, new_dep
+                            )
+                            station_train_id[_station1] += 1
+                        
+                        station_route_dep[_station1][eng_name].sort()
+                    
+                    if timetable:
+                        for dep_time_val in departures_new:
+                            new_timetable = [y + dep_time_val + 8 * 60 * 60 for y in timetable]
+                            trains[route_id].append(new_timetable)
+                
+                # 保存生成的数据
+                import pickle
+                with open('station_timetable_data.dat', 'wb') as f:
+                    pickle.dump(all_route_dep, f)
+                
+                with open('train_timetable_data.dat', 'wb') as f:
+                    pickle.dump(trains, f)
+                
+                print("时刻表数据文件生成成功!")
+            
+            print("所有缺失数据文件生成完成!")
+        except Exception as e:
+            print(f"数据生成失败: {str(e)}")
+
+# 在应用启动时检查数据文件
+check_and_generate_data()
 
 @app.route('/')
 def index():
@@ -764,6 +957,296 @@ def admin():
 def admin_logout():
     session.pop('admin_logged_in', None)
     return redirect('/admin')
+
+# 时刻表相关路由
+@app.route('/timetable/')
+def timetable_index():
+    return redirect('/timetable/station/')
+
+@app.route('/timetable/station/', methods=['GET'], strict_slashes=False)
+def station_list():
+    '''
+    展示所有车站的列表，点击后可以直接跳转到对应的车站方向查询页面
+    '''
+    try:
+        with open(config['LOCAL_FILE_PATH_V4'], encoding='utf-8') as f:
+            data_v4 = json.load(f)
+        
+        # 获取所有车站数据
+        stations = data_v4['stations']
+        
+        # 生成车站列表HTML
+        html = '''
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>车站列表</title>
+            <style>
+                body {
+                    font-family: Arial, sans-serif;
+                    max-width: 800px;
+                    margin: 0 auto;
+                    padding: 20px;
+                }
+                h1 {
+                    color: #333;
+                    text-align: center;
+                }
+                .search-container {
+                    margin: 20px 0;
+                    text-align: center;
+                }
+                #search-input {
+                    width: 100%;
+                    max-width: 500px;
+                    padding: 12px;
+                    font-size: 16px;
+                    border: 1px solid #ddd;
+                    border-radius: 25px;
+                    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+                    outline: none;
+                    transition: all 0.3s ease;
+                }
+                #search-input:focus {
+                    border-color: #4CAF50;
+                    box-shadow: 0 2px 10px rgba(76,175,80,0.2);
+                }
+                .station-list {
+                    list-style-type: none;
+                    padding: 0;
+                }
+                .station-item {
+                    margin: 10px 0;
+                    padding: 15px;
+                    background-color: #f5f5f5;
+                    border-radius: 5px;
+                    transition: background-color 0.3s;
+                    display: block;
+                }
+                .station-item:hover {
+                    background-color: #e0e0e0;
+                }
+                .station-item.hidden {
+                    display: none;
+                }
+                .station-link {
+                    text-decoration: none;
+                    color: #333;
+                    display: block;
+                }
+                .station-name {
+                    font-weight: bold;
+                    font-size: 18px;
+                }
+                .station-info {
+                    font-size: 14px;
+                    color: #666;
+                    margin-top: 5px;
+                }
+                .search-results {
+                    margin: 10px 0;
+                    color: #666;
+                    font-size: 14px;
+                    text-align: center;
+                }
+            </style>
+        </head>
+        <body>
+            <h1>车站列表</h1>
+            <div class="search-container">
+                <input type="text" id="search-input" placeholder="请输入车站名称或ID进行搜索...">
+                <div class="search-results" id="search-results"></div>
+            </div>
+            <ul class="station-list" id="station-list">
+        '''
+        
+        # 遍历所有车站，生成列表项
+        for station_id, station_data in stations.items():
+            # 获取车站短代码
+            station_short_id = int(station_data['station'], 16)
+            # 车站名称
+            station_name = station_data['name'].split('|')[0]
+            # 英文名称（如果有）
+            if '|' in station_data['name']:
+                eng_name = station_data['name'].split('|')[1].split('|')[0]
+            else:
+                eng_name = ''
+            
+            # 生成列表项
+            html += f'''
+                <li class="station-item">
+                    <a href="/timetable/station/{station_short_id}" class="station-link">
+                        <div class="station-name">{station_name}</div>
+                        <div class="station-info">ID: {station_short_id} | {eng_name}</div>
+                    </a>
+                </li>
+            '''
+        
+        html += '''
+            </ul>
+            <script>
+                // 搜索功能实现
+                document.addEventListener('DOMContentLoaded', function() {
+                    const searchInput = document.getElementById('search-input');
+                    const stationList = document.getElementById('station-list');
+                    const stationItems = stationList.getElementsByClassName('station-item');
+                    const searchResults = document.getElementById('search-results');
+                    
+                    // 计算并显示搜索结果数量
+                    function updateSearchResults(visibleCount, totalCount) {
+                        if (searchInput.value.trim() === '') {
+                            searchResults.textContent = '';
+                        } else {
+                            searchResults.textContent = `找到 ${visibleCount} 个车站，共 ${totalCount} 个`;
+                        }
+                    }
+                    
+                    // 搜索功能
+                    searchInput.addEventListener('input', function() {
+                        const searchTerm = this.value.toLowerCase().trim();
+                        let visibleCount = 0;
+                        const totalCount = stationItems.length;
+                        
+                        // 遍历所有车站项，根据搜索词过滤
+                        for (let i = 0; i < stationItems.length; i++) {
+                            const stationItem = stationItems[i];
+                            const stationName = stationItem.querySelector('.station-name').textContent.toLowerCase();
+                            const stationInfo = stationItem.querySelector('.station-info').textContent.toLowerCase();
+                            
+                            // 检查车站名称或信息是否包含搜索词
+                            if (stationName.includes(searchTerm) || stationInfo.includes(searchTerm)) {
+                                stationItem.classList.remove('hidden');
+                                visibleCount++;
+                            } else {
+                                stationItem.classList.add('hidden');
+                            }
+                        }
+                        
+                        // 更新搜索结果统计
+                        updateSearchResults(visibleCount, totalCount);
+                    });
+                });
+            </script>
+        </body>
+        </html>
+        '''
+        
+        return html
+    except Exception as e:
+        return jsonify({'error': f'获取车站列表失败: {str(e)}'})
+
+@app.route('/timetable/station/<station_short_id>', methods=['GET'], strict_slashes=False)
+def station_directions(station_short_id=None):
+    if not station_short_id:
+        return jsonify({'error': '请输入车站短代码'})
+
+    try:
+        station_short_id = int(station_short_id)
+    except ValueError:
+        return jsonify({'error': '车站短代码格式错误'})
+
+    with open(config['LOCAL_FILE_PATH_V3'], encoding='utf-8') as f:
+        data_v3 = json.load(f)
+
+    with open(config['LOCAL_FILE_PATH_V4'], encoding='utf-8') as f:
+        data_v4 = json.load(f)
+
+    sta_id = station_short_id_to_id(data_v4, station_short_id)
+    if sta_id is None:
+        return jsonify({'error': '车站短代码错误'})
+
+    all_stations = data_v4['stations']
+    station_name = all_stations[sta_id]['name']
+    html = main_get_sta_directions(
+        config['LOCAL_FILE_PATH_V4'],
+        station_name,
+        os.path.join('templates', 'directions_template.htm'))
+
+    if html is None or html is False:
+        return jsonify({'error': '未找到该车站信息'})
+
+    return render_template_string(html[0])
+
+@app.route('/timetable/station/<station_short_id>/<direction>', methods=['GET'], strict_slashes=False)
+def station_timetable(station_short_id=None, direction=None):
+    if not station_short_id or not direction:
+        return jsonify({'error': '请输入车站短代码和方向'})
+
+    try:
+        station_short_id = int(station_short_id)
+        direction = int(direction)
+    except ValueError:
+        return jsonify({'error': '车站短代码或方向格式错误'})
+
+    with open(config['LOCAL_FILE_PATH_V3'], encoding='utf-8') as f:
+        data_v3 = json.load(f)
+
+    with open(config['LOCAL_FILE_PATH_V4'], encoding='utf-8') as f:
+        data_v4 = json.load(f)
+
+    sta_id = station_short_id_to_id(data_v4, station_short_id)
+    if sta_id is None:
+        return jsonify({'error': '车站短代码错误'})
+
+    all_stations = data_v4['stations']
+    station_name = all_stations[sta_id]['name']
+
+    html = main_get_sta_directions(
+        config['LOCAL_FILE_PATH_V4'],
+        station_name,
+        os.path.join('templates', 'directions_template.htm'))
+
+    if html is None:
+        return jsonify({'error': '未找到该车站信息'})
+
+    try:
+        route_names = html[2][direction]
+    except Exception:
+        return jsonify({'error': '路线编号错误'})
+    except KeyError:
+        return jsonify({'error': '路线编号错误'})
+
+    html = main_sta_timetable(
+        config['LOCAL_FILE_PATH_V3'],
+        config['LOCAL_FILE_PATH_V4'],
+        os.path.join('templates', 'station_template.htm'),
+        '',
+        station_name, route_names)
+
+    if html is None or html is False:
+        return jsonify({'error': '未找到该车站信息'})
+
+    return render_template_string(html[0])
+
+@app.route('/timetable/train/<station_short_id>/<train_id>', methods=['GET'])
+def train_timetable(station_short_id=None, train_id=None):
+    if not station_short_id or not train_id:
+        return jsonify({'error': '请输入车站短代码和方向'})
+
+    try:
+        station_short_id = int(station_short_id)
+        train_id = int(train_id)
+    except ValueError:
+        return jsonify({'error': '车站短代码或方向格式错误'})
+
+    with open(config['LOCAL_FILE_PATH_V4'], encoding='utf-8') as f:
+        data_v4 = json.load(f)
+
+    sta_id = station_short_id_to_id(data_v4, station_short_id)
+    if sta_id is None:
+        return jsonify({'error': '车站短代码错误'})
+
+    all_stations = data_v4['stations']
+    station_name = all_stations[sta_id]['name']
+    html = main_train(
+        config['LOCAL_FILE_PATH_V4'], '', '',
+        os.path.join('templates', 'timetable_template.htm'),
+        station_name, train_id)
+
+    if html is None or html is False:
+        return jsonify({'error': '未找到该车站信息'})
+
+    return render_template_string(html[0])
 
 @app.route('/api/find_route', methods=['POST'])
 def api_find_route():
