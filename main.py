@@ -418,13 +418,33 @@ def stations():
     
     # 数据字段过滤：只返回前端页面需要的字段
     filtered_stations = []
+    
+    # 读取V4数据文件获取短代码信息
+    v4_data = None
+    try:
+        with open(config['LOCAL_FILE_PATH_V4'], encoding='utf-8') as f:
+            v4_data = json.load(f)
+    except Exception as e:
+        print(f"读取V4数据文件失败: {e}")
+    
     for station in stations_data:
         if isinstance(station, dict):
+            # 获取车站短代码
+            station_short_id = None
+            if v4_data and isinstance(v4_data, dict) and 'stations' in v4_data:
+                v4_stations = v4_data['stations']
+                if station['id'] in v4_stations:
+                    try:
+                        station_short_id = int(v4_stations[station['id']]['station'], 16)
+                    except (ValueError, KeyError):
+                        pass
+            
             filtered_station = {
                 'id': station.get('id', 'N/A'),
                 'name': station.get('name', 'N/A'),
                 'line_count': station.get('line_count', 0),
-                'branch_count': station.get('branch_count', 0)
+                'branch_count': station.get('branch_count', 0),
+                'short_id': station_short_id
             }
             filtered_stations.append(filtered_station)
     
@@ -2209,8 +2229,16 @@ def _update_data():
     mock_stdin = StringIO('y\n' * 20)  # 提供足够的'y'响应
     sys.stdin = mock_stdin
     
+    # 声明全局变量，用于更新进度
+    global data_update_progress
+    
     try:
         # 1. 生成v3版程序所需的数据
+        data_update_progress.update({
+            'percentage': 20,
+            'stage': '数据更新',
+            'message': '正在生成V3版车站数据...'
+        })
         print("正在生成V3版车站数据...")
         fetch_data_v3(
             config['LINK'],
@@ -2218,6 +2246,11 @@ def _update_data():
             config['MTR_VER']
         )
         
+        data_update_progress.update({
+            'percentage': 35,
+            'stage': '数据更新',
+            'message': '正在生成V3版间隔数据...'
+        })
         print("正在生成V3版间隔数据...")
         gen_route_interval_v3(
             config['LOCAL_FILE_PATH_V3'],
@@ -2227,24 +2260,191 @@ def _update_data():
         )
         
         # 2. 生成v4版程序所需的数据
+        data_update_progress.update({
+            'percentage': 50,
+            'stage': '数据更新',
+            'message': '正在生成V4版车站数据...'
+        })
         print("正在生成V4版车站数据...")
-        from mtr_pathfinder_lib.mtr_pathfinder_v4 import fetch_data as fetch_data_v4
         fetch_data_v4(
             config['LINK'],
             config['LOCAL_FILE_PATH_V4'],
             config['MAX_WILD_BLOCKS']
         )
         
+        data_update_progress.update({
+            'percentage': 65,
+            'stage': '数据更新',
+            'message': '正在生成V4版发车数据...'
+        })
         print("正在生成V4版发车数据...")
         gen_departure_v4(
             config['LINK'],
             config['DEP_PATH_V4']
         )
         
+        # 3. 生成时刻表数据文件
+        data_update_progress.update({
+            'percentage': 80,
+            'stage': '数据更新',
+            'message': '正在生成时刻表数据文件...'
+        })
+        print("正在生成时刻表数据文件...")
+        
+        # 直接生成时刻表数据，避免调用check_and_generate_data()带来的额外开销
+        try:
+            # 读取V4数据文件
+            with open(config['LOCAL_FILE_PATH_V4'], 'r', encoding='utf-8') as f:
+                data_v4 = json.load(f)
+            
+            # 读取发车数据
+            with open(config['DEP_PATH_V4'], 'r', encoding='utf-8') as f:
+                dep_data = json.load(f)
+            
+            # 生成时刻表数据
+            station_route_dep = {}
+            all_route_dep = {}
+            trains = {}
+            station_train_id = {}
+            ignored_lines = config['ORIGINAL_IGNORED_LINES']
+            
+            for route_id, departures in dep_data.items():
+                if route_id not in data_v4['routes']:
+                    continue
+                
+                route = data_v4['routes'][route_id]
+                route_name = route['name']
+                
+                if route_name in ignored_lines:
+                    continue
+                
+                # 提取英文名称
+                try:
+                    eng_name = route_name.split('|')[1].split('|')[0]
+                    if eng_name == '':
+                        eng_name = route_name.split('|')[0]
+                except IndexError:
+                    eng_name = route_name.split('|')[0]
+                
+                durations = route.get('durations', [])
+                if not durations:
+                    continue
+                
+                if route_id not in trains:
+                    trains[route_id] = []
+                
+                # 获取车站短代码
+                station_ids = []
+                for station in route['stations']:
+                    if station['id'] in data_v4['stations']:
+                        station_ids.append(data_v4['stations'][station['id']]['station'])
+                    else:
+                        station_ids.append('')
+                
+                # 确保durations长度与车站数量匹配
+                if len(station_ids) - 1 < len(durations):
+                    durations = durations[:len(station_ids) - 1]
+                
+                if len(station_ids) - 1 > len(durations):
+                    continue
+                
+                # 处理发车时间
+                departures_new = []
+                for dep in departures:
+                    if dep < 0:
+                        dep += 86400
+                    elif dep >= 86400:
+                        dep -= 86400
+                    departures_new.append(dep)
+                
+                real_ids = [x['id'] for x in route['stations']]
+                dwells = [x.get('dwellTime', 0) for x in route['stations']]
+                
+                if len(dwells) > 0:
+                    dep = -round(dwells[-1] / 1000)
+                else:
+                    dep = 0
+                
+                timetable = []
+                for i in range(len(station_ids) - 1, 0, -1):
+                    station1 = station_ids[i - 1]
+                    station2 = station_ids[i]
+                    _station1 = real_ids[i - 1]
+                    _station2 = real_ids[i]
+                    
+                    if not station1 or not station2:
+                        continue
+                    
+                    dur = round(durations[i - 1] / 1000)
+                    arr_time = dep
+                    dep_time = dep - dur
+                    dwell = round(dwells[i - 1] / 1000)
+                    dep -= dur
+                    dep -= dwell
+                    
+                    if station1 == station2:
+                        continue
+                    
+                    timetable.insert(0, arr_time)
+                    timetable.insert(0, dep_time)
+                    
+                    if _station1 not in station_train_id:
+                        station_train_id[_station1] = 1
+                    
+                    if _station1 not in station_route_dep:
+                        station_route_dep[_station1] = {}
+                    
+                    if eng_name not in station_route_dep[_station1]:
+                        station_route_dep[_station1][eng_name] = []
+                    
+                    if _station1 not in all_route_dep:
+                        all_route_dep[_station1] = {}
+                    
+                    for idx, dep_time_val in enumerate(departures_new):
+                        new_dep = (dep_time + dep_time_val + 8 * 60 * 60) % 86400
+                        train_id = station_train_id[_station1]
+                        station_route_dep[_station1][eng_name].append(
+                            (route_id, new_dep, (idx, train_id))
+                        )
+                        all_route_dep[_station1][train_id] = (
+                            route_id, idx, new_dep
+                        )
+                        station_train_id[_station1] += 1
+                    
+                    station_route_dep[_station1][eng_name].sort()
+                
+                if timetable:
+                    for dep_time_val in departures_new:
+                        new_timetable = [y + dep_time_val + 8 * 60 * 60 for y in timetable]
+                        trains[route_id].append(new_timetable)
+            
+            # 保存生成的数据
+            import pickle
+            with open('station_timetable_data.dat', 'wb') as f:
+                pickle.dump(all_route_dep, f)
+            
+            with open('train_timetable_data.dat', 'wb') as f:
+                pickle.dump(trains, f)
+            
+            print("时刻表数据文件生成成功!")
+        except Exception as e:
+            print(f"生成时刻表数据文件失败: {str(e)}")
+            # 时刻表数据生成失败不影响整体更新
+        
+        data_update_progress.update({
+            'percentage': 100,
+            'stage': '数据更新',
+            'message': '数据更新完成！'
+        })
         print("数据更新完成！")
         return True
     except Exception as e:
         print(f"数据更新失败: {str(e)}")
+        data_update_progress.update({
+            'percentage': 0,
+            'stage': '错误',
+            'message': f'更新失败: {str(e)}'
+        })
         return False
     finally:
         # 恢复原始stdin

@@ -33,6 +33,7 @@
                     <th class="col-name">名称</th>
                     <th class="col-lines whitespace-nowrap">线路数量</th>
                     <th class="col-lines whitespace-nowrap">交路数量</th>
+                    <th class="col-timetable whitespace-nowrap">时刻表</th>
                 </tr>
             </thead>
             <tbody id="station-table-body">
@@ -53,11 +54,20 @@
                             <td class="col-lines whitespace-nowrap" style="width: 100px;">
                                 {{ station.get('branch_count', 0) }}
                             </td>
+                            <td class="col-timetable whitespace-nowrap" style="width: 100px;">
+                                {% if station.get('short_id') is not none %}
+                                    <a href="/timetable/station/{{ station.get('short_id') }}" class="text-blue-600 hover:underline">
+                                        <i class="fa-solid fa-clock"></i> 车站{{ station.get('short_id') }}
+                                    </a>
+                                {% else %}
+                                    <span class="text-gray-400">N/A</span>
+                                {% endif %}
+                            </td>
                         </tr>
                     {% endfor %}
                 {% else %}
                     <tr>
-                        <td colspan="4" class="py-12 text-center" style="color: var(--text-tertiary);">
+                        <td colspan="5" class="py-12 text-center" style="color: var(--text-tertiary);">
                             <i class="fa-solid fa-map-marker-alt text-3xl mb-2"></i>
                             <p>暂无车站数据，请先在控制台更新数据</p>
                         </td>
@@ -125,7 +135,7 @@
         if (!filteredStations || filteredStations.length === 0) {
                 tbody.innerHTML = `
                     <tr>
-                        <td colspan="4" class="py-12 text-center" style="color: var(--text-tertiary);">
+                        <td colspan="5" class="py-12 text-center" style="color: var(--text-tertiary);">
                             <i class="fa-solid fa-search text-3xl mb-2" style="color: var(--text-tertiary);"></i>
                             <p style="color: var(--text-secondary);">未找到匹配的车站</p>
                         </td>
@@ -153,6 +163,9 @@
                     <td class="col-lines whitespace-nowrap" style="width: 100px;">
                         ${station.branch_count || 0}
                     </td>
+                    <td class="col-timetable whitespace-nowrap" style="width: 100px;">
+                        ${station.short_id !== null && station.short_id !== undefined ? `<a href="/timetable/station/${station.short_id}" class="text-blue-600 hover:underline"><i class="fa-solid fa-clock"></i> 车站${station.short_id}</a>` : '<span class="text-gray-400">N/A</span>'}
+                    </td>
                 </tr>
             `).join('');
             
@@ -160,7 +173,7 @@
             if (filteredStations.length > stationsPerPage && !showAllStations) {
                 rows += `
                     <tr>
-                        <td colspan="4" class="py-4 text-center">
+                        <td colspan="5" class="py-4 text-center">
                             <button id="expand-stations-btn" class="btn-secondary">
                                 <i class="fa-solid fa-chevron-down mr-1"></i> 展开剩余 ${filteredStations.length - stationsPerPage} 个车站
                             </button>
