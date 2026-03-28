@@ -1006,7 +1006,7 @@
         timeInfoDiv.className = 'time-info';
         timeInfoDiv.id = 'time-info';
         
-        // 构建时间网格内容，理论模式下只显示总用时
+        // 构建时间网格内容
         let timeGridContent = `
             <div class="time-grid ${algorithm === 'theory' ? 'theory-mode' : ''}">
                 <div class="time-item total-time">
@@ -1018,8 +1018,9 @@
                 </div>
         `;
         
-        // 非理论模式且详细模式下显示乘车时间和等车时间
-        if (algorithm !== 'theory' && detail) {
+        // 默认和实时模式下显示乘车时间和等车时间，跟是否开启详细选项无关
+        // 理论模式下不显示乘车时间和等车时间
+        if (algorithm !== 'theory') {
             timeGridContent += `
                 <div class="time-item traveling-time">
                     <div class="time-icon"><i class="fa-solid fa-train"></i></div>
@@ -1285,7 +1286,7 @@
             // 初始化同名线路的乘车时间数组，确保在所有情况下都有定义
             let ridingTimes = [];
             
-            // 只有非步行路线、不是理论模式且在详细模式下才显示等车时间
+            // 非步行路线、非理论模式且详细模式下显示等车时间
             // 实时模式下的等车时间已经显示在出站时间上方
             if (!isWalk && algorithm !== 'theory' && detail) {
                 // 非实时模式下显示等车时间
@@ -1657,7 +1658,7 @@
                     }
                 }
                 
-                // 只有非步行路线、不是理论模式且在详细模式下才显示发车间隔
+                // 只有非步行路线、非理论模式且在详细模式下才显示发车间隔
                 // 实时模式下的等车时间已经显示在出站时间上方
                 if (!isWalk && algorithm !== 'theory' && detail) {
                     // 非实时模式下显示发车间隔
