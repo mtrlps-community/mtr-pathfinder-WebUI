@@ -1600,6 +1600,9 @@ def api_find_route():
                 # 获取route_id和线路名称
                 route_info = route_segment[10]  # route_info是第11个元素(索引10)
                 route_id = route_info[0] if route_info else None  # route_id是列表中的第一个元素
+                # 确保route_id只包含一个ID，去除逗号分隔的多个ID
+                if route_id:
+                    route_id = str(route_id).split(',')[0].strip()
                 route_name = route_segment[3]  # 当前的线路名称
                 
                 # 获取原始路线名称（用于提取禁路线字符串）
@@ -1842,7 +1845,45 @@ def api_search_stations():
             formatted_name = station['name'].replace('|', ' ')
             results.add(formatted_name)
     
-    return jsonify(list(results))  # 返回去重后的匹配结果
+    return jsonify(sorted(list(results)))
+
+@app.route('/api/stations_routes_data', methods=['GET'])
+def api_stations_routes_data():
+    # 返回车站和线路数据，用于前端生成详情链接
+    data_file_path = config['LOCAL_FILE_PATH_V3']
+    if not os.path.exists(data_file_path):
+        return jsonify({'stations': {}, 'routes': []})
+    
+    with open(data_file_path, 'r', encoding='utf-8') as f:
+        data = json.load(f)
+    
+    stations = {}
+    routes = []
+    
+    # 统一处理，无论MTR_VER版本，数据都是列表格式
+    if isinstance(data, list) and len(data) > 0:
+        stations = data[0]['stations']
+        routes_data = data[0]['routes']
+    elif isinstance(data, dict):
+        # 兼容旧格式，直接访问
+        stations = data.get('stations', {})
+        routes_data = data.get('routes', [])
+    else:
+        routes_data = []
+    
+    # 转换为列表格式便于前端处理
+    if isinstance(routes_data, dict):
+        routes = list(routes_data.values())
+    else:
+        routes = routes_data
+    
+    # 确保每个线路只返回一个ID
+    for route in routes:
+        if route.get('id'):
+            # 如果ID包含多个值，用逗号分隔，只取第一个
+            route['id'] = str(route['id']).split(',')[0].strip()
+    
+    return jsonify({'stations': stations, 'routes': routes})
 
 # 全局变量，用于存储最新生成的图片文件路径
 latest_image_path = ''

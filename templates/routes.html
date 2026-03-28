@@ -13,16 +13,18 @@
                 <i class="fa-solid fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
             </div>
             <div class="flex space-x-2">
-                <select id="route-sort" class="form-input">
-                    <option value="default" selected>按数据文件默认排序</option>
-                    <option value="name">按名称排序</option>
-                    <option value="id">按ID排序</option>
-                    <option value="stations">按站点数量排序</option>
-                </select>
-                <button id="route-sort-direction" class="btn-secondary">
-                    <i class="fa-solid fa-sort-amount-asc"></i>
-                </button>
-            </div>
+            <select id="route-sort" class="form-input">
+                <option value="default" selected>按数据文件默认排序</option>
+                <option value="name">按名称排序</option>
+                <option value="id">按ID排序</option>
+                <option value="stations">按站点数量排序</option>
+            </select>
+            <button id="route-sort-direction" class="btn-secondary">
+                <i class="fa-solid fa-sort-amount-asc"></i>
+            </button>
+            <button id="toggle-id-display" class="btn-secondary">
+                <i class="fa-solid fa-eye-slash"></i> 显示ID
+            </button>
         </div>
         
 
@@ -99,6 +101,8 @@
     let sortDirection = 'asc';
     // 控制是否显示所有线路
     let showAllRoutes = false;
+    // 控制是否显示ID
+    let showId = false;
     // 每页显示数量
     const routesPerPage = 100;
     
@@ -128,10 +132,16 @@
     // 渲染表格 - 显示所有数据
     function renderTable() {
         const tbody = document.getElementById('route-table-body');
+        const theadIdTh = document.querySelector('table thead th.col-id');
         
         if (!tbody) {
             console.error('Table body element not found');
             return;
+        }
+        
+        // 控制ID列的显示和隐藏
+        if (theadIdTh) {
+            theadIdTh.style.display = showId ? 'table-cell' : 'none';
         }
         
         if (!filteredRoutes || filteredRoutes.length === 0) {
@@ -151,11 +161,11 @@
             // 生成表格行
             let rows = routesToDisplay.map(route => `
                 <tr>
-                    <td class="col-id whitespace-nowrap">
+                    <td class="col-id whitespace-nowrap" style="display: ${showId ? 'table-cell' : 'none'};">
                         ${route.id || 'N/A'}
                     </td>
                     <td class="col-name font-medium">
-                        <a href="/routes/${route.id || ''}">
+                        <a href="/routes/${String(route.id || '').split(',')[0].trim()}">
                             ${route.name || 'N/A'}
                         </a>
                     </td>
@@ -193,6 +203,20 @@
                 });
             }
         }
+    }
+    
+    // 切换ID显示状态
+    function toggleIdDisplay() {
+        showId = !showId;
+        const toggleBtn = document.getElementById('toggle-id-display');
+        if (toggleBtn) {
+            const icon = toggleBtn.querySelector('i');
+            if (icon) {
+                icon.className = showId ? 'fa-solid fa-eye' : 'fa-solid fa-eye-slash';
+            }
+            toggleBtn.innerHTML = `<i class="fa-solid fa-${showId ? 'eye' : 'eye-slash'}"></i> ${showId ? '隐藏' : '显示'}ID`;
+        }
+        renderTable();
     }
     
     // 初始化搜索功能
@@ -236,6 +260,12 @@
             });
         } else {
             console.error('Sort direction button not found');
+        }
+        
+        // 切换ID显示按钮事件监听
+        const toggleIdBtn = document.getElementById('toggle-id-display');
+        if (toggleIdBtn) {
+            toggleIdBtn.addEventListener('click', toggleIdDisplay);
         }
     });
     
