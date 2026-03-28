@@ -1231,7 +1231,7 @@
             // 解析路线详细信息，添加默认值
             // 路线详情数组结构：
             // v3: [起点, 终点, 颜色, 路线名, 终点站信息, 时长, 等车时间, 发车间隔, 交通类型, 站台编号, [route_id, station_1, station_2], ban_route_string]
-            // v4(实时模式): [起点, 终点, 颜色, 路线名, 终点站信息, 时长, 等车时间, 交通类型, 站台编号, [route_id, station_1, station_2]] (与v3保持一致)
+            // v4(实时模式): [起点, 终点, 颜色, 路线名, 终点站信息, 时长, 等车时间, 交通类型, 站台编号, 原始路线名]
             let originalRouteName = '';
             let platform = '';
             let departureInterval = 0;
@@ -1265,9 +1265,9 @@
                 // 尝试提取站台编号，不管数组长度如何
                 // 对于v4版本，站台编号在第9个位置（索引8）
                 platform = routeDetail[8] || '';
-                // v4版本中，路线信息在索引9位置，是一个数组：[route_id, station_1, station_2]
-                if (routeDetail.length > 9 && Array.isArray(routeDetail[9])) {
-                    routeIdFromData = routeDetail[9][0];
+                // v4版本中，索引9是原始路线名
+                if (routeDetail.length > 9) {
+                    originalRouteName = routeDetail[9];
                 }
                 banRouteString = '';
             }
@@ -1397,30 +1397,65 @@
                     const routeId = this.dataset.routeId;
                     console.log('Route button clicked, raw routeId:', routeId);
                     
-                    // 直接从原始routeId中提取第一个ID，不需要复杂的正则表达式
-                    // 因为routeId中已经包含了线路ID，只是可能有多个用逗号分隔
                     let detailUrl;
+                    let finalRouteId = null;
                     
-                    // 简单直接的方法：直接取第一个逗号前的部分作为ID
-                    const firstId = String(routeId).split(',')[0].trim();
-                    
-                    // 检查firstId是否是有效的线路ID，如果不是，尝试使用findRouteIdByName函数查找
-                    let finalRouteId = firstId;
-                    if (!finalRouteId || finalRouteId === routeName) {
-                        // 如果finalRouteId是线路名称，使用findRouteIdByName函数查找真正的线路ID
+                    // 1. 首先检查routeId是否已经是有效的线路ID（直接从数据中获取的）
+                    if (routeId && routeId !== routeName) {
+                        // 如果routeId不是线路名称，直接使用
+                        finalRouteId = String(routeId).split(',')[0].trim();
+                        console.log('Using provided route ID:', finalRouteId);
+                    } else {
+                        // 2. 使用v4原程序返回的原始线路名查找对应的线路ID
                         console.log('Route ID is route name, trying to find actual ID using findRouteIdByName...');
-                        const actualRouteId = findRouteIdByName(firstId);
-                        if (actualRouteId) {
-                            finalRouteId = actualRouteId;
-                            console.log('Found actual route ID:', finalRouteId);
+                        // 优先使用originalRouteName（从routeDetail[9]获取的原始路线名）
+                        if (originalRouteName) {
+                            finalRouteId = findRouteIdByName(originalRouteName);
+                            if (finalRouteId) {
+                                console.log('Found actual route ID using original route name from routeDetail[9]:', finalRouteId);
+                            } else {
+                                console.log('Failed to find route ID with original route name from routeDetail[9], trying with routeName...');
+                                // 如果originalRouteName查找失败，尝试使用routeName
+                                finalRouteId = findRouteIdByName(routeName);
+                                if (finalRouteId) {
+                                    console.log('Found actual route ID using routeName:', finalRouteId);
+                                } else {
+                                    // 如果还是找不到，尝试使用处理后的线路名
+                                    console.log('Failed to find route ID with routeName, trying with processed route name...');
+                                    finalRouteId = findRouteIdByName(processedRouteName);
+                                    if (finalRouteId) {
+                                        console.log('Found actual route ID using processed route name:', finalRouteId);
+                                    }
+                                }
+                            }
+                        } else {
+                            // 如果没有originalRouteName，尝试使用routeName
+                            finalRouteId = findRouteIdByName(routeName);
+                            if (finalRouteId) {
+                                console.log('Found actual route ID using routeName:', finalRouteId);
+                            } else {
+                                // 如果还是找不到，尝试使用处理后的线路名
+                                console.log('Failed to find route ID with routeName, trying with processed route name...');
+                                finalRouteId = findRouteIdByName(processedRouteName);
+                                if (finalRouteId) {
+                                    console.log('Found actual route ID using processed route name:', finalRouteId);
+                                }
+                            }
                         }
                     }
                     
-                    // 不检查UUID格式，直接使用finalRouteId
-                    detailUrl = `/routes/${encodeURIComponent(finalRouteId)}`;
+                    // 构建最终的URL
+                    if (finalRouteId) {
+                        // 使用查找到的线路ID构建链接
+                        detailUrl = `/routes/${encodeURIComponent(finalRouteId)}`;
+                        console.log('Constructed detail URL with route ID:', detailUrl);
+                    } else {
+                        // 如果无法找到线路ID，降级处理，使用线路名称作为备选
+                        console.warn('Failed to find route ID, using route name as fallback');
+                        detailUrl = `/routes/${encodeURIComponent(processedRouteName)}`;
+                        console.log('Constructed detail URL with route name fallback:', detailUrl);
+                    }
                     
-                    console.log('Using final route ID:', finalRouteId);
-                    console.log('Constructed detail URL:', detailUrl);
                     window.open(detailUrl, '_blank');
                 });
                 
@@ -2597,97 +2632,61 @@
         return null;
     }
     
-    // 根据线路名称查找线路ID
+    // 根据原始线路名查找对应的线路ID
     function findRouteIdByName(routeName) {
         // 调试日志
         console.log('=== findRouteIdByName called ===');
         console.log('Input routeName:', routeName);
         console.log('Total routes available:', routesData.length);
         
-        // 处理输入的线路名称
-        const originalSearchName = routeName.trim();
-        const searchName = originalSearchName.toLowerCase();
+        // 确保routesData是数组
+        if (!Array.isArray(routesData)) {
+            console.error('routesData is not an array');
+            return null;
+        }
         
-        // 直接匹配模式：只查找完全匹配的线路
-        // 这是最可靠的匹配方式，避免模糊匹配导致的错误
+        // 使用原始线路名直接匹配
+        const originalRouteName = routeName.trim();
+        
+        // 直接匹配模式：查找完全匹配的线路
         for (const route of routesData) {
-            if (route.name) {
-                // 处理线路数据中的名称
-                const routeNameFromData = route.name;
-                // 只比较核心线路名称（||前面的部分）
-                const coreRouteName = routeNameFromData.split('||')[0];
-                // 比较每种语言的名称
-                const languageNames = coreRouteName.split('|').map(part => part.trim().toLowerCase());
-                
-                // 检查是否有完全匹配
-                if (languageNames.includes(searchName)) {
+            if (route && route.name) {
+                // 检查线路名称是否完全匹配
+                if (route.name === originalRouteName) {
                     // 确保只返回一个ID，即使线路数据中包含多个ID
                     const singleId = String(route.id).split(',')[0].trim();
-                    console.log('Exact match found, returning single ID:', singleId);
+                    console.log('Exact match found with original route name, returning single ID:', singleId);
                     return singleId;
                 }
             }
         }
         
-        console.log('No exact match found, trying partial match...');
-        
-        // 如果没有找到完全匹配的线路，尝试更精确的部分匹配
-        let bestMatch = null;
-        let bestScore = 0;
-        
+        // 如果没有找到完全匹配，尝试使用核心线路名称（||前面的部分）匹配
+        const coreRouteName = originalRouteName.split('||')[0].trim();
         for (const route of routesData) {
-            if (route.name) {
-                const routeNameFromData = route.name;
-                const coreRouteName = routeNameFromData.split('||')[0];
-                const languageNames = coreRouteName.split('|').map(part => part.trim().toLowerCase());
-                const cleanRouteName = languageNames.join(' ');
-                
-                // 计算匹配评分
-                let score = 0;
-                
-                // 1. 搜索词完全匹配任何语言的线路名称
-                if (languageNames.includes(searchName)) {
-                    score += 100;
-                }
-                
-                // 2. 搜索词完全匹配清理后的线路名称
-                if (searchName === cleanRouteName) {
-                    score += 90;
-                }
-                
-                // 3. 搜索词是清理后线路名称的前缀
-                if (cleanRouteName.startsWith(searchName)) {
-                    score += 80;
-                }
-                
-                // 4. 清理后的线路名称是搜索词的前缀
-                if (searchName.startsWith(cleanRouteName)) {
-                    score += 70;
-                }
-                
-                // 5. 搜索词包含清理后的线路名称
-                if (searchName.includes(cleanRouteName)) {
-                    score += 60;
-                }
-                
-                // 6. 清理后的线路名称包含搜索词
-                if (cleanRouteName.includes(searchName)) {
-                    score += 50;
-                }
-                
-                // 更新最佳匹配
-                if (score > bestScore) {
-                    bestScore = score;
-                    bestMatch = route;
+            if (route && route.name) {
+                const routeCoreName = route.name.split('||')[0].trim();
+                if (routeCoreName === coreRouteName) {
+                    // 确保只返回一个ID，即使线路数据中包含多个ID
+                    const singleId = String(route.id).split(',')[0].trim();
+                    console.log('Core match found, returning single ID:', singleId);
+                    return singleId;
                 }
             }
         }
         
-        if (bestMatch) {
-            // 确保只返回一个ID，即使线路数据中包含多个ID
-            const singleId = String(bestMatch.id).split(',')[0].trim();
-            console.log('Best partial match found, returning single ID:', singleId);
-            return singleId;
+        // 如果没有找到完全匹配，尝试使用不区分大小写的核心线路名称匹配
+        const lowerCoreRouteName = coreRouteName.toLowerCase();
+        for (const route of routesData) {
+            if (route && route.name) {
+                const routeCoreName = route.name.split('||')[0].trim().toLowerCase();
+                if (routeCoreName === lowerCoreRouteName) {
+                    // 确保只返回一个ID，即使线路数据中包含多个ID
+                    const singleId = String(route.id).split(',')[0].trim();
+                    console.log('Case-insensitive core match found, returning single ID:', singleId);
+                    return singleId;
+                }
+            }
         }
         
         console.log('No match found for route:', routeName);
