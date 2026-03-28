@@ -30,15 +30,13 @@ app.secret_key = 'your-secret-key'
 # 全局进度跟踪变量
 search_progress = {
     'percentage': 0,
-    'stage': '初始化',
-    'message': '传入寻路参数...'
+    'stage': '初始化'
 }
 
 # 数据更新进度跟踪变量
 data_update_progress = {
     'percentage': 0,
-    'stage': '准备中...',
-    'message': '正在准备数据更新...'
+    'stage': '初始化'
 }
 
 # 寻路次数统计
@@ -1277,7 +1275,7 @@ def api_find_route():
     global search_progress
     search_progress = {
         'percentage': 0,
-        'stage': '寻路参数发送...'
+        'stage': '发送寻路参数'
     }
     
     # 声明全局变量
@@ -1322,8 +1320,7 @@ def api_find_route():
             # 更新进度
             search_progress.update({
                 'percentage': 33,
-                'stage': '寻路算法运行',
-                'message': '寻路计算-V4...'
+                'stage': '寻路计算-V4'
             })
             
             # 处理出发时间参数
@@ -1368,9 +1365,8 @@ def api_find_route():
             )
 
             search_progress.update({
-                'percentage': 45,
-                'stage': '寻路结果处理',
-                'message': '检查寻路结果...'
+                'percentage': 67,
+                'stage': '处理寻路结果'
             })
 
             # 检查寻路结果
@@ -1383,12 +1379,6 @@ def api_find_route():
             elif result_gen_image_false is None:
                 # 车站名称不正确
                 return jsonify({'error': '车站名称不正确，请检查输入'}), 400
-            
-            search_progress.update({
-                'percentage': 55,
-                'stage': '(4/8)寻路计算-V4',
-                'message': '提取路线详情列表...'
-            })
 
             # 提取路线详情列表
             every_route_time = result_gen_image_false
@@ -1462,13 +1452,6 @@ def api_find_route():
         else:
             # 使用v3版程序的寻路功能，直接调用main函数
             
-            # 更新进度
-            search_progress.update({
-                'percentage': 15,
-                'stage': '寻路计算-V3',
-                'message': '准备所需参数...'
-            })
-            
             # 构建调用main函数所需的参数
             LINK = config['LINK']
             LOCAL_FILE_PATH = config['LOCAL_FILE_PATH_V3']
@@ -1516,11 +1499,10 @@ def api_find_route():
             
             # 在调用寻路函数之前，检查缓存文件是否已经存在
             cache_file_existed_before = os.path.exists(filename)
-            
+
             search_progress.update({
-                'percentage': 20,
-                'stage': '寻路计算-V3',
-                'message': '调用寻路算法...'
+                'percentage': 33,
+                'stage': '寻路计算-V3'
             })
 
             # 调用mtr_pathfinder.py的main函数，gen_image=False
@@ -1553,9 +1535,8 @@ def api_find_route():
             )
             
             search_progress.update({
-                'percentage': 30,
-                'stage': '寻路计算-V3',
-                'message': '检查寻路结果...'
+                'percentage': 67,
+                'stage': '处理寻路结果'
             })
 
             # 检查寻路结果
@@ -1564,21 +1545,9 @@ def api_find_route():
                     return jsonify({'error': '找不到路线，请尝试调整选项'}), 400
                 else:
                     return jsonify({'error': '车站名称不正确，请检查输入'}), 400
-            
-            search_progress.update({
-                'percentage': 35,
-                'stage': '寻路计算-V3',
-                'message': '提取寻路结果...'
-            })
 
             # 提取main函数返回的数据
             ert, shortest_distance = result_gen_image_false
-            
-            search_progress.update({
-                'percentage': 40,
-                'stage': '寻路计算-V3',
-                'message': '检查寻路结果是否有效...'
-            })
 
             # 检查寻路结果是否有效
             if ert in [False, None]:
@@ -1586,18 +1555,6 @@ def api_find_route():
                     return jsonify({'error': '找不到路线，请尝试调整选项'}), 400
                 else:
                     return jsonify({'error': '车站名称不正确，请检查输入'}), 400
-            
-            search_progress.update({
-                'percentage': 55,
-                'stage': '寻路计算-V3',
-                'message': '设置寻路类型...'
-            })
-            
-            search_progress.update({
-                'percentage': 60,
-                'stage': '寻路计算-V3',
-                'message': '检查缓存使用状态...'
-            })
             
             # 检查是否使用了缓存
             # 只检查用户是否额外添加了禁路线，不考虑全局禁路线
@@ -1629,13 +1586,6 @@ def api_find_route():
             # 才认为使用了缓存
             # 这确保了只有当程序真正从缓存中读取数据时，才会被判定为使用缓存
             used_cache = cache_conditions_met and cache_file_existed_before
-            
-            # 更新进度
-            search_progress.update({
-                'percentage': 70,
-                'stage': '寻路计算-V3',
-                'message': '处理寻路结果...'
-            })
             
             # 重新获取完整的寻路结果，包括shortest_path、waiting_time和riding_time
             # 这里需要重新调用find_shortest_route，因为main函数(gen_image=False)没有返回这些信息
@@ -1738,12 +1688,6 @@ def api_find_route():
                     station_names.append(segment[3])  # 线路名称
                     station_names.append(segment[1])  # 终点站
 
-            search_progress.update({
-                'percentage': 80,
-                'stage': '寻路计算-V3',
-                'message': '构建用于前端展示的结果数组...'
-            })            
-
             # 构建用于前端展示的结果数组
             formatted_result = [
                 shortest_distance,  # 总用时 (元素0) - 来自main函数返回的shortest_distance
@@ -1752,13 +1696,6 @@ def api_find_route():
                 riding_time,  # 乘车时间 (元素3) - 所有线路的乘车时间之和
                 waiting_time  # 等车时间 (元素4) - 每个路线组的等待时间之和
             ]
-
-            # 更新进度
-            search_progress.update({
-                'percentage': 90,
-                'stage': '寻路计算-V3',
-                'message': '准备图片生成所需数据...'
-            })
 
             # 3. 将寻路结果和生成图片所需数据存储在缓存中，供后续图片生成使用
             # 生成唯一标识符
@@ -1787,8 +1724,7 @@ def api_find_route():
         # 更新进度为100%
         search_progress.update({
             'percentage': 100,
-            'stage': '完成',
-            'message': '路径计算完成'
+            'stage': '完成寻路计算'
         })
         
         # 计算寻路用时
@@ -2191,10 +2127,9 @@ def _update_data():
         # 1. 生成v3版程序所需的数据
         data_update_progress.update({
             'percentage': 20,
-            'stage': '数据更新',
-            'message': '正在生成V3版车站数据...'
-        })
-        print("正在生成V3版车站数据...")
+            'stage': '数据更新-V3原始数据'
+})
+        print("正在获取V3原始数据...")
         fetch_data_v3(
             config['LINK'],
             config['LOCAL_FILE_PATH_V3'],
@@ -2203,10 +2138,9 @@ def _update_data():
         
         data_update_progress.update({
             'percentage': 35,
-            'stage': '数据更新',
-            'message': '正在生成V3版间隔数据...'
-        })
-        print("正在生成V3版间隔数据...")
+            'stage': '数据更新-V3间隔数据'
+})
+        print("正在生成V3间隔数据...")
         gen_route_interval_v3(
             config['LOCAL_FILE_PATH_V3'],
             config['INTERVAL_PATH_V3'],
@@ -2217,10 +2151,9 @@ def _update_data():
         # 2. 生成v4版程序所需的数据
         data_update_progress.update({
             'percentage': 50,
-            'stage': '数据更新',
-            'message': '正在生成V4版车站数据...'
-        })
-        print("正在生成V4版车站数据...")
+            'stage': '数据更新-V4原始数据'
+})
+        print("正在获取V4原始数据...")
         fetch_data_v4(
             config['LINK'],
             config['LOCAL_FILE_PATH_V4'],
@@ -2229,10 +2162,9 @@ def _update_data():
         
         data_update_progress.update({
             'percentage': 65,
-            'stage': '数据更新',
-            'message': '正在生成V4版发车数据...'
-        })
-        print("正在生成V4版发车数据...")
+            'stage': '数据更新-V4发车数据'
+})
+        print("正在生成V4发车数据...")
         gen_departure_v4(
             config['LINK'],
             config['DEP_PATH_V4']
@@ -2241,9 +2173,8 @@ def _update_data():
         # 3. 生成时刻表数据文件
         data_update_progress.update({
             'percentage': 80,
-            'stage': '数据更新',
-            'message': '正在生成时刻表数据文件...'
-        })
+            'stage': '数据更新-时刻表数据'
+})
         print("正在生成时刻表数据文件...")
         
         # 直接生成时刻表数据，避免调用check_and_generate_data()带来的额外开销
@@ -2388,9 +2319,8 @@ def _update_data():
         
         data_update_progress.update({
             'percentage': 100,
-            'stage': '数据更新',
-            'message': '数据更新完成！'
-        })
+            'stage': '数据更新完成'
+})
         print("数据更新完成！")
         return True
     except Exception as e:
@@ -2415,8 +2345,7 @@ def api_update_data():
     global data_update_progress
     data_update_progress = {
         'percentage': 0,
-        'stage': '准备中...',
-        'message': '正在准备数据更新...'
+        'stage': '初始化',
     }
     
     try:
@@ -2427,17 +2356,15 @@ def api_update_data():
             # 数据更新完成
             data_update_progress.update({
                 'percentage': 100,
-                'stage': '完成',
-                'message': '数据更新完成！'
-            })
+                'stage': '完成'
+})
             return jsonify({'success': True})
         else:
             # 更新失败时设置错误状态
             data_update_progress.update({
                 'percentage': 0,
-                'stage': '错误',
-                'message': '数据更新失败'
-            })
+                'stage': '错误'
+})
             return jsonify({'error': '数据更新失败'}), 500
     except Exception as e:
         # 更新失败时设置错误状态

@@ -215,7 +215,7 @@
                             <span id="progress-percentage" style="color: var(--text-secondary);">0%</span>
                         </div>
                     </div>
-                    <div id="progress-message" class="text-center text-sm" style="color: var(--text-tertiary);"></div>
+
                 </div>
             </div>
             
@@ -747,7 +747,6 @@
     const progressBar = document.getElementById('progress-bar');
     const progressStage = document.getElementById('progress-stage');
     const progressPercentage = document.getElementById('progress-percentage');
-    const progressMessage = document.getElementById('progress-message');
     
     // 轮询相关变量
     let progressInterval = null;
@@ -758,9 +757,6 @@
         progressBar.style.width = `${progress.percentage}%`;
         progressStage.textContent = progress.stage;
         progressPercentage.textContent = `${progress.percentage}%`;
-        if (progress.message) {
-            progressMessage.textContent = progress.message;
-        }
     }
     
     // 开始轮询进度
@@ -773,8 +769,7 @@
         // 初始化进度
         updateProgress({
             percentage: 0,
-            stage: '准备中...',
-            message: '正在初始化寻路参数...'
+            stage: '准备中...'
         });
         
         // 开始轮询

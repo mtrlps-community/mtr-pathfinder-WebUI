@@ -168,7 +168,7 @@
                             <span id="progress-stage" style="color: var(--text-secondary);">准备中...</span>
                             <span id="progress-percentage" style="color: var(--text-secondary);">0%</span>
                         </div>
-                        <div id="progress-message" class="text-sm mt-1" style="color: var(--text-tertiary);"></div>
+
                     </div>
                     
                     <div id="update-status" class="mt-4 p-4 rounded-lg hidden"></div>
@@ -384,14 +384,10 @@
         const progressBar = document.getElementById('progress-bar');
         const progressStage = document.getElementById('progress-stage');
         const progressPercentage = document.getElementById('progress-percentage');
-        const progressMessage = document.getElementById('progress-message');
         
         progressBar.style.width = `${progress.percentage}%`;
         progressStage.textContent = progress.stage;
         progressPercentage.textContent = `${progress.percentage}%`;
-        if (progress.message) {
-            progressMessage.textContent = progress.message;
-        }
     }
     
     // 开始轮询更新进度
