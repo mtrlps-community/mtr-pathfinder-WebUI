@@ -29,11 +29,11 @@
                         <div>
                             <h4 class="font-semibold mb-2" style="color: var(--text-primary);">其他参数：</h4>
                             <ul class="list-disc pl-5 space-y-2" style="color: var(--text-secondary);">
-                                <li><strong style="color: var(--text-primary);">默认</strong> -> 实际能坐的最快路线（计算等车时间），以图片形式输出寻路结果</li>
-                                <li><strong style="color: var(--text-primary);">详细</strong> -> 输出详细信息，包括线路间隔以及每一站的等车时间</li>
+                                <li><strong style="color: var(--text-primary);">默认</strong> -> 实际能坐的最快路线（计算等车时间）</li>
+                                <li><strong style="color: var(--text-primary);">详细</strong> -> 输出详细信息，包括线路交路的发车间隔以及每一站的等车时间</li>
                                 <li><strong style="color: var(--text-primary);">理论</strong> -> 理论最快路线，不考虑线路上是否有车在跑</li>
                                 <li><strong style="color: var(--text-primary);">实时</strong> -> 实时寻路（仅适用于MTR 4.0服务器）</li>
-                                <li><strong style="color: var(--text-primary);">越野</strong> -> 允许在两个车站间步行，最大范围为 1500 格</li>
+                                <li><strong style="color: var(--text-primary);">越野</strong> -> 允许在两个车站间步行（出站换乘），默认最大范围为 1500 格</li>
                                 <li><strong style="color: var(--text-primary);">禁路线</strong> -> 禁止使用指定路线，可添加多条路线</li>
                                 <li><strong style="color: var(--text-primary);">仅路线</strong> -> 只能使用指定路线，可添加多条路线</li>
                                 <li><strong style="color: var(--text-primary);">禁车站</strong> -> 禁止经过指定车站，可添加多个车站</li>
@@ -65,7 +65,7 @@
                     </label>
                     <div class="relative">
                         <textarea id="start-station" name="start" class="form-input" placeholder="输入起点站名称" required></textarea>
-                        <div id="start-suggestions" class="absolute z-10 w-full rounded-md shadow-lg mt-1 hidden" style="background-color: var(--card-bg); border: 1px solid var(--border-color);"></div>
+                        <div id="start-suggestions" class="absolute z-10 w-full rounded-md shadow-lg mt-1 hidden" style="background-color: var(--card-bg); border: 1px solid var(--border-color); max-height: 200px; overflow-y: auto; box-shadow: var(--card-shadow);"></div>
                     </div>
                 </div>
                 
@@ -76,7 +76,7 @@
                     </label>
                     <div class="relative">
                         <textarea id="end-station" name="end" class="form-input" placeholder="输入终点站名称" required></textarea>
-                        <div id="end-suggestions" class="absolute z-10 w-full rounded-md shadow-lg mt-1 hidden" style="background-color: var(--card-bg); border: 1px solid var(--border-color);"></div>
+                        <div id="end-suggestions" class="absolute z-10 w-full rounded-md shadow-lg mt-1 hidden" style="background-color: var(--card-bg); border: 1px solid var(--border-color); max-height: 200px; overflow-y: auto; box-shadow: var(--card-shadow);"></div>
                     </div>
                 </div>
                 
@@ -156,7 +156,7 @@
                             <div class="algorithm-tab" data-index="1" data-value="theory">理论</div>
                             <div class="algorithm-tab" data-index="2" data-value="real">实时</div>
                         </div>
-                        <div class="mt-2 text-center font-medium text-blue-500" id="algorithm-display">考虑等车时间（V3-NetworkX）</div>
+                        <div class="mt-2 text-center font-medium text-blue-500" id="algorithm-display">考虑等车时间（V3-Dijkstra[NetworkX]）</div>
                         <input type="hidden" id="algorithm" name="algorithm" value="default">
                     </div>
                 </div>
@@ -257,8 +257,8 @@
 <script>
     // 算法映射
     const algorithmMap = [
-        { value: 'default', label: '考虑等车时间（V3-NetworkX）' },
-        { value: 'theory', label: '不考虑等车时间（V3-NetworkX）' },
+        { value: 'default', label: '考虑等车时间（V3-Dijkstra[NetworkX]）' },
+        { value: 'theory', label: '不考虑等车时间（V3-Dijkstra[NetworkX]）' },
         { value: 'real', label: '根据实时运行数据（V4-CSA）' }
     ];
     
@@ -327,7 +327,7 @@
                 detailCheckbox.checked = false;
             }
             algorithmInput.value = 'default';
-            algorithmDisplay.textContent = '考虑等车时间（V3-NetworkX）';
+            algorithmDisplay.textContent = '考虑等车时间（V3-Dijkstra[NetworkX]）';
             
             // 移除算法选项卡的active类
             document.querySelectorAll('.algorithm-tab').forEach(tab => {
@@ -386,7 +386,7 @@
                         break;
                     case '理论':
                         algorithmInput.value = 'theory';
-                        algorithmDisplay.textContent = '不考虑等车时间（V3-NetworkX）';
+                        algorithmDisplay.textContent = '不考虑等车时间（V3-Dijkstra[NetworkX]）';
                         document.querySelectorAll('.algorithm-tab').forEach(tab => {
                             tab.classList.remove('active');
                         });
@@ -683,9 +683,14 @@
                 if (data.length > 0) {
                     data.forEach(station => {
                         const div = document.createElement('div');
-                        div.className = 'px-4 py-2 cursor-pointer';
+                        div.className = 'station-suggestion-item';
                         div.textContent = station;
-                        div.style.transition = 'background-color 0.2s ease';
+                        div.style.padding = '6px 8px';
+                        div.style.cursor = 'pointer';
+                        div.style.borderBottom = '1px solid var(--border-color)';
+                        div.style.display = 'flex';
+                        div.style.alignItems = 'center';
+                        div.style.transition = 'background-color 0.2s';
                         div.style.color = 'var(--text-primary)';
                         div.onmouseenter = function() {
                             this.style.backgroundColor = 'var(--hover-bg)';

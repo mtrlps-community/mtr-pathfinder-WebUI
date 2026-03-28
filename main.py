@@ -1277,8 +1277,7 @@ def api_find_route():
     global search_progress
     search_progress = {
         'percentage': 0,
-        'stage': '初始化',
-        'message': '传入寻路参数...'
+        'stage': '寻路参数发送...'
     }
     
     # 声明全局变量
@@ -1301,13 +1300,6 @@ def api_find_route():
     # 初始化变量来存储实际使用的出发时间
     actual_departure_time = None
     
-    # 更新进度
-    search_progress.update({
-        'percentage': 5,
-        'stage': '数据验证',
-        'message': '检查数据文件是否存在...'
-    })
-    
     # 检查数据文件是否存在
     if algorithm == 'real':
         # 对于实时寻路，检查v4版本的数据文件
@@ -1322,13 +1314,6 @@ def api_find_route():
         if not os.path.exists(config['INTERVAL_PATH_V3']):
             return jsonify({'error': '间隔数据不存在，请先更新数据'}), 400
     
-    # 更新进度
-    search_progress.update({
-        'percentage': 10,
-        'stage': '算法判定',
-        'message': '根据传入参数选择相应的寻路算法...'
-    })
-    
     try:
         # 根据算法选择不同的寻路实现
         if algorithm == 'real':
@@ -1336,9 +1321,9 @@ def api_find_route():
             
             # 更新进度
             search_progress.update({
-                'percentage': 20,
-                'stage': '(1/8)寻路计算-V4',
-                'message': '处理出发时间...'
+                'percentage': 33,
+                'stage': '寻路算法运行',
+                'message': '寻路计算-V4...'
             })
             
             # 处理出发时间参数
@@ -1351,12 +1336,6 @@ def api_find_route():
             
             # 保存实际使用的出发时间
             actual_departure_time = dep_time_seconds
-            
-            search_progress.update({
-                'percentage': 25,
-                'stage': '(2/8)寻路计算-V4',
-                'message': '调用寻路算法...'
-            })
 
             # 1. 生成gen_image=False条件下的数组结果
             result_gen_image_false = mtr_main_v4(
@@ -1390,7 +1369,7 @@ def api_find_route():
 
             search_progress.update({
                 'percentage': 45,
-                'stage': '(3/8)寻路计算-V4',
+                'stage': '寻路结果处理',
                 'message': '检查寻路结果...'
             })
 
@@ -1413,12 +1392,6 @@ def api_find_route():
 
             # 提取路线详情列表
             every_route_time = result_gen_image_false
-            
-            search_progress.update({
-                'percentage': 60,
-                'stage': '(5/8)寻路计算-V4',
-                'message': '构建车站列表...'
-            })
 
             # 构建车站列表
             station_names = []
@@ -1432,12 +1405,6 @@ def api_find_route():
                         station_names.append(start_station)
                     station_names.append(route_name)
                     station_names.append(end_station)
-            
-            search_progress.update({
-                'percentage': 70,
-                'stage': '(6/8)寻路计算-V4',
-                'message': '计算总用时、乘车时间和等车时间...'
-            })
 
             # 计算总用时、乘车时间和等车时间
             if every_route_time:
@@ -1448,12 +1415,6 @@ def api_find_route():
                 total_time = 0
                 riding_time = 0
                 waiting_time = 0
-            
-            search_progress.update({
-                'percentage': 80,
-                'stage': '(7/8)寻路计算-V4',
-                'message': '构建用于前端展示的结果数组...'
-            })
 
             # 构建用于前端展示的结果数组
             formatted_result = [
@@ -1463,12 +1424,6 @@ def api_find_route():
                 riding_time,  # 乘车时间 (元素3)
                 waiting_time  # 等车时间 (元素4)
             ]
-            
-            search_progress.update({
-                'percentage': 90,
-                'stage': '(8/8)寻路计算-V4',
-                'message': '准备图片生成所需数据...'
-            })
             
             # 3. 将寻路结果和生成图片所需数据存储在缓存中，供后续图片生成使用
             # 生成唯一标识符
@@ -1944,14 +1899,14 @@ def api_search_stations():
         # 无效格式，返回空列表
         return jsonify([])
     
-    results = []
+    results = set()
     for station in stations:
         if query in station['name'].lower():
             # 将车站名称中的竖线替换为空格
             formatted_name = station['name'].replace('|', ' ')
-            results.append(formatted_name)
+            results.add(formatted_name)
     
-    return jsonify(results[:10])  # 限制返回10个结果
+    return jsonify(list(results))  # 返回去重后的匹配结果
 
 # 全局变量，用于存储最新生成的图片文件路径
 latest_image_path = ''
