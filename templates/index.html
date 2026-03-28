@@ -1662,9 +1662,29 @@
                 if (!isWalk && algorithm !== 'theory' && detail) {
                     // 非实时模式下显示发车间隔
                     if (algorithm !== 'real') {
+                        // 收集所有同名线路的发车间隔
+                        const departureIntervals = [];
+                        for (const route of sameNameRoutes) {
+                            let routeDepartureInterval = 0;
+                            if (route.length >= 9) {
+                                // v3版本 - 发车间隔在索引7位置
+                                routeDepartureInterval = route[7] || 0;
+                            }
+                            departureIntervals.push(routeDepartureInterval);
+                        }
+                        
+                        // 去重相同的发车间隔
+                        const uniqueIntervals = [...new Set(departureIntervals)];
+                        // 排序发车间隔
+                        const sortedIntervals = uniqueIntervals.sort((a, b) => a - b);
+                        // 格式化发车间隔为字符串
+                        const intervalStrings = sortedIntervals.map(interval => formatTime(interval));
+                        // 合并显示发车间隔
+                        const displayInterval = intervalStrings.join(' / ');
+                        
                         const intervalDiv = document.createElement('div');
                         intervalDiv.className = 'time-detail';
-                        intervalDiv.innerHTML = `<span><i class="fa-solid fa-clock-rotate-left mr-1"></i> 发车间隔</span><span class="time-value">${formatTime(departureInterval)}</span>`;
+                        intervalDiv.innerHTML = `<span><i class="fa-solid fa-clock-rotate-left mr-1"></i> 发车间隔</span><span class="time-value">${displayInterval}</span>`;
                         routeInfoDiv.appendChild(intervalDiv);
                     }
                 }
@@ -1688,8 +1708,13 @@
                     // 非实时模式，处理同名线路的乘车时间
                     if (ridingTimes.length > 1) {
                         // 有同名线路，显示所有乘车时间
-                        const sortedTimes = [...ridingTimes].sort((a, b) => a - b);
+                        // 去重相同的乘车时间
+                        const uniqueTimes = [...new Set(ridingTimes)];
+                        // 排序乘车时间
+                        const sortedTimes = uniqueTimes.sort((a, b) => a - b);
+                        // 格式化乘车时间为字符串
                         const timeStrings = sortedTimes.map(time => formatTime(time));
+                        // 合并显示乘车时间
                         displayTimeText = timeStrings.join(' / ');
                         // 使用最短乘车时间作为主要显示时间
                         finalRidingTime = sortedTimes[0];
@@ -1704,7 +1729,7 @@
                 finalRidingTime = algorithm === 'real' && lineRidingTime !== null ? lineRidingTime : duration;
                 displayTimeText = formatTime(finalRidingTime);
             }
-            durationDiv.innerHTML = `<span>${timeLabel}</span><span class="time-value">${displayTimeText}</span>`;
+            durationDiv.innerHTML = `<span style="white-space: nowrap;">${timeLabel}</span><span class="time-value">${displayTimeText}</span>`;
             routeInfoDiv.appendChild(durationDiv);
             
             // 如果有其他匹配的路线，显示"或"下拉选单
@@ -2141,20 +2166,67 @@
                         routeStep.appendChild(waitingTimeDiv);
                     }
                     
+                    // 收集所有同名路线的发车时间
+                    const departureTimes = [];
+                    // 获取当前线路的基本名称
+                    const currentRouteName = currentRouteDetail[3] || '';
+                    const currentBaseRouteName = getBaseRouteName(currentRouteName);
+                    
+                    // 遍历所有匹配的路线，收集同名线路的发车时间
+                    for (const route of matchedRouteDetails) {
+                        const routeName = route[3] || '';
+                        const baseRouteName = getBaseRouteName(routeName);
+                        if (baseRouteName === currentBaseRouteName) {
+                            const routeDepartureTime = route[5] || 0;
+                            departureTimes.push(routeDepartureTime);
+                        }
+                    }
+                    
+                    // 去重相同的发车时间
+                    const uniqueDepartureTimes = [...new Set(departureTimes)];
+                    // 排序发车时间
+                    const sortedDepartureTimes = uniqueDepartureTimes.sort((a, b) => a - b);
+                    // 格式化发车时间为字符串
+                    const departureTimeStrings = sortedDepartureTimes.map(time => formatTimestamp(time));
+                    // 合并显示发车时间
+                    const displayDepartureTime = departureTimeStrings.join(' / ');
+                    
                     // 显示线路前的发车时间
                     const departureTimeDiv = document.createElement('div');
                     departureTimeDiv.className = 'time-stamp route-departure-time';
-                    departureTimeDiv.textContent = `出站时间：${formatTimestamp(departureTime)}`;
+                    departureTimeDiv.textContent = `出站时间：${displayDepartureTime}`;
                     routeStep.appendChild(departureTimeDiv);
                     
                     // 传递计算的时间到buildRouteInfo函数
                     const routeInfoDiv = buildRouteInfo(currentRouteDetail, matchedRouteDetails, waitingTime, nonWalkRoutesCount, algorithm, detail, lineRidingTime, lineWaitingTime);
                     routeStep.appendChild(routeInfoDiv);
                     
+                    // 收集所有同名路线的到站时间
+                    const arrivalTimes = [];
+                    
+                    // 遍历所有匹配的路线，收集同名线路的到站时间
+                    for (const route of matchedRouteDetails) {
+                        const routeName = route[3] || '';
+                        const baseRouteName = getBaseRouteName(routeName);
+                        if (baseRouteName === currentBaseRouteName) {
+                            const routeArrivalTime = route[6] || 0;
+                            arrivalTimes.push(routeArrivalTime);
+                        }
+                    }
+                    
+                    // 去重相同的到站时间
+                    const uniqueArrivalTimes = [...new Set(arrivalTimes)];
+                    // 排序到站时间
+                    const sortedArrivalTimes = uniqueArrivalTimes.sort((a, b) => a - b);
+                    // 格式化到站时间为字符串
+                    const arrivalTimeStrings = sortedArrivalTimes.map(time => formatTimestamp(time));
+                    // 合并显示到站时间
+                    const displayArrivalTime = arrivalTimeStrings.join(' / ');
+                    
                     // 显示线路后的到站时间
                     const arrivalTimeDiv = document.createElement('div');
                     arrivalTimeDiv.className = 'time-stamp route-arrival-time';
-                    arrivalTimeDiv.textContent = `到站时间：${formatTimestamp(arrivalTime)}`;
+                    arrivalTimeDiv.textContent = `到站时间：${displayArrivalTime}`;
                     routeStep.appendChild(arrivalTimeDiv);
                 } else {
                     // 非实时模式，使用原来的时间计算
