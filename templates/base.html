@@ -556,7 +556,7 @@
         
         .route-info {
             margin-bottom: 12px;
-            border-left: 4px solid;
+            border-left: 6px solid;
             padding-left: 12px;
             border-radius: 0;
         }
@@ -625,6 +625,38 @@
             margin-top: 2px;
             font-size: 0.85rem;
             color: var(--text-primary);
+        }
+        
+        /* 统一的标签样式，用于线路类型和站台编号 */
+        .route-tag-label {
+            margin-left: 8px;
+            opacity: 0.8;
+            padding: 1px 6px;
+            background-color: var(--bg-tertiary);
+            color: var(--text-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-size: 0.85em;
+            font-family: inherit;
+            line-height: normal;
+            white-space: nowrap;
+            display: inline-flex;
+            align-items: center;
+        }
+        
+        /* 站台编号标签 - 正常粗细 */
+        .station-info-label {
+            font-weight: normal;
+        }
+        
+        /* 线路类型标签 - 粗体 */
+        .line-type-label {
+            font-weight: bold;
+        }
+        
+        /* 确保字号统一 */
+        .route-name {
+            font-size: 1em;
         }
         
         .direction-indicator::before {
