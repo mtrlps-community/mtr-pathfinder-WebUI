@@ -1,0 +1,14 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="card">
+    <h2 class="text-2xl font-bold mb-4">错误</h2>
+    <div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded relative" role="alert">
+        <strong class="font-bold">错误信息：</strong>
+        <span class="block sm:inline">{{ message or '发生了一个未知错误' }}</span>
+    </div>
+    <div class="mt-6">
+        <a href="/" class="btn-primary">返回首页</a>
+    </div>
+</div>
+{% endblock %}

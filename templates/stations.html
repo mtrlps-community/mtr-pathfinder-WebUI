@@ -4,7 +4,7 @@
 <div class="card">
     <h2 class="text-2xl font-bold mb-6">车站列表 <span class="text-sm text-gray-500 font-normal">（共 {{ stations|length }} 个车站）</span></h2>
     
-    <!-- 搜索和排序 -->
+    <!-- 搜索、排序和显示选项 -->
     <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
         <div class="relative w-full md:w-64">
             <textarea id="station-search" placeholder="搜索车站名称" class="form-input pl-10"></textarea>
@@ -20,6 +20,9 @@
             </select>
             <button id="sort-direction" class="btn-secondary">
                 <i class="fa-solid fa-sort-amount-asc"></i>
+            </button>
+            <button id="toggle-id-display" class="btn-secondary">
+                <i class="fa-solid fa-eye-slash"></i> 显示ID
             </button>
         </div>
     </div>
@@ -92,6 +95,8 @@
     let sortDirection = 'asc';
     // 控制是否显示所有车站
     let showAllStations = false;
+    // 控制是否显示ID
+    let showId = false;
     // 每页显示数量
     const stationsPerPage = 100;
     
@@ -126,10 +131,16 @@
     // 渲染表格 - 显示所有数据
     function renderTable() {
         const tbody = document.getElementById('station-table-body');
+        const theadIdTh = document.querySelector('table thead th.col-id');
         
         if (!tbody) {
             console.error('Table body element not found');
             return;
+        }
+        
+        // 控制ID列的显示和隐藏
+        if (theadIdTh) {
+            theadIdTh.style.display = showId ? 'table-cell' : 'none';
         }
         
         if (!filteredStations || filteredStations.length === 0) {
@@ -149,11 +160,11 @@
             // 生成表格行
             let rows = stationsToDisplay.map(station => `
                 <tr>
-                    <td class="col-id whitespace-nowrap" style="width: 150px;">
+                    <td class="col-id whitespace-nowrap" style="width: 150px; display: ${showId ? 'table-cell' : 'none'};">
                         ${station.id || 'N/A'}
                     </td>
                     <td class="col-name font-medium">
-                        <a href="/stations/${station.id || 'N/A'}">
+                        <a href="/stations/${String(station.id || '').split(',')[0].trim()}">
                             ${station.name || 'N/A'}
                         </a>
                     </td>
@@ -195,6 +206,20 @@
         }
     }
     
+    // 切换ID显示状态
+    function toggleIdDisplay() {
+        showId = !showId;
+        const toggleBtn = document.getElementById('toggle-id-display');
+        if (toggleBtn) {
+            const icon = toggleBtn.querySelector('i');
+            if (icon) {
+                icon.className = showId ? 'fa-solid fa-eye' : 'fa-solid fa-eye-slash';
+            }
+            toggleBtn.innerHTML = `<i class="fa-solid fa-${showId ? 'eye' : 'eye-slash'}"></i> ${showId ? '隐藏' : '显示'}ID`;
+        }
+        renderTable();
+    }
+    
     // 排序功能
     document.addEventListener('DOMContentLoaded', function() {
         // 搜索事件监听
@@ -231,6 +256,15 @@
         } else {
             console.error('Sort direction button not found');
         }
+        
+        // 切换ID显示按钮事件监听
+        const toggleIdBtn = document.getElementById('toggle-id-display');
+        if (toggleIdBtn) {
+            toggleIdBtn.addEventListener('click', toggleIdDisplay);
+        }
+        
+        // 初始渲染时隐藏ID列
+        renderTable();
     });
     
     function sortStations() {

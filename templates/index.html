@@ -29,11 +29,11 @@
                         <div>
                             <h4 class="font-semibold mb-2" style="color: var(--text-primary);">其他参数：</h4>
                             <ul class="list-disc pl-5 space-y-2" style="color: var(--text-secondary);">
-                                <li><strong style="color: var(--text-primary);">默认</strong> -> 实际能坐的最快路线（计算等车时间），以图片形式输出寻路结果</li>
-                                <li><strong style="color: var(--text-primary);">详细</strong> -> 输出详细信息，包括线路间隔以及每一站的等车时间</li>
+                                <li><strong style="color: var(--text-primary);">默认</strong> -> 实际能坐的最快路线（计算等车时间）</li>
+                                <li><strong style="color: var(--text-primary);">详细</strong> -> 输出详细信息，包括线路交路的发车间隔以及每一站的等车时间</li>
                                 <li><strong style="color: var(--text-primary);">理论</strong> -> 理论最快路线，不考虑线路上是否有车在跑</li>
                                 <li><strong style="color: var(--text-primary);">实时</strong> -> 实时寻路（仅适用于MTR 4.0服务器）</li>
-                                <li><strong style="color: var(--text-primary);">越野</strong> -> 允许在两个车站间步行，最大范围为 1500 格</li>
+                                <li><strong style="color: var(--text-primary);">越野</strong> -> 允许在两个车站间步行（出站换乘），默认最大范围为 1500 格</li>
                                 <li><strong style="color: var(--text-primary);">禁路线</strong> -> 禁止使用指定路线，可添加多条路线</li>
                                 <li><strong style="color: var(--text-primary);">仅路线</strong> -> 只能使用指定路线，可添加多条路线</li>
                                 <li><strong style="color: var(--text-primary);">禁车站</strong> -> 禁止经过指定车站，可添加多个车站</li>
@@ -65,7 +65,7 @@
                     </label>
                     <div class="relative">
                         <textarea id="start-station" name="start" class="form-input" placeholder="输入起点站名称" required></textarea>
-                        <div id="start-suggestions" class="absolute z-10 w-full rounded-md shadow-lg mt-1 hidden" style="background-color: var(--card-bg); border: 1px solid var(--border-color);"></div>
+                        <div id="start-suggestions" class="absolute z-10 w-full rounded-md shadow-lg mt-1 hidden" style="background-color: var(--card-bg); border: 1px solid var(--border-color); max-height: 200px; overflow-y: auto; box-shadow: var(--card-shadow);"></div>
                     </div>
                 </div>
                 
@@ -76,7 +76,7 @@
                     </label>
                     <div class="relative">
                         <textarea id="end-station" name="end" class="form-input" placeholder="输入终点站名称" required></textarea>
-                        <div id="end-suggestions" class="absolute z-10 w-full rounded-md shadow-lg mt-1 hidden" style="background-color: var(--card-bg); border: 1px solid var(--border-color);"></div>
+                        <div id="end-suggestions" class="absolute z-10 w-full rounded-md shadow-lg mt-1 hidden" style="background-color: var(--card-bg); border: 1px solid var(--border-color); max-height: 200px; overflow-y: auto; box-shadow: var(--card-shadow);"></div>
                     </div>
                 </div>
                 
@@ -156,7 +156,7 @@
                             <div class="algorithm-tab" data-index="1" data-value="theory">理论</div>
                             <div class="algorithm-tab" data-index="2" data-value="real">实时</div>
                         </div>
-                        <div class="mt-2 text-center font-medium text-blue-500" id="algorithm-display">考虑等车时间（V3-NetworkX）</div>
+                        <div class="mt-2 text-center font-medium text-blue-500" id="algorithm-display">考虑等车时间（V3-Dijkstra[NetworkX]）</div>
                         <input type="hidden" id="algorithm" name="algorithm" value="default">
                     </div>
                 </div>
@@ -215,7 +215,7 @@
                             <span id="progress-percentage" style="color: var(--text-secondary);">0%</span>
                         </div>
                     </div>
-                    <div id="progress-message" class="text-center text-sm" style="color: var(--text-tertiary);"></div>
+
                 </div>
             </div>
             
@@ -257,8 +257,8 @@
 <script>
     // 算法映射
     const algorithmMap = [
-        { value: 'default', label: '考虑等车时间（V3-NetworkX）' },
-        { value: 'theory', label: '不考虑等车时间（V3-NetworkX）' },
+        { value: 'default', label: '考虑等车时间（V3-Dijkstra[NetworkX]）' },
+        { value: 'theory', label: '不考虑等车时间（V3-Dijkstra[NetworkX]）' },
         { value: 'real', label: '根据实时运行数据（V4-CSA）' }
     ];
     
@@ -327,7 +327,7 @@
                 detailCheckbox.checked = false;
             }
             algorithmInput.value = 'default';
-            algorithmDisplay.textContent = '考虑等车时间（V3-NetworkX）';
+            algorithmDisplay.textContent = '考虑等车时间（V3-Dijkstra[NetworkX]）';
             
             // 移除算法选项卡的active类
             document.querySelectorAll('.algorithm-tab').forEach(tab => {
@@ -386,7 +386,7 @@
                         break;
                     case '理论':
                         algorithmInput.value = 'theory';
-                        algorithmDisplay.textContent = '不考虑等车时间（V3-NetworkX）';
+                        algorithmDisplay.textContent = '不考虑等车时间（V3-Dijkstra[NetworkX]）';
                         document.querySelectorAll('.algorithm-tab').forEach(tab => {
                             tab.classList.remove('active');
                         });
@@ -683,9 +683,14 @@
                 if (data.length > 0) {
                     data.forEach(station => {
                         const div = document.createElement('div');
-                        div.className = 'px-4 py-2 cursor-pointer';
+                        div.className = 'station-suggestion-item';
                         div.textContent = station;
-                        div.style.transition = 'background-color 0.2s ease';
+                        div.style.padding = '6px 8px';
+                        div.style.cursor = 'pointer';
+                        div.style.borderBottom = '1px solid var(--border-color)';
+                        div.style.display = 'flex';
+                        div.style.alignItems = 'center';
+                        div.style.transition = 'background-color 0.2s';
                         div.style.color = 'var(--text-primary)';
                         div.onmouseenter = function() {
                             this.style.backgroundColor = 'var(--hover-bg)';
@@ -742,7 +747,6 @@
     const progressBar = document.getElementById('progress-bar');
     const progressStage = document.getElementById('progress-stage');
     const progressPercentage = document.getElementById('progress-percentage');
-    const progressMessage = document.getElementById('progress-message');
     
     // 轮询相关变量
     let progressInterval = null;
@@ -753,9 +757,6 @@
         progressBar.style.width = `${progress.percentage}%`;
         progressStage.textContent = progress.stage;
         progressPercentage.textContent = `${progress.percentage}%`;
-        if (progress.message) {
-            progressMessage.textContent = progress.message;
-        }
     }
     
     // 开始轮询进度
@@ -768,8 +769,7 @@
         // 初始化进度
         updateProgress({
             percentage: 0,
-            stage: '准备中...',
-            message: '正在初始化寻路参数...'
+            stage: '准备中...'
         });
         
         // 开始轮询
@@ -807,6 +807,71 @@
         });
     }
     
+    // 用于跟踪重试次数，避免无限循环
+    let retryCount = 0;
+    const maxRetries = 3;
+    
+    // 寻路请求函数，支持重试
+    async function findRouteWithRetry(data) {
+        try {
+            // 发送请求
+            const response = await fetch('/api/find_route', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(data)
+            });
+            
+            const resultData = await response.json();
+            
+            // 检查结果
+            if (response.ok) {
+                if (resultData.result) {
+                    // 解析结果
+                    const routeResult = resultData.result;
+                    const algorithm = resultData.algorithm;
+                    const calcTime = resultData.calc_time;
+                    const dataVersions = resultData.data_versions;
+                    const usedCache = resultData.used_cache;
+                    const imageId = resultData.image_id;
+                    const departureTime = resultData.departure_time; // 从API响应中获取实际使用的出发时间
+                    
+                    // 检查是否需要重试（仅实时模式）
+                    if (algorithm === 'real' && routeResult[2] && routeResult[2].length > 0) {
+                        // 获取第一条线路的出站时间
+                        const firstRouteDeparture = routeResult[2][0][5] || 0;
+                        
+                        // 检查出发时间是否晚于第一条线路的出站时间
+                        if (departureTime > firstRouteDeparture && retryCount < maxRetries) {
+                            retryCount++;
+                            // 递归调用，重试寻路
+                            return findRouteWithRetry(data);
+                        }
+                    }
+                    
+                    // 显示结果，传递实际使用的出发时间
+                displayResultInternal(routeResult, algorithm, calcTime, dataVersions, usedCache, data.detail, imageId, departureTime);
+                } else {
+                    // 无结果
+                    noResult.classList.remove('hidden');
+                }
+            } else {
+                // API返回错误状态码
+                error.textContent = resultData.error || '网络错误，请稍后重试';
+                error.classList.remove('hidden');
+            }
+        } catch (err) {
+            // 网络错误或其他异常
+            console.error('寻路请求错误详情:', err);
+            error.textContent = `寻路请求错误: ${err.message || '网络错误，请稍后重试'}`;
+            error.classList.remove('hidden');
+        } finally {
+            // 隐藏加载状态
+            loading.classList.add('hidden');
+        }
+    }
+    
     routeForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         
@@ -832,12 +897,16 @@
         
         // 收集表单数据
         const formData = new FormData(routeForm);
+        
+        // 获取表单值，处理null情况
+        const getFormValue = (key) => formData.get(key) || '';
+        
         const data = {
             start: formData.get('start'),
             end: formData.get('end'),
-            ignored_lines: formData.get('ignored_lines').split(',').map(s => s.trim()).filter(Boolean),
-            only_lines: formData.get('only_lines').split(',').map(s => s.trim()).filter(Boolean),
-            avoid_stations: formData.get('avoid_stations').split(',').map(s => s.trim()).filter(Boolean),
+            ignored_lines: getFormValue('ignored_lines').split(/[,;；]/).map(s => s.trim()).filter(Boolean),
+            only_lines: getFormValue('only_lines').split(/[,;；]/).map(s => s.trim()).filter(Boolean),
+            avoid_stations: getFormValue('avoid_stations').split(/[,;；]/).map(s => s.trim()).filter(Boolean),
             disable_high_speed: formData.get('disable_high_speed') === 'on',
             disable_boat: formData.get('disable_boat') === 'on',
             enable_wild: formData.get('enable_wild') === 'on',
@@ -861,26 +930,26 @@
         
         try {
             // 转换禁路线、仅路线和禁车站的分隔符为逗号，以适应API要求
-            data.ignored_lines = formData.get('ignored_lines').split(/[,;；]/).map(s => s.trim()).filter(Boolean);
-            data.only_lines = formData.get('only_lines').split(/[,;；]/).map(s => s.trim()).filter(Boolean);
-            data.avoid_stations = formData.get('avoid_stations').split(/[,;；]/).map(s => s.trim()).filter(Boolean);
-            
+            data.ignored_lines = getFormValue('ignored_lines').split(/[,;；]/).map(s => s.trim()).filter(Boolean);
+            data.only_lines = getFormValue('only_lines').split(/[,;；]/).map(s => s.trim()).filter(Boolean);
+            data.avoid_stations = getFormValue('avoid_stations').split(/[,;；]/).map(s => s.trim()).filter(Boolean);
+        
             // 重置重试计数器
             retryCount = 0;
             
             // 使用带重试机制的寻路请求函数
             await findRouteWithRetry(data);
         } catch (err) {
-            // 停止轮询
-            if (progressInterval) {
-                clearInterval(progressInterval);
+                // 停止轮询
+                if (progressInterval) {
+                    clearInterval(progressInterval);
+                }
+                
+                // 显示详细错误信息
+                console.error('错误详情:', err);
+                error.textContent = `错误: ${err.message || '网络错误，请稍后重试'}`;
+                error.classList.remove('hidden');
             }
-            
-            // 显示错误
-            error.textContent = '网络错误，请稍后重试';
-            error.classList.remove('hidden');
-            console.error('寻路错误:', err);
-        }
     });
     
     // 格式化时间戳为HH:MM:SS格式
@@ -892,83 +961,22 @@
     }
     
     // 显示结果
-        // 用于跟踪重试次数，避免无限循环
-        let retryCount = 0;
-        const maxRetries = 3;
+    function displayResultInternal(routeResult, algorithm, calcTime, dataVersions, usedCache, detail, imageId, departureTime) {
+        result.classList.remove('hidden');
         
-        // 寻路请求函数，支持重试
-        async function findRouteWithRetry(data) {
-            try {
-                // 发送请求
-                const response = await fetch('/api/find_route', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(data)
-                });
-                
-                const resultData = await response.json();
-                
-                // 检查结果
-                if (response.ok && resultData.result) {
-                    // 解析结果
-                    const routeResult = resultData.result;
-                    const algorithm = resultData.algorithm;
-                    const calcTime = resultData.calc_time;
-                    const dataVersions = resultData.data_versions;
-                    const usedCache = resultData.used_cache;
-                    const imageId = resultData.image_id;
-                    const departureTime = resultData.departure_time; // 从API响应中获取实际使用的出发时间
-                    
-                    // 检查是否需要重试（仅实时模式）
-                    if (algorithm === 'real' && routeResult[2] && routeResult[2].length > 0) {
-                        // 获取第一条线路的出站时间
-                        const firstRouteDeparture = routeResult[2][0][5] || 0;
-                        
-                        // 检查出发时间是否晚于第一条线路的出站时间
-                        if (departureTime > firstRouteDeparture && retryCount < maxRetries) {
-                            retryCount++;
-                            console.log(`检测到出发时间（${departureTime}）晚于第一条线路出站时间（${firstRouteDeparture}），正在重试...（${retryCount}/${maxRetries}）`);
-                            // 递归调用，重试寻路
-                            return findRouteWithRetry(data);
-                        }
-                    }
-                    
-                    // 显示结果，传递实际使用的出发时间
-                    displayResultInternal(routeResult, algorithm, calcTime, dataVersions, usedCache, data.detail, imageId, departureTime);
-                } else {
-                    // 无结果或错误
-                    noResult.classList.remove('hidden');
-                }
-            } catch (err) {
-                // 网络错误
-                console.error('寻路错误:', err);
-                error.textContent = '网络错误，请稍后重试';
-                error.classList.remove('hidden');
-            } finally {
-                // 隐藏加载状态
-                loading.classList.add('hidden');
-            }
-        }
+        // 解析routeresult数组，添加默认值处理
+        const totalTime = routeResult[0] || 0; // 总用时 (元素0, 秒)
+        const travelingTime = routeResult[3] || 0; // 乘车时间 (元素3, 秒)
+        const waitingTime = routeResult[4] || 0; // 等车时间 (元素4, 秒)
         
-        // 内部显示结果函数
-        function displayResultInternal(routeResult, algorithm, calcTime, dataVersions, usedCache, detail, imageId, departureTime) {
-            result.classList.remove('hidden');
-            
-            // 解析routeresult数组，添加默认值处理
-            const totalTime = routeResult[0] || 0; // 总用时 (元素0, 秒)
-            const travelingTime = routeResult[3] || 0; // 乘车时间 (元素3, 秒)
-            const waitingTime = routeResult[4] || 0; // 等车时间 (元素4, 秒)
-            
-            // 确保stationNames是数组
-            const stationNames = Array.isArray(routeResult[1]) ? routeResult[1] : [];
-            
-            // 确保routeDetails是数组，避免TypeError
-            const routeDetails = Array.isArray(routeResult[2]) ? routeResult[2] : [];
-            
-            // 设置全局变量，用于后续更新总用时
-            window.currentRouteData = routeResult;
+        // 确保stationNames是数组
+        const stationNames = Array.isArray(routeResult[1]) ? routeResult[1] : [];
+        
+        // 确保routeDetails是数组，避免TypeError
+        const routeDetails = Array.isArray(routeResult[2]) ? routeResult[2] : [];
+        
+        // 设置全局变量，用于后续更新总用时
+        window.currentRouteData = routeResult;
         
         // 处理结果图片
         const imageLoading = document.getElementById('image-loading');
@@ -998,7 +1006,7 @@
         timeInfoDiv.className = 'time-info';
         timeInfoDiv.id = 'time-info';
         
-        // 构建时间网格内容，理论模式下只显示总用时
+        // 构建时间网格内容
         let timeGridContent = `
             <div class="time-grid ${algorithm === 'theory' ? 'theory-mode' : ''}">
                 <div class="time-item total-time">
@@ -1010,7 +1018,8 @@
                 </div>
         `;
         
-        // 非理论模式下显示乘车时间和等车时间
+        // 默认和实时模式下显示乘车时间和等车时间，跟是否开启详细选项无关
+        // 理论模式下不显示乘车时间和等车时间
         if (algorithm !== 'theory') {
             timeGridContent += `
                 <div class="time-item traveling-time">
@@ -1143,6 +1152,24 @@
             return name;
         }
         
+        // 辅助函数：提取线路的基本名称，用于检测同名线路
+        function getBaseRouteName(routeName) {
+            if (typeof routeName === 'string') {
+                // 去除方向信息和其他后缀
+                let baseName = routeName;
+                // 去除 || 后面的方向信息
+                if (baseName.includes('||')) {
+                    baseName = baseName.split('||')[0];
+                }
+                // 只保留线路名称，去除 | 分隔的中英文（保留第一个）
+                if (baseName.includes('|')) {
+                    baseName = baseName.split('|')[0];
+                }
+                return baseName.trim();
+            }
+            return routeName;
+        }
+        
         // 函数：重新计算并更新总用时
         function updateTotalTime() {
             let totalTravelingTime = 0;
@@ -1203,25 +1230,30 @@
             
             // 解析路线详细信息，添加默认值
             // 路线详情数组结构：
-            // v3: [起点, 终点, 颜色, 路线名, 终点站信息, 时长, 等车时间, 发车间隔, 交通类型, 站台编号, 原始路线名]
-            // v4(实时模式): [起点, 终点, 颜色, 路线名, 终点站信息, 时长, 等车时间, 交通类型, 站台编号, 原始路线名] (与v3保持一致)
+            // v3: [起点, 终点, 颜色, 路线名, 终点站信息, 时长, 等车时间, 发车间隔, 交通类型, 站台编号, [route_id, station_1, station_2], ban_route_string]
+            // v4(实时模式): [起点, 终点, 颜色, 路线名, 终点站信息, 时长, 等车时间, 交通类型, 站台编号, 原始路线名]
             let originalRouteName = '';
             let platform = '';
             let departureInterval = 0;
+            let routeIdFromData = null;
             
             // 使用更灵活的方式解析，适应不同长度的routeDetail数组
             if (routeDetail.length >= 12) {
                 // v3版本 - 完整格式，包含禁路线字符串
-                var [, , color = '#4a90e2', routeName = '', terminus = '', duration = 0, segmentWaitingTime = 0, depInterval = 0, trainType = 'train_normal', plat = '', extraInfo = '', banRouteString = ''] = routeDetail;
-                // v3版本中，原始路线名在索引10位置
-                originalRouteName = routeDetail[10] || routeName;
+                var [, , color = '#4a90e2', routeName = '', terminus = '', duration = 0, segmentWaitingTime = 0, depInterval = 0, trainType = 'train_normal', plat = '', routeInfo = null, banRouteString = ''] = routeDetail;
+                // v3版本中，路线信息在索引10位置，是一个数组：[route_id, station_1, station_2]
+                if (Array.isArray(routeInfo)) {
+                    routeIdFromData = routeInfo[0];
+                }
                 platform = plat;
                 departureInterval = depInterval;
             } else if (routeDetail.length >= 11) {
                 // v3版本 - 完整格式（旧版本，没有禁路线字符串）
-                var [, , color = '#4a90e2', routeName = '', terminus = '', duration = 0, segmentWaitingTime = 0, depInterval = 0, trainType = 'train_normal', plat = '', extraInfo = ''] = routeDetail;
-                // v3版本中，原始路线名在索引10位置
-                originalRouteName = routeDetail[10] || routeName;
+                var [, , color = '#4a90e2', routeName = '', terminus = '', duration = 0, segmentWaitingTime = 0, depInterval = 0, trainType = 'train_normal', plat = '', routeInfo = null] = routeDetail;
+                // v3版本中，路线信息在索引10位置，是一个数组：[route_id, station_1, station_2]
+                if (Array.isArray(routeInfo)) {
+                    routeIdFromData = routeInfo[0];
+                }
                 platform = plat;
                 departureInterval = depInterval;
                 banRouteString = '';
@@ -1233,8 +1265,10 @@
                 // 尝试提取站台编号，不管数组长度如何
                 // 对于v4版本，站台编号在第9个位置（索引8）
                 platform = routeDetail[8] || '';
-                // v4版本中，原始路线名在索引9位置
-                originalRouteName = routeDetail[9] || routeName;
+                // v4版本中，索引9是原始路线名
+                if (routeDetail.length > 9) {
+                    originalRouteName = routeDetail[9];
+                }
                 banRouteString = '';
             }
             
@@ -1253,7 +1287,13 @@
             // 确保等车时间不为负数
             const displayWaitingTime = Math.max(segmentWaitingTime, 0);
             
-            // 只有非步行路线、不是理论模式且在详细模式下才显示等车时间
+            // 初始化合并后的乘车时间为当前路线的乘车时间
+            let displayRidingTime = duration;
+            
+            // 初始化同名线路的乘车时间数组，确保在所有情况下都有定义
+            let ridingTimes = [];
+            
+            // 非步行路线、非理论模式且详细模式下显示等车时间
             // 实时模式下的等车时间已经显示在出站时间上方
             if (!isWalk && algorithm !== 'theory' && detail) {
                 // 非实时模式下显示等车时间
@@ -1273,14 +1313,16 @@
                 routeInfoDiv.appendChild(waitingDiv);
             }
             
-            // 创建路线标签，使用正确的颜色
+            // 设置路线信息左侧边框颜色
+            routeInfoDiv.style.borderLeftColor = color;
+            
+            // 创建路线标签，使用透明背景色
             const routeTag = document.createElement('div');
             routeTag.className = 'route-tag';
-            routeTag.style.backgroundColor = color;
+            routeTag.style.backgroundColor = 'transparent';
             
-            // 根据背景色自动计算文字颜色
-            const textColor = getContrastTextColor(color);
-            routeTag.style.color = textColor;
+            // 使用主题默认文字颜色
+            routeTag.style.color = 'var(--text-primary)';
             
             // 获取交通图标 - 步行路线强制使用步行图标
             const effectiveTrainType = isWalk ? 'walk' : trainType;
@@ -1291,82 +1333,140 @@
             routeTag.innerHTML = '';
             routeTag.style.display = 'flex';
             routeTag.style.alignItems = 'center';
-            routeTag.style.justifyContent = isWalk ? 'flex-start' : 'space-between';
+            routeTag.style.justifyContent = 'space-between';
+            
+            // 右侧按钮组容器
+            const rightButtons = document.createElement('div');
+            rightButtons.style.display = 'flex';
+            rightButtons.style.alignItems = 'center';
+            rightButtons.style.gap = '0'; // 按钮之间没有间隙
+            rightButtons.style.marginLeft = 'auto'; // 确保按钮组靠右对齐
             
             // 路线信息左侧内容
             const routeLeftContent = document.createElement('div');
             routeLeftContent.style.display = 'flex';
             routeLeftContent.style.alignItems = 'center';
             
-            // 步行路线不显示括号内的交通类型
-            if (isWalk) {
-                routeLeftContent.innerHTML = `
-                    ${transportIcon}
-                    <span class="route-name">${processedRouteName}</span>
-                `;
-            } else {
-                routeLeftContent.innerHTML = `
-                    ${transportIcon}
-                    <span class="route-name">${processedRouteName}</span>
-                    <span style="margin-left: 8px; opacity: 0.8; padding: 1px 6px; background-color: #e5e7eb; color: #374151; border: 1px solid #d1d5db; border-radius: 4px; font-size: 0.85em;">${transportName}</span>
-                `;
-            }
+            // 添加交通图标
+            const iconSpan = document.createElement('span');
+            iconSpan.innerHTML = transportIcon;
+            routeLeftContent.appendChild(iconSpan);
             
-            // 路线信息右侧内容（站台显示）
-            const routeRightContent = document.createElement('div');
-            routeRightContent.style.display = 'flex';
-            routeRightContent.style.alignItems = 'center';
-            routeRightContent.style.justifyContent = 'flex-end';
-            routeRightContent.style.flex = '1';
-            routeRightContent.style.gap = '8px';
+            // 添加路线名称
+            const routeNameSpan = document.createElement('span');
+            routeNameSpan.className = 'route-name';
+            routeNameSpan.textContent = processedRouteName;
+            routeLeftContent.appendChild(routeNameSpan);
             
-            // 显示站台编号
-            if (platform && platform.trim() !== '') {
-                routeRightContent.innerHTML = `
-                    <span class="station-info" style="opacity: 0.9; font-size: 0.85rem; font-weight: lighter;">站台 ${platform}</span>
-                `;
-            } else {
-                routeRightContent.innerHTML = `
-                    <span class="station-info" style="opacity: 0.9; font-size: 0.85rem; font-weight: lighter;"></span>
-                `;
-            }
-            
-            // 直接添加内容到routeTag
-            routeTag.appendChild(routeLeftContent);
-            routeTag.appendChild(routeRightContent);
-            
-            // 非步行路线才添加叉按钮
+            // 非步行路线添加线路类型
             if (!isWalk) {
+                // 直接使用与站台编号完全相同的样式创建线路类型
+                const lineTypeSpan = document.createElement('span');
+                lineTypeSpan.style.marginLeft = '8px';
+                lineTypeSpan.style.opacity = '0.8';
+                lineTypeSpan.style.padding = '1px 6px';
+                lineTypeSpan.style.backgroundColor = 'var(--bg-tertiary)';
+                lineTypeSpan.style.color = 'var(--text-secondary)';
+                lineTypeSpan.style.border = '1px solid var(--border-color)';
+                lineTypeSpan.style.borderRadius = '4px';
+                lineTypeSpan.style.fontSize = '12px'; // 直接使用像素大小，确保完全一致
+                lineTypeSpan.style.fontWeight = 'bold'; // 线路类型使用粗体
+                lineTypeSpan.style.whiteSpace = 'nowrap';
+                lineTypeSpan.textContent = transportName;
+                routeLeftContent.appendChild(lineTypeSpan);
+            }
+            
+            // 暂时不直接添加到routeTag，稍后和右侧按钮一起添加
+            
+            // 非步行路线才添加详情和叉按钮
+            if (!isWalk) {
+                // 添加详情按钮
+                const routeDetailBtn = document.createElement('button');
+                routeDetailBtn.className = 'detail-btn route-detail-btn';
+                routeDetailBtn.innerHTML = '<i class="fa-solid fa-circle-info"></i>';
+                
+                // 存储当前路线信息到按钮元素
+                // 优先使用从路线信息中提取的routeIdFromData，如果没有则使用线路名称
+                const currentRouteId = routeIdFromData || routeName;
+                routeDetailBtn.dataset.routeId = currentRouteId;
+                
+                // 点击事件：在新标签页中打开线路详情
+                routeDetailBtn.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    // 从按钮元素获取路线ID
+                    const routeId = this.dataset.routeId;
+                    console.log('Route button clicked, raw routeId:', routeId);
+                    
+                    let detailUrl;
+                    let finalRouteId = null;
+                    
+                    // 1. 首先检查routeId是否已经是有效的线路ID（直接从数据中获取的）
+                    if (routeId && routeId !== routeName) {
+                        // 如果routeId不是线路名称，直接使用
+                        finalRouteId = String(routeId).split(',')[0].trim();
+                        console.log('Using provided route ID:', finalRouteId);
+                    } else {
+                        // 2. 使用v4原程序返回的原始线路名查找对应的线路ID
+                        console.log('Route ID is route name, trying to find actual ID using findRouteIdByName...');
+                        // 优先使用originalRouteName（从routeDetail[9]获取的原始路线名）
+                        if (originalRouteName) {
+                            finalRouteId = findRouteIdByName(originalRouteName);
+                            if (finalRouteId) {
+                                console.log('Found actual route ID using original route name from routeDetail[9]:', finalRouteId);
+                            } else {
+                                console.log('Failed to find route ID with original route name from routeDetail[9], trying with routeName...');
+                                // 如果originalRouteName查找失败，尝试使用routeName
+                                finalRouteId = findRouteIdByName(routeName);
+                                if (finalRouteId) {
+                                    console.log('Found actual route ID using routeName:', finalRouteId);
+                                } else {
+                                    // 如果还是找不到，尝试使用处理后的线路名
+                                    console.log('Failed to find route ID with routeName, trying with processed route name...');
+                                    finalRouteId = findRouteIdByName(processedRouteName);
+                                    if (finalRouteId) {
+                                        console.log('Found actual route ID using processed route name:', finalRouteId);
+                                    }
+                                }
+                            }
+                        } else {
+                            // 如果没有originalRouteName，尝试使用routeName
+                            finalRouteId = findRouteIdByName(routeName);
+                            if (finalRouteId) {
+                                console.log('Found actual route ID using routeName:', finalRouteId);
+                            } else {
+                                // 如果还是找不到，尝试使用处理后的线路名
+                                console.log('Failed to find route ID with routeName, trying with processed route name...');
+                                finalRouteId = findRouteIdByName(processedRouteName);
+                                if (finalRouteId) {
+                                    console.log('Found actual route ID using processed route name:', finalRouteId);
+                                }
+                            }
+                        }
+                    }
+                    
+                    // 构建最终的URL
+                    if (finalRouteId) {
+                        // 使用查找到的线路ID构建链接
+                        detailUrl = `/routes/${encodeURIComponent(finalRouteId)}`;
+                        console.log('Constructed detail URL with route ID:', detailUrl);
+                    } else {
+                        // 如果无法找到线路ID，降级处理，使用线路名称作为备选
+                        console.warn('Failed to find route ID, using route name as fallback');
+                        detailUrl = `/routes/${encodeURIComponent(processedRouteName)}`;
+                        console.log('Constructed detail URL with route name fallback:', detailUrl);
+                    }
+                    
+                    window.open(detailUrl, '_blank');
+                });
+                
+                // 添加到右侧按钮组容器
+                rightButtons.appendChild(routeDetailBtn);
+                
                 // 添加叉按钮
                 const routeCloseBtn = document.createElement('button');
-                routeCloseBtn.className = 'route-close-btn';
+                routeCloseBtn.className = 'close-btn route-close-btn';
                 routeCloseBtn.innerHTML = '&times;';
-                routeCloseBtn.style.cssText = `
-                    background: none;
-                    border: none;
-                    width: auto;
-                    height: auto;
-                    cursor: pointer;
-                    font-size: 1rem;
-                    line-height: 1;
-                    padding: 0.8px;
-                    opacity: 0.7;
-                    transition: color 0.2s;
-                    margin-left: 8px;
-                `;
                 
-                // 确保按钮文字颜色与线路标签一致
-                routeCloseBtn.style.color = textColor;
-                
-                // 悬停效果
-                routeCloseBtn.addEventListener('mouseenter', function() {
-                    this.style.opacity = 1;
-                    this.style.color = '#ef4444';
-                });
-                routeCloseBtn.addEventListener('mouseleave', function() {
-                    this.style.opacity = 0.7;
-                    this.style.color = textColor;
-                });
                 
                 // 点击事件：添加到禁路线
                 routeCloseBtn.addEventListener('click', function(e) {
@@ -1410,12 +1510,96 @@
                     }
                 });
                 
-                routeTag.appendChild(routeCloseBtn);
+                // 添加到右侧按钮组容器
+                rightButtons.appendChild(routeCloseBtn);
             }
+            
+            // 将左侧内容和右侧按钮组添加到routeTag
+            routeTag.appendChild(routeLeftContent);
+            routeTag.appendChild(rightButtons);
             routeInfoDiv.appendChild(routeTag);
             
-            // 只有非步行路线才显示方向指示器
+            // 只有非步行路线才显示方向指示器和站台信息
             if (!isWalk) {
+                // 创建一个容器，将站台编号和方向指示器放在同一行
+                const infoContainer = document.createElement('div');
+                infoContainer.style.display = 'flex';
+                infoContainer.style.alignItems = 'center';
+                infoContainer.style.flexWrap = 'nowrap';
+                
+                // 检测同名线路，合并它们的站台、方向和乘车时间信息
+                const currentBaseRouteName = getBaseRouteName(routeName);
+                const sameNameRoutes = [routeDetail];
+                
+                // 遍历所有匹配的路线，寻找同名线路
+                for (const otherRoute of matchedRouteDetails) {
+                    if (otherRoute !== routeDetail) {
+                        const otherRouteName = otherRoute[3] || '';
+                        const otherBaseRouteName = getBaseRouteName(otherRouteName);
+                        if (otherBaseRouteName === currentBaseRouteName) {
+                            sameNameRoutes.push(otherRoute);
+                        }
+                    }
+                }
+                
+                // 收集所有同名路线的乘车时间
+                ridingTimes = [];
+                for (const route of sameNameRoutes) {
+                    // 从路线详情中获取乘车时间
+                    const routeDuration = route[5] || 0;
+                    ridingTimes.push(routeDuration);
+                }
+                
+                // 处理合并后的乘车时间
+                if (ridingTimes.length > 1) {
+                    // 如果有多个乘车时间，使用最短乘车时间
+                    displayRidingTime = Math.min(...ridingTimes);
+                }
+                
+                // 处理站台信息 - 合并所有同名线路的站台编号
+                const platformInfo = [];
+                if (sameNameRoutes.length > 1) {
+                    // 有同名线路，合并站台信息
+                    for (const route of sameNameRoutes) {
+                        let routePlatform = '';
+                        if (route.length >= 10) {
+                            // v3版本 - 站台编号在索引9位置
+                            routePlatform = route[9] || '';
+                        } else if (route.length >= 9) {
+                            // v4版本 - 站台编号在索引8位置
+                            routePlatform = route[8] || '';
+                        }
+                        if (routePlatform && routePlatform.trim() !== '') {
+                            platformInfo.push(routePlatform);
+                        }
+                    }
+                } else {
+                    // 只有一条线路，使用当前线路的站台编号
+                    if (platform && platform.trim() !== '') {
+                        platformInfo.push(platform);
+                    }
+                }
+                
+                // 显示合并后的站台编号，去重后显示
+                if (platformInfo.length > 0) {
+                    // 去重站台编号
+                    const uniquePlatforms = [...new Set(platformInfo)];
+                    // 直接使用与线路类型完全相同的样式创建站台编号，包括粗体
+                    const platformSpan = document.createElement('span');
+                    platformSpan.style.marginLeft = '8px';
+                    platformSpan.style.opacity = '0.8';
+                    platformSpan.style.padding = '1px 6px';
+                    platformSpan.style.backgroundColor = 'var(--bg-tertiary)';
+                    platformSpan.style.color = 'var(--text-secondary)';
+                    platformSpan.style.border = '1px solid var(--border-color)';
+                    platformSpan.style.borderRadius = '4px';
+                    platformSpan.style.fontSize = '12px'; // 使用与线路类型完全相同的像素大小
+                    platformSpan.style.fontWeight = 'bold'; // 站台编号使用粗体，与线路类型完全一致
+                    platformSpan.style.whiteSpace = 'nowrap';
+                    platformSpan.textContent = `站台 ${uniquePlatforms.join('、')}`;
+                    infoContainer.appendChild(platformSpan);
+                }
+                
                 // 显示方向指示器（终点站）
                 // terminus 的格式可能是：
                 //   - 普通路线：("终点站中文", "终点站英文") 元组
@@ -1423,10 +1607,15 @@
                 //   - 字符串格式
                 const directionIndicator = document.createElement('div');
                 directionIndicator.className = 'direction-indicator';
+                directionIndicator.style.display = 'inline-block';
+                directionIndicator.style.marginLeft = '8px';
+                directionIndicator.style.whiteSpace = 'normal';
+                directionIndicator.style.flex = '1';
+                directionIndicator.style.minWidth = '0';
                 
                 let terminusDisplay = '';
                 
-                // 在JavaScript中，Python元组会被转换为数组，所以直接检查是否为数组
+                // 处理当前线路的终点站信息
                 if (Array.isArray(terminus)) {
                     if (terminus.length >= 2) {
                         if (terminus[0] === true && terminus.length >= 3) {
@@ -1468,17 +1657,110 @@
                     terminusDisplay = formattedTerminus;
                 }
                 
-                directionIndicator.textContent = terminusDisplay;
-                routeInfoDiv.appendChild(directionIndicator);
+                // 如果有同名线路，合并它们的方向信息
+                if (sameNameRoutes.length > 1) {
+                    const additionalDirections = [];
+                    for (const route of sameNameRoutes) {
+                        if (route !== routeDetail) {
+                            let otherTerminus = route[4] || '';
+                            let otherTerminusDisplay = '';
+                            
+                            if (Array.isArray(otherTerminus)) {
+                                if (otherTerminus.length >= 2) {
+                                    if (otherTerminus[0] === true && otherTerminus.length >= 3) {
+                                        // 环线格式：[true, "环线中文", "环线英文"]
+                                        const otherTerminus1 = formatTerminusName(otherTerminus[1]);
+                                        const otherTerminus2 = formatTerminusName(otherTerminus[2]);
+                                        otherTerminusDisplay = `${otherTerminus1} ${otherTerminus2}`;
+                                    } else {
+                                        // 普通路线：["终点站中文", "终点站英文"]
+                                        const otherTerminus1 = formatTerminusName(otherTerminus[0]);
+                                        const otherTerminus2 = formatTerminusName(otherTerminus[1]);
+                                        otherTerminusDisplay = `${otherTerminus1} ${otherTerminus2}`;
+                                    }
+                                }
+                            } else if (typeof otherTerminus === 'object' && otherTerminus !== null) {
+                                // 处理对象格式（如果有的话）
+                                const keys = Object.keys(otherTerminus);
+                                if (keys.length >= 2) {
+                                    if (otherTerminus[0] === true && keys.length >= 3) {
+                                        // 环线格式：{0: true, 1: "环线中文", 2: "环线英文"}
+                                        const otherTerminus1 = formatTerminusName(otherTerminus[1]);
+                                        const otherTerminus2 = formatTerminusName(otherTerminus[2]);
+                                        otherTerminusDisplay = `${otherTerminus1} ${otherTerminus2}`;
+                                    } else {
+                                        // 普通路线：{0: "终点站中文", 1: "终点站英文"}
+                                        const otherTerminus1 = formatTerminusName(otherTerminus[0]);
+                                        const otherTerminus2 = formatTerminusName(otherTerminus[1]);
+                                        otherTerminusDisplay = `${otherTerminus1} ${otherTerminus2}`;
+                                    }
+                                }
+                            } else if (typeof otherTerminus === 'string') {
+                                // 字符串格式，可能包含 | 分隔符
+                                const formattedOtherTerminus = formatTerminusName(otherTerminus);
+                                otherTerminusDisplay = formattedOtherTerminus;
+                            }
+                            
+                            if (otherTerminusDisplay && otherTerminusDisplay !== terminusDisplay) {
+                                additionalDirections.push(otherTerminusDisplay);
+                            }
+                        }
+                    }
+                    
+                    // 如果有其他方向，合并显示
+                    if (additionalDirections.length > 0) {
+                        // 去重
+                        const uniqueDirections = [...new Set(additionalDirections)];
+                        if (uniqueDirections.length > 0) {
+                            terminusDisplay += ` / ${uniqueDirections.join(' / ')}`;
+                        }
+                    }
+                }
                 
-                // 只有非步行路线、不是理论模式且在详细模式下才显示发车间隔
+                directionIndicator.textContent = terminusDisplay;
+                infoContainer.appendChild(directionIndicator);
+                routeInfoDiv.appendChild(infoContainer);
+                
+                // 从 matchedRouteDetails 中移除同名线路，避免它们显示在"或"路线中
+                if (sameNameRoutes.length > 1) {
+                    for (const sameRoute of sameNameRoutes) {
+                        if (sameRoute !== routeDetail) {
+                            const index = matchedRouteDetails.indexOf(sameRoute);
+                            if (index > -1) {
+                                matchedRouteDetails.splice(index, 1);
+                            }
+                        }
+                    }
+                }
+                
+                // 只有非步行路线、非理论模式且在详细模式下才显示发车间隔
                 // 实时模式下的等车时间已经显示在出站时间上方
                 if (!isWalk && algorithm !== 'theory' && detail) {
                     // 非实时模式下显示发车间隔
                     if (algorithm !== 'real') {
+                        // 收集所有同名线路的发车间隔
+                        const departureIntervals = [];
+                        for (const route of sameNameRoutes) {
+                            let routeDepartureInterval = 0;
+                            if (route.length >= 9) {
+                                // v3版本 - 发车间隔在索引7位置
+                                routeDepartureInterval = route[7] || 0;
+                            }
+                            departureIntervals.push(routeDepartureInterval);
+                        }
+                        
+                        // 去重相同的发车间隔
+                        const uniqueIntervals = [...new Set(departureIntervals)];
+                        // 排序发车间隔
+                        const sortedIntervals = uniqueIntervals.sort((a, b) => a - b);
+                        // 格式化发车间隔为字符串
+                        const intervalStrings = sortedIntervals.map(interval => formatTime(interval));
+                        // 合并显示发车间隔
+                        const displayInterval = intervalStrings.join(' / ');
+                        
                         const intervalDiv = document.createElement('div');
                         intervalDiv.className = 'time-detail';
-                        intervalDiv.innerHTML = `<span><i class="fa-solid fa-clock-rotate-left mr-1"></i> 发车间隔</span><span class="time-value">${formatTime(departureInterval)}</span>`;
+                        intervalDiv.innerHTML = `<span><i class="fa-solid fa-clock-rotate-left mr-1"></i> 发车间隔</span><span class="time-value">${displayInterval}</span>`;
                         routeInfoDiv.appendChild(intervalDiv);
                     }
                 }
@@ -1488,19 +1770,173 @@
             const durationDiv = document.createElement('div');
             durationDiv.className = 'time-detail';
             const timeLabel = isWalk ? '<i class="fa-regular fa-clock mr-1"></i> 步行时间' : '<i class="fa-regular fa-clock mr-1"></i> 乘车时间';
-            // 实时模式使用计算的乘车时间，否则使用原始duration
-            const displayRidingTime = algorithm === 'real' && lineRidingTime !== null ? lineRidingTime : duration;
-            durationDiv.innerHTML = `<span>${timeLabel}</span><span class="time-value">${formatTime(displayRidingTime)}</span>`;
+            // 实时模式使用计算的乘车时间，否则使用合并后的乘车时间
+            let finalRidingTime = duration;
+            let displayTimeText = '';
+            
+            if (!isWalk) {
+                // 非步行路线处理
+                if (algorithm === 'real' && lineRidingTime !== null) {
+                    // 实时模式使用计算的乘车时间
+                    finalRidingTime = lineRidingTime;
+                    displayTimeText = formatTime(finalRidingTime);
+                } else {
+                    // 非实时模式，处理同名线路的乘车时间
+                    if (ridingTimes.length > 1) {
+                        // 有同名线路，显示所有乘车时间
+                        // 去重相同的乘车时间
+                        const uniqueTimes = [...new Set(ridingTimes)];
+                        // 排序乘车时间
+                        const sortedTimes = uniqueTimes.sort((a, b) => a - b);
+                        // 格式化乘车时间为字符串
+                        const timeStrings = sortedTimes.map(time => formatTime(time));
+                        // 合并显示乘车时间
+                        displayTimeText = timeStrings.join(' / ');
+                        // 使用最短乘车时间作为主要显示时间
+                        finalRidingTime = sortedTimes[0];
+                    } else {
+                        // 只有一条线路，显示单一乘车时间
+                        finalRidingTime = displayRidingTime;
+                        displayTimeText = formatTime(finalRidingTime);
+                    }
+                }
+            } else {
+                // 步行路线使用原始duration
+                finalRidingTime = algorithm === 'real' && lineRidingTime !== null ? lineRidingTime : duration;
+                displayTimeText = formatTime(finalRidingTime);
+            }
+            durationDiv.innerHTML = `<span style="white-space: nowrap;">${timeLabel}</span><span class="time-value">${displayTimeText}</span>`;
             routeInfoDiv.appendChild(durationDiv);
             
-            // 如果有其他匹配的路线，显示"或"选项
+            // 如果有其他匹配的路线，显示"或"下拉选单
             if (matchedRouteDetails.length > 1) {
                 const otherRoutesDiv = document.createElement('div');
                 otherRoutesDiv.className = 'other-routes';
-                otherRoutesDiv.innerHTML = '<div class="other-routes-label">或</div>';
+                otherRoutesDiv.style.display = 'flex';
+                otherRoutesDiv.style.alignItems = 'center';
                 
-                const otherRoutesList = document.createElement('div');
-                otherRoutesList.className = 'other-routes-list';
+                // 添加或标签
+                const orLabel = document.createElement('div');
+                orLabel.className = 'other-routes-label';
+                orLabel.textContent = '或';
+                otherRoutesDiv.appendChild(orLabel);
+                
+                // 创建自定义下拉选单容器
+                const dropdownContainer = document.createElement('div');
+                dropdownContainer.className = 'other-routes-dropdown';
+                dropdownContainer.style.position = 'relative';
+                dropdownContainer.style.display = 'inline-block';
+                otherRoutesDiv.appendChild(dropdownContainer);
+                
+                // 计算下拉选单所需的最大宽度
+                let maxContentWidth = 0;
+                const tempContainer = document.createElement('div');
+                tempContainer.style.visibility = 'hidden';
+                tempContainer.style.position = 'absolute';
+                tempContainer.style.display = 'flex';
+                tempContainer.style.alignItems = 'center';
+                tempContainer.style.fontSize = '0.85rem';
+                document.body.appendChild(tempContainer);
+                
+                // 创建临时元素用于测量
+                const tempRouteName = document.createElement('span');
+                tempRouteName.style.fontSize = '0.85rem';
+                tempRouteName.style.whiteSpace = 'nowrap';
+                tempContainer.appendChild(tempRouteName);
+                
+                const tempTransportType = document.createElement('span');
+                tempTransportType.style.marginLeft = '8px';
+                tempTransportType.style.opacity = '0.8';
+                tempTransportType.style.padding = '1px 6px';
+                tempTransportType.style.fontSize = '0.75em';
+                tempTransportType.style.whiteSpace = 'nowrap';
+                tempContainer.appendChild(tempTransportType);
+                
+                // 遍历所有路线，计算最大宽度
+                for (let j = 0; j < matchedRouteDetails.length; j++) {
+                    const otherRoute = matchedRouteDetails[j];
+                    let otherRouteName = otherRoute[3] || '';
+                    if (otherRouteName.includes('||')) {
+                        otherRouteName = otherRouteName.split('||')[0];
+                    }
+                    otherRouteName = otherRouteName.replace('|', ' ').trim();
+                    
+                    // 获取交通类型
+                    const effectiveTrainType = otherRoute[8] || otherRoute[9] || ''; // 交通类型在v3是索引8，v4是索引9
+                    const otherTransportName = getTransportName(effectiveTrainType);
+                    
+                    // 测量线路名称和交通类型的总宽度
+                    tempRouteName.textContent = otherRouteName;
+                    tempTransportType.textContent = otherTransportName;
+                    
+                    // 加上图标、颜色条和内边距的宽度（80px = 图标+颜色条+内边距+箭头+额外空间）
+                    const routeWidth = tempContainer.offsetWidth + 80;
+                    if (routeWidth > maxContentWidth) {
+                        maxContentWidth = routeWidth;
+                    }
+                }
+                
+                // 清理临时元素
+                document.body.removeChild(tempContainer);
+                
+                // 确保有合理的最小宽度
+                const minWidth = 200; // 增加最小宽度，确保下拉菜单有足够空间
+                
+                // 计算合适的最大宽度
+                // 获取结果展示框的宽度（整个结果卡片的宽度）
+                const resultContainer = document.getElementById('result');
+                const resultCard = resultContainer.closest('.card');
+                const resultCardWidth = resultCard.offsetWidth;
+                // 计算内容最大宽度为结果展示框宽度减去85px
+                const contentMaxWidth = resultCardWidth - 85;
+                
+                // 确保宽度在合理范围内
+                maxContentWidth = Math.max(maxContentWidth, minWidth); // 不小于最小宽度
+                maxContentWidth = Math.min(maxContentWidth, contentMaxWidth); // 不大于计算的最大宽度
+                
+                // 创建下拉选单显示区域
+                const dropdownDisplay = document.createElement('div');
+                dropdownDisplay.className = 'other-routes-display';
+                dropdownDisplay.style.padding = '2px 6px';
+                dropdownDisplay.style.border = '1px solid var(--border-color)';
+                dropdownDisplay.style.borderRadius = '4px';
+                dropdownDisplay.style.cursor = 'pointer';
+                dropdownDisplay.style.backgroundColor = 'var(--card-bg)';
+                dropdownDisplay.style.width = `${maxContentWidth}px`;
+                dropdownDisplay.style.display = 'flex';
+                dropdownDisplay.style.alignItems = 'center';
+                dropdownDisplay.style.justifyContent = 'space-between';
+                dropdownContainer.appendChild(dropdownDisplay);
+                
+                // 添加下拉选单显示文本
+                const dropdownText = document.createElement('span');
+                dropdownText.textContent = `其他${matchedRouteDetails.length - 1}条线路`;
+                dropdownText.style.fontSize = '0.85rem';
+                dropdownDisplay.appendChild(dropdownText);
+                
+                // 添加下拉图标
+                const dropdownIcon = document.createElement('i');
+                dropdownIcon.className = 'fa-solid fa-chevron-down';
+                dropdownIcon.style.marginLeft = '8px';
+                dropdownIcon.style.fontSize = '0.75rem';
+                dropdownDisplay.appendChild(dropdownIcon);
+                
+                // 创建下拉选项列表，默认隐藏
+                const dropdownList = document.createElement('div');
+                dropdownList.className = 'other-routes-dropdown-list';
+                dropdownList.style.position = 'absolute';
+                dropdownList.style.top = '100%';
+                dropdownList.style.left = '0';
+                dropdownList.style.zIndex = '1000';
+                dropdownList.style.width = `${maxContentWidth}px`;
+                dropdownList.style.backgroundColor = 'var(--card-bg)';
+                dropdownList.style.border = '1px solid var(--border-color)';
+                dropdownList.style.borderRadius = '4px';
+                dropdownList.style.boxShadow = 'var(--card-shadow)';
+                dropdownList.style.maxHeight = '200px';
+                dropdownList.style.overflowY = 'auto';
+                dropdownList.style.display = 'none';
+                dropdownContainer.appendChild(dropdownList);
                 
                 // 遍历其他匹配的路线
                 for (let j = 0; j < matchedRouteDetails.length; j++) {
@@ -1520,14 +1956,37 @@
                     }
                     processedOtherRouteName = processedOtherRouteName.replace('|', ' ').trim();
                     
-                    // 创建其他路线标签
-                    const otherRouteTag = document.createElement('div');
-                    otherRouteTag.className = 'other-route-tag';
-                    otherRouteTag.style.backgroundColor = otherColor;
+                    // 创建下拉选项
+                    const dropdownOption = document.createElement('div');
+                    dropdownOption.className = 'other-routes-dropdown-option';
+                    dropdownOption.style.padding = '6px 8px';
+                    dropdownOption.style.cursor = 'pointer';
+                    dropdownOption.style.borderBottom = '1px solid var(--border-color)';
+                    dropdownOption.style.display = 'flex';
+                    dropdownOption.style.alignItems = 'center';
+                    dropdownOption.style.transition = 'background-color 0.2s';
                     
-                    // 根据背景色自动计算文字颜色
-                    const otherTextColor = getContrastTextColor(otherColor);
-                    otherRouteTag.style.color = otherTextColor;
+                    // 添加选项悬停效果
+                    dropdownOption.addEventListener('mouseenter', function() {
+                        this.style.backgroundColor = 'var(--hover-bg)';
+                    });
+                    dropdownOption.addEventListener('mouseleave', function() {
+                        this.style.backgroundColor = 'transparent';
+                    });
+                    
+                    // 创建路线标签，保留原有样式
+                    const routeTag = document.createElement('div');
+                    routeTag.style.display = 'flex';
+                    routeTag.style.alignItems = 'center';
+                    routeTag.style.width = '100%';
+                    
+                    // 添加路线标志色竖线
+                    const colorBar = document.createElement('div');
+                    colorBar.style.width = '3px';
+                    colorBar.style.height = '20px';
+                    colorBar.style.backgroundColor = otherColor;
+                    colorBar.style.marginRight = '8px';
+                    routeTag.appendChild(colorBar);
                     
                     // 检查是否为步行路线
                     const otherIsWalk = otherTrainType === 'walk' || processedOtherRouteName.toLowerCase().includes('walk') || processedOtherRouteName.includes('步行');
@@ -1537,34 +1996,67 @@
                     const otherTransportIcon = getTransportIcon(effectiveOtherTrainType);
                     const otherTransportName = getTransportName(effectiveOtherTrainType);
                     
-                    // 步行路线不显示括号内的交通类型
-                    if (otherIsWalk) {
-                        otherRouteTag.innerHTML = `
-                            ${otherTransportIcon}
-                            <span class="other-route-name">${processedOtherRouteName}</span>
-                        `;
-                    } else {
-                        otherRouteTag.innerHTML = `
-                            ${otherTransportIcon}
-                            <span class="other-route-name">${processedOtherRouteName}</span>
-                            <span style="margin-left: 4px; opacity: 0.8; padding: 1px 6px; background-color: #e5e7eb; color: #374151; border: 1px solid #d1d5db; border-radius: 4px; font-size: 0.85em;">${otherTransportName}</span>
-                        `;
+                    // 添加交通图标
+                    const iconDiv = document.createElement('div');
+                    iconDiv.innerHTML = otherTransportIcon;
+                    iconDiv.style.marginRight = '4px';
+                    routeTag.appendChild(iconDiv);
+                    
+                    // 添加路线名称
+                    const routeNameSpan = document.createElement('span');
+                    routeNameSpan.textContent = processedOtherRouteName;
+                    routeNameSpan.style.flex = '1';
+                    routeNameSpan.style.fontSize = '0.85rem';
+                    routeTag.appendChild(routeNameSpan);
+                    
+                    // 非步行路线添加交通类型标识
+                    if (!otherIsWalk) {
+                        const transportSpan = document.createElement('span');
+                        transportSpan.style.marginLeft = '4px';
+                        transportSpan.style.opacity = '0.8';
+                        transportSpan.style.padding = '1px 6px';
+                        transportSpan.style.backgroundColor = 'var(--bg-tertiary)';
+                        transportSpan.style.color = 'var(--text-secondary)';
+                        transportSpan.style.border = '1px solid var(--border-color)';
+                        transportSpan.style.borderRadius = '4px';
+                        transportSpan.style.fontSize = '0.75em';
+                        transportSpan.textContent = otherTransportName;
+                        routeTag.appendChild(transportSpan);
                     }
                     
+                    // 添加路线到选项
+                    dropdownOption.appendChild(routeTag);
+                    
                     // 添加点击事件
-                    otherRouteTag.addEventListener('click', function() {
+                    dropdownOption.addEventListener('click', function() {
                         // 重新构建路线信息
                         const newRouteInfo = buildRouteInfo(otherRoute, matchedRouteDetails, totalWaitingTime, nonWalkRoutesCount, algorithm, detail);
                         // 替换当前路线信息
                         routeInfoDiv.parentNode.replaceChild(newRouteInfo, routeInfoDiv);
                         // 更新总用时
                         updateTotalTime();
+                        // 关闭下拉菜单
+                        dropdownList.style.display = 'none';
                     });
                     
-                    otherRoutesList.appendChild(otherRouteTag);
+                    dropdownList.appendChild(dropdownOption);
                 }
                 
-                otherRoutesDiv.appendChild(otherRoutesList);
+                // 添加下拉选单显示/隐藏事件
+                dropdownDisplay.addEventListener('click', function() {
+                    const isVisible = dropdownList.style.display === 'block';
+                    dropdownList.style.display = isVisible ? 'none' : 'block';
+                    dropdownIcon.style.transform = isVisible ? 'rotate(0deg)' : 'rotate(180deg)';
+                });
+                
+                // 点击页面其他地方关闭下拉菜单
+                document.addEventListener('click', function(e) {
+                    if (!dropdownContainer.contains(e.target)) {
+                        dropdownList.style.display = 'none';
+                        dropdownIcon.style.transform = 'rotate(0deg)';
+                    }
+                });
+                
                 routeInfoDiv.appendChild(otherRoutesDiv);
             }
             
@@ -1587,6 +2079,11 @@
             const currentStation = stationNames[i] || '';
             const routeInfo = stationNames[i + 1] || '';
             const nextStation = stationNames[i + 2] || stationNames[stationNames.length - 1] || '';
+            
+            // 跳过起终点站相同的无效路线段
+            if (normalizeStationName(currentStation) === normalizeStationName(nextStation)) {
+                continue;
+            }
             
             // 找到所有匹配的详细路线信息
             let matchedRouteDetails = [];
@@ -1625,34 +2122,43 @@
             stationNameSpan.style.textAlign = 'left';
             stationDiv.appendChild(stationNameSpan);
             
-            // 只给非起点站添加叉按钮
-            if (i !== 0) {
+            // 1. 添加详情按钮 - 给所有车站显示
+            const stationDetailBtn = document.createElement('button');
+            stationDetailBtn.className = 'detail-btn station-detail-btn';
+            stationDetailBtn.innerHTML = '<i class="fa-solid fa-circle-info"></i>';
+            
+            // 存储当前车站信息到按钮元素
+            // 使用当前车站名称作为车站ID，因为在这个上下文中没有完整的车站对象
+            const currentStationId = currentStation.replace(/\|/g, ' ');
+            stationDetailBtn.dataset.stationId = currentStationId;
+            
+            // 点击事件：在新标签页中打开车站详情
+            stationDetailBtn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                // 从按钮元素获取车站ID
+                const stationId = this.dataset.stationId;
+                // 查找真正的车站ID
+                const actualStationId = findStationIdByName(stationId);
+                if (actualStationId) {
+                    const detailUrl = `/stations/${encodeURIComponent(actualStationId)}`;
+                    window.open(detailUrl, '_blank');
+                } else {
+                    // 如果找不到真正的ID，使用名称作为备用
+                    const detailUrl = `/stations/${encodeURIComponent(stationId)}`;
+                    window.open(detailUrl, '_blank');
+                }
+            });
+            
+            // 添加到stationDiv
+            stationDiv.appendChild(stationDetailBtn);
+            
+            // 2. 添加叉按钮 - 只给中间车站显示（不是起点站和终点站）
+            // 起点站是i=0，终点站是i=stationNames.length-1（但由于步长为2，实际遍历到stationNames.length-1之前就结束了）
+            // 所以只给i>0的车站添加叉按钮，并且只有当有下一个车站时（i+2 < stationNames.length）才添加
+            if (i > 0 && i + 2 < stationNames.length) {
                 const stationCloseBtn = document.createElement('button');
-                stationCloseBtn.className = 'station-close-btn';
+                stationCloseBtn.className = 'close-btn station-close-btn';
                 stationCloseBtn.innerHTML = '&times;';
-                stationCloseBtn.style.cssText = `
-                    background: none;
-                    border: none;
-                    width: auto;
-                    height: auto;
-                    cursor: pointer;
-                    font-size: 1rem;
-                    line-height: 1;
-                    opacity: 0.7;
-                    transition: color 0.2s;
-                    color: #6b7280;
-                    margin-left: 8px;
-                `;
-                
-                // 悬停效果
-                stationCloseBtn.addEventListener('mouseenter', function() {
-                    this.style.opacity = 1;
-                    this.style.color = '#ef4444';
-                });
-                stationCloseBtn.addEventListener('mouseleave', function() {
-                    this.style.opacity = 0.7;
-                    this.style.color = '#6b7280';
-                });
                 
                 // 点击事件：添加到禁车站
                 stationCloseBtn.addEventListener('click', function() {
@@ -1742,28 +2248,75 @@
                         }
                     }
                     
-                    // 显示等车时间（如果有等车时间）
-                    if (i < stationNames.length - 1 && lineWaitingTime > 0) {
+                    // 显示等车时间（如果有等车时间且在详细模式下）
+                    if (i < stationNames.length - 1 && lineWaitingTime > 0 && detail) {
                         const waitingTimeDiv = document.createElement('div');
                         waitingTimeDiv.className = 'time-detail';
                         waitingTimeDiv.innerHTML = `<span><i class="fa-solid fa-hourglass mr-1"></i> 等车时间</span><span class="time-value">${formatTime(lineWaitingTime)}</span>`;
                         routeStep.appendChild(waitingTimeDiv);
                     }
                     
+                    // 收集所有同名路线的发车时间
+                    const departureTimes = [];
+                    // 获取当前线路的基本名称
+                    const currentRouteName = currentRouteDetail[3] || '';
+                    const currentBaseRouteName = getBaseRouteName(currentRouteName);
+                    
+                    // 遍历所有匹配的路线，收集同名线路的发车时间
+                    for (const route of matchedRouteDetails) {
+                        const routeName = route[3] || '';
+                        const baseRouteName = getBaseRouteName(routeName);
+                        if (baseRouteName === currentBaseRouteName) {
+                            const routeDepartureTime = route[5] || 0;
+                            departureTimes.push(routeDepartureTime);
+                        }
+                    }
+                    
+                    // 去重相同的发车时间
+                    const uniqueDepartureTimes = [...new Set(departureTimes)];
+                    // 排序发车时间
+                    const sortedDepartureTimes = uniqueDepartureTimes.sort((a, b) => a - b);
+                    // 格式化发车时间为字符串
+                    const departureTimeStrings = sortedDepartureTimes.map(time => formatTimestamp(time));
+                    // 合并显示发车时间
+                    const displayDepartureTime = departureTimeStrings.join(' / ');
+                    
                     // 显示线路前的发车时间
                     const departureTimeDiv = document.createElement('div');
                     departureTimeDiv.className = 'time-stamp route-departure-time';
-                    departureTimeDiv.textContent = `出站时间：${formatTimestamp(departureTime)}`;
+                    departureTimeDiv.textContent = `出站时间：${displayDepartureTime}`;
                     routeStep.appendChild(departureTimeDiv);
                     
                     // 传递计算的时间到buildRouteInfo函数
                     const routeInfoDiv = buildRouteInfo(currentRouteDetail, matchedRouteDetails, waitingTime, nonWalkRoutesCount, algorithm, detail, lineRidingTime, lineWaitingTime);
                     routeStep.appendChild(routeInfoDiv);
                     
+                    // 收集所有同名路线的到站时间
+                    const arrivalTimes = [];
+                    
+                    // 遍历所有匹配的路线，收集同名线路的到站时间
+                    for (const route of matchedRouteDetails) {
+                        const routeName = route[3] || '';
+                        const baseRouteName = getBaseRouteName(routeName);
+                        if (baseRouteName === currentBaseRouteName) {
+                            const routeArrivalTime = route[6] || 0;
+                            arrivalTimes.push(routeArrivalTime);
+                        }
+                    }
+                    
+                    // 去重相同的到站时间
+                    const uniqueArrivalTimes = [...new Set(arrivalTimes)];
+                    // 排序到站时间
+                    const sortedArrivalTimes = uniqueArrivalTimes.sort((a, b) => a - b);
+                    // 格式化到站时间为字符串
+                    const arrivalTimeStrings = sortedArrivalTimes.map(time => formatTimestamp(time));
+                    // 合并显示到站时间
+                    const displayArrivalTime = arrivalTimeStrings.join(' / ');
+                    
                     // 显示线路后的到站时间
                     const arrivalTimeDiv = document.createElement('div');
                     arrivalTimeDiv.className = 'time-stamp route-arrival-time';
-                    arrivalTimeDiv.textContent = `到站时间：${formatTimestamp(arrivalTime)}`;
+                    arrivalTimeDiv.textContent = `到站时间：${displayArrivalTime}`;
                     routeStep.appendChild(arrivalTimeDiv);
                 } else {
                     // 非实时模式，使用原来的时间计算
@@ -1771,178 +2324,24 @@
                     routeStep.appendChild(routeInfoDiv);
                 }
             } else {
-                // 如果没有详细信息，显示基本路线信息
-                const routeInfoDiv = document.createElement('div');
-                routeInfoDiv.className = 'route-info';
+                // 即使没有匹配的详细路线，也使用新的展示样式
+                // 创建一个简化的路线详情对象，使用默认值
+                const simplifiedRouteDetail = [
+                    currentStation,           // 起点
+                    nextStation,              // 终点
+                    '#4a90e2',                // 颜色
+                    routeInfo,                // 路线名
+                    `前往 ${nextStation}`,    // 终点站信息
+                    0,                        // 时长
+                    0,                        // 等车时间
+                    0,                        // 发车间隔
+                    'train_normal',           // 交通类型
+                    '',                       // 站台编号
+                    routeInfo                 // 原始路线名
+                ];
                 
-                const routeTag = document.createElement('div');
-                routeTag.className = 'route-tag';
-                const defaultColor = '#4a90e2';
-                routeTag.style.backgroundColor = defaultColor;
-                
-                // 根据背景色自动计算文字颜色
-                const textColor = getContrastTextColor(defaultColor);
-                routeTag.style.color = textColor;
-                
-                // 设置routeTag为flex容器
-                routeTag.style.display = 'flex';
-                routeTag.style.alignItems = 'center';
-                routeTag.style.justifyContent = 'space-between';
-                
-                // 处理路线信息，只保留中文和英文，去除方向和分隔符
-                let processedRouteInfo = routeInfo;
-                if (processedRouteInfo.includes('||')) {
-                    processedRouteInfo = processedRouteInfo.split('||')[0];
-                }
-                processedRouteInfo = processedRouteInfo.replace('|', ' ').trim();
-                
-                // 检查是否为步行路线
-                const isWalk = processedRouteInfo.toLowerCase().includes('walk') || processedRouteInfo.includes('步行');
-                const icon = isWalk ? '<i class="fa-solid fa-person-walking"></i>' : '<i class="fa-solid fa-train"></i>';
-                const transportName = isWalk ? '步行' : '列车';
-                
-                // 路线信息左侧内容
-                const routeLeftContent = document.createElement('div');
-                routeLeftContent.style.display = 'flex';
-                routeLeftContent.style.alignItems = 'center';
-                
-                // 步行路线不显示括号内的交通类型
-                if (isWalk) {
-                    routeLeftContent.innerHTML = `
-                        ${icon}
-                        <span class="route-name">${processedRouteInfo}</span>
-                    `;
-                } else {
-                    routeLeftContent.innerHTML = `
-                        ${icon}
-                        <span class="route-name">${processedRouteInfo}</span>
-                        <span style="margin-left: 8px; opacity: 0.8;">(${transportName})</span>
-                    `;
-                }
-                
-                // 直接添加内容到routeTag
-                routeTag.appendChild(routeLeftContent);
-                
-                // 非步行路线才添加叉按钮
-                if (!isWalk) {
-                    // 添加叉按钮
-                    const routeCloseBtn = document.createElement('button');
-                    routeCloseBtn.className = 'route-close-btn';
-                    routeCloseBtn.innerHTML = '&times;';
-                    routeCloseBtn.style.cssText = `
-                        background: none;
-                        border: none;
-                        width: auto;
-                        height: auto;
-                        cursor: pointer;
-                        font-size: 1rem;
-                        line-height: 1;
-                        opacity: 0.7;
-                        transition: color 0.2s;
-                        margin-left: 8px;
-                    `;
-                    
-                    // 确保按钮文字颜色与线路标签一致
-                    routeCloseBtn.style.color = textColor;
-                    
-                    // 悬停效果
-                    routeCloseBtn.addEventListener('mouseenter', function() {
-                        this.style.opacity = 1;
-                        this.style.color = '#ef4444';
-                    });
-                    routeCloseBtn.addEventListener('mouseleave', function() {
-                        this.style.opacity = 0.7;
-                        this.style.color = textColor;
-                    });
-                    
-                    // 点击事件：添加到禁路线
-                    routeCloseBtn.addEventListener('click', function(e) {
-                        const ignoredLinesInput = document.getElementById('ignored-lines');
-                        const currentValue = ignoredLinesInput.value;
-                        
-                        // 尝试从当前路线详细信息中获取后端提供的禁路线字符串
-                        let banRouteString = '';
-                        if (matchedRouteDetails.length > 0) {
-                            // 如果有匹配的路线详细信息，从第一条中获取禁路线字符串
-                            banRouteString = matchedRouteDetails[0][11] || '';
-                        }
-                        
-                        // 使用后端提供的禁路线字符串（如果有），否则使用原始路线信息
-                        let routeToAdd = banRouteString;
-                        
-                        // 如果后端没有提供禁路线字符串，则使用旧方法处理
-                        if (!routeToAdd) {
-                            // 使用原始路线信息，而不是显示名称
-                            routeToAdd = routeInfo;
-                            
-                            // 处理原始路线名称：确保是字符串
-                            if (Array.isArray(routeToAdd)) {
-                                // 如果是数组，使用processedRouteInfo代替
-                                routeToAdd = processedRouteInfo;
-                            }
-                            
-                            // 处理原始路线名称：
-                            // 1. 删去||后面的方向信息
-                            // 2. 只保留第一条|前面的内容，使用一种语言的线路名
-                            routeToAdd = routeToAdd.split('||')[0].split('|')[0].trim();
-                        }
-                        
-                        // 检查是否已存在
-                        const lines = currentValue.split(/[,;；]/).map(line => line.trim()).filter(Boolean);
-                        
-                        if (!lines.includes(routeToAdd)) {
-                            lines.push(routeToAdd);
-                            ignoredLinesInput.value = lines.join(';');
-                            // 触发自动调整高度
-                            if (window.autoResizeTextarea) {
-                                window.autoResizeTextarea(ignoredLinesInput);
-                            }
-                            // 更新简码
-                            if (typeof updateShortcode === 'function') {
-                                updateShortcode();
-                            }
-                        }
-                    });
-                    
-                    routeTag.appendChild(routeCloseBtn);
-                }
-                
-                routeInfoDiv.appendChild(routeTag);
-                
-                // 只有非步行路线才显示方向指示器
-                if (!isWalk) {
-                    const directionIndicator = document.createElement('div');
-                    directionIndicator.className = 'direction-indicator';
-                    directionIndicator.textContent = `前往 ${nextStation}`;
-                    routeInfoDiv.appendChild(directionIndicator);
-                    
-                    // 只有非步行路线且不是理论模式才显示发车间隔
-                    if (!isWalk && algorithm !== 'theory') {
-                        // 显示发车间隔
-                        const intervalDiv = document.createElement('div');
-                        intervalDiv.className = 'time-detail';
-                        intervalDiv.innerHTML = `<span><i class="fa-solid fa-clock-rotate-left mr-1"></i> 发车间隔</span><span class="time-value">00:00</span>`;
-                        routeInfoDiv.appendChild(intervalDiv);
-                    }
-                }
-                
-                // 显示乘车时长或步行时间
-                const durationDiv = document.createElement('div');
-                durationDiv.className = 'time-detail';
-                const timeLabel = isWalk ? '<i class="fa-solid fa-clock mr-1"></i> 步行时间' : '<i class="fa-solid fa-clock mr-1"></i> 乘车时间';
-                durationDiv.innerHTML = `<span>${timeLabel}</span><span class="time-value">00:00</span>`;
-                routeInfoDiv.appendChild(durationDiv);
-                
-                // 只有非步行路线且不是理论模式才显示等车时间
-                if (!isWalk && algorithm !== 'theory') {
-                    // 显示等车时间
-                    const waitingDiv = document.createElement('div');
-                    waitingDiv.className = 'time-detail';
-                    const segmentWaitingTime = nonWalkRoutesCount > 0 ? waitingTime / nonWalkRoutesCount : 0;
-                    waitingDiv.innerHTML = `<span><i class="fa-solid fa-hourglass mr-1"></i> 等车时间</span><span class="time-value">${formatTime(segmentWaitingTime)}</span>`;
-                    routeInfoDiv.appendChild(waitingDiv);
-                }
-                
+                // 使用新的样式显示路线
+                const routeInfoDiv = buildRouteInfo(simplifiedRouteDetail, [simplifiedRouteDetail], waitingTime, nonWalkRoutesCount, algorithm, detail);
                 routeStep.appendChild(routeInfoDiv);
             }
             
@@ -1956,10 +2355,49 @@
         
         const endStationDiv = document.createElement('div');
         endStationDiv.className = 'station';
+        endStationDiv.style.display = 'flex';
+        endStationDiv.style.alignItems = 'center';
+        endStationDiv.style.justifyContent = 'space-between';
+        endStationDiv.style.textAlign = 'left';
         
         // 替换车站名称中的所有竖杠为空格
         const formattedEndStationName = endStation.replace(/\|/g, ' ');
-        endStationDiv.textContent = formattedEndStationName;
+        
+        // 车站名称文本
+        const endStationNameSpan = document.createElement('span');
+        endStationNameSpan.textContent = formattedEndStationName;
+        endStationNameSpan.style.flex = '1';
+        endStationNameSpan.style.textAlign = 'left';
+        endStationDiv.appendChild(endStationNameSpan);
+        
+        // 给终点站添加详情按钮
+        const endStationDetailBtn = document.createElement('button');
+        endStationDetailBtn.className = 'detail-btn station-detail-btn';
+        endStationDetailBtn.innerHTML = '<i class="fa-solid fa-circle-info"></i>';
+        
+        // 存储当前车站信息到按钮元素
+        const endStationId = endStation.replace(/\|/g, ' ');
+        endStationDetailBtn.dataset.stationId = endStationId;
+        
+        // 点击事件：在新标签页中打开车站详情
+        endStationDetailBtn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            // 从按钮元素获取车站ID
+            const stationId = this.dataset.stationId;
+            // 查找真正的车站ID
+            const actualStationId = findStationIdByName(stationId);
+            if (actualStationId) {
+                const detailUrl = `/stations/${encodeURIComponent(actualStationId)}`;
+                window.open(detailUrl, '_blank');
+            } else {
+                // 如果找不到真正的ID，使用名称作为备用
+                const detailUrl = `/stations/${encodeURIComponent(stationId)}`;
+                window.open(detailUrl, '_blank');
+            }
+        });
+        
+        // 添加到endStationDiv
+        endStationDiv.appendChild(endStationDetailBtn);
         
         endStationStep.appendChild(endStationDiv);
         detailsContainer.appendChild(endStationStep);
@@ -2154,20 +2592,110 @@
         downloadImageBtn.classList.add('hidden');
     });
     
-    // 根据背景色自动计算文字颜色
-    function getContrastTextColor(hexColor) {
-        // 解析十六进制颜色值
-        const hex = hexColor.replace('#', '');
-        const r = parseInt(hex.substring(0, 2), 16);
-        const g = parseInt(hex.substring(2, 4), 16);
-        const b = parseInt(hex.substring(4, 6), 16);
-        
-        // 计算亮度 (luminance)
-        // 使用标准的相对亮度公式
-        const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-        
-        // 如果亮度小于0.5，使用白色文字，否则使用黑色文字
-        return luminance < 0.5 ? 'white' : 'black';
+    // 存储车站和线路数据，用于详情链接生成
+    let stationsData = {};
+    let routesData = [];
+    
+    // 加载车站和线路数据
+    async function loadStationsAndRoutesData() {
+        try {
+            const response = await fetch('/api/stations_routes_data');
+            const data = await response.json();
+            if (data) {
+                stationsData = data.stations || {};
+                routesData = data.routes || [];
+                console.log('Successfully loaded stations and routes data:', {
+                    stationCount: Object.keys(stationsData).length,
+                    routeCount: routesData.length
+                });
+                // 输出前几条线路数据，检查数据格式
+                console.log('First few routes:', routesData.slice(0, 3));
+            }
+        } catch (error) {
+            console.error('Failed to load stations and routes data:', error);
+            // 重置为默认值，避免后续操作出错
+            stationsData = {};
+            routesData = [];
+        }
     }
+    
+    // 根据车站名称查找车站ID
+    function findStationIdByName(stationName) {
+        for (const [id, station] of Object.entries(stationsData)) {
+            const stationNames = station.name.split('|').map(name => name.trim());
+            const formattedStationName = station.name.replace(/\|/g, ' ').trim();
+            if (stationNames.includes(stationName) || formattedStationName === stationName) {
+                // 确保只返回一个ID，即使车站数据中包含多个ID
+                return id.split(',')[0].trim();
+            }
+        }
+        return null;
+    }
+    
+    // 根据原始线路名查找对应的线路ID
+    function findRouteIdByName(routeName) {
+        // 调试日志
+        console.log('=== findRouteIdByName called ===');
+        console.log('Input routeName:', routeName);
+        console.log('Total routes available:', routesData.length);
+        
+        // 确保routesData是数组
+        if (!Array.isArray(routesData)) {
+            console.error('routesData is not an array');
+            return null;
+        }
+        
+        // 使用原始线路名直接匹配
+        const originalRouteName = routeName.trim();
+        
+        // 直接匹配模式：查找完全匹配的线路
+        for (const route of routesData) {
+            if (route && route.name) {
+                // 检查线路名称是否完全匹配
+                if (route.name === originalRouteName) {
+                    // 确保只返回一个ID，即使线路数据中包含多个ID
+                    const singleId = String(route.id).split(',')[0].trim();
+                    console.log('Exact match found with original route name, returning single ID:', singleId);
+                    return singleId;
+                }
+            }
+        }
+        
+        // 如果没有找到完全匹配，尝试使用核心线路名称（||前面的部分）匹配
+        const coreRouteName = originalRouteName.split('||')[0].trim();
+        for (const route of routesData) {
+            if (route && route.name) {
+                const routeCoreName = route.name.split('||')[0].trim();
+                if (routeCoreName === coreRouteName) {
+                    // 确保只返回一个ID，即使线路数据中包含多个ID
+                    const singleId = String(route.id).split(',')[0].trim();
+                    console.log('Core match found, returning single ID:', singleId);
+                    return singleId;
+                }
+            }
+        }
+        
+        // 如果没有找到完全匹配，尝试使用不区分大小写的核心线路名称匹配
+        const lowerCoreRouteName = coreRouteName.toLowerCase();
+        for (const route of routesData) {
+            if (route && route.name) {
+                const routeCoreName = route.name.split('||')[0].trim().toLowerCase();
+                if (routeCoreName === lowerCoreRouteName) {
+                    // 确保只返回一个ID，即使线路数据中包含多个ID
+                    const singleId = String(route.id).split(',')[0].trim();
+                    console.log('Case-insensitive core match found, returning single ID:', singleId);
+                    return singleId;
+                }
+            }
+        }
+        
+        console.log('No match found for route:', routeName);
+        return null;
+    }
+    
+    // 页面加载完成后加载车站和线路数据
+    document.addEventListener('DOMContentLoaded', function() {
+        loadStationsAndRoutesData();
+    });
 </script>
 {% endblock %}
