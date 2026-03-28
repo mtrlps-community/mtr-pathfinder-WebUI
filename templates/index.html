@@ -1282,6 +1282,9 @@
             // 初始化合并后的乘车时间为当前路线的乘车时间
             let displayRidingTime = duration;
             
+            // 初始化同名线路的乘车时间数组，确保在所有情况下都有定义
+            let ridingTimes = [];
+            
             // 只有非步行路线、不是理论模式且在详细模式下才显示等车时间
             // 实时模式下的等车时间已经显示在出站时间上方
             if (!isWalk && algorithm !== 'theory' && detail) {
@@ -1464,7 +1467,7 @@
                 }
                 
                 // 收集所有同名路线的乘车时间
-                const ridingTimes = [];
+                ridingTimes = [];
                 for (const route of sameNameRoutes) {
                     // 从路线详情中获取乘车时间
                     const routeDuration = route[5] || 0;
@@ -1673,14 +1676,35 @@
             const timeLabel = isWalk ? '<i class="fa-regular fa-clock mr-1"></i> 步行时间' : '<i class="fa-regular fa-clock mr-1"></i> 乘车时间';
             // 实时模式使用计算的乘车时间，否则使用合并后的乘车时间
             let finalRidingTime = duration;
+            let displayTimeText = '';
+            
             if (!isWalk) {
-                // 非步行路线使用合并后的乘车时间
-                finalRidingTime = algorithm === 'real' && lineRidingTime !== null ? lineRidingTime : displayRidingTime;
+                // 非步行路线处理
+                if (algorithm === 'real' && lineRidingTime !== null) {
+                    // 实时模式使用计算的乘车时间
+                    finalRidingTime = lineRidingTime;
+                    displayTimeText = formatTime(finalRidingTime);
+                } else {
+                    // 非实时模式，处理同名线路的乘车时间
+                    if (ridingTimes.length > 1) {
+                        // 有同名线路，显示所有乘车时间
+                        const sortedTimes = [...ridingTimes].sort((a, b) => a - b);
+                        const timeStrings = sortedTimes.map(time => formatTime(time));
+                        displayTimeText = timeStrings.join(' / ');
+                        // 使用最短乘车时间作为主要显示时间
+                        finalRidingTime = sortedTimes[0];
+                    } else {
+                        // 只有一条线路，显示单一乘车时间
+                        finalRidingTime = displayRidingTime;
+                        displayTimeText = formatTime(finalRidingTime);
+                    }
+                }
             } else {
                 // 步行路线使用原始duration
                 finalRidingTime = algorithm === 'real' && lineRidingTime !== null ? lineRidingTime : duration;
+                displayTimeText = formatTime(finalRidingTime);
             }
-            durationDiv.innerHTML = `<span>${timeLabel}</span><span class="time-value">${formatTime(finalRidingTime)}</span>`;
+            durationDiv.innerHTML = `<span>${timeLabel}</span><span class="time-value">${displayTimeText}</span>`;
             routeInfoDiv.appendChild(durationDiv);
             
             // 如果有其他匹配的路线，显示"或"下拉选单
