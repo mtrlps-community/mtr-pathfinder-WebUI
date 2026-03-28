@@ -851,7 +851,7 @@
                     }
                     
                     // 显示结果，传递实际使用的出发时间
-                displayResultInternal(routeResult, algorithm, calcTime, dataVersions, usedCache, detail, imageId, departureTime);
+                displayResultInternal(routeResult, algorithm, calcTime, dataVersions, usedCache, data.detail, imageId, departureTime);
                 } else {
                     // 无结果
                     noResult.classList.remove('hidden');
@@ -1018,8 +1018,8 @@
                 </div>
         `;
         
-        // 非理论模式下显示乘车时间和等车时间
-        if (algorithm !== 'theory') {
+        // 非理论模式且详细模式下显示乘车时间和等车时间
+        if (algorithm !== 'theory' && detail) {
             timeGridContent += `
                 <div class="time-item traveling-time">
                     <div class="time-icon"><i class="fa-solid fa-train"></i></div>
@@ -2158,8 +2158,8 @@
                         }
                     }
                     
-                    // 显示等车时间（如果有等车时间）
-                    if (i < stationNames.length - 1 && lineWaitingTime > 0) {
+                    // 显示等车时间（如果有等车时间且在详细模式下）
+                    if (i < stationNames.length - 1 && lineWaitingTime > 0 && detail) {
                         const waitingTimeDiv = document.createElement('div');
                         waitingTimeDiv.className = 'time-detail';
                         waitingTimeDiv.innerHTML = `<span><i class="fa-solid fa-hourglass mr-1"></i> 等车时间</span><span class="time-value">${formatTime(lineWaitingTime)}</span>`;
@@ -2377,8 +2377,8 @@
                     directionIndicator.textContent = `前往 ${nextStation}`;
                     routeInfoDiv.appendChild(directionIndicator);
                     
-                    // 只有非步行路线且不是理论模式才显示发车间隔
-                    if (!isWalk && algorithm !== 'theory') {
+                    // 只有非步行路线且不是理论模式且在详细模式下才显示发车间隔
+                    if (!isWalk && algorithm !== 'theory' && detail) {
                         // 显示发车间隔
                         const intervalDiv = document.createElement('div');
                         intervalDiv.className = 'time-detail';
@@ -2394,8 +2394,8 @@
                 durationDiv.innerHTML = `<span>${timeLabel}</span><span class="time-value">00:00</span>`;
                 routeInfoDiv.appendChild(durationDiv);
                 
-                // 只有非步行路线且不是理论模式才显示等车时间
-                if (!isWalk && algorithm !== 'theory') {
+                // 只有非步行路线且不是理论模式且在详细模式下才显示等车时间
+                if (!isWalk && algorithm !== 'theory' && detail) {
                     // 显示等车时间
                     const waitingDiv = document.createElement('div');
                     waitingDiv.className = 'time-detail';
