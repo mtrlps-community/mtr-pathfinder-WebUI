@@ -1,0 +1,292 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <div class="lg:col-span-1">
+        <div class="card mb-6">
+            <div class="flex items-center mb-2">
+                <label class="block font-medium mr-2" for="shortcode" style="color: var(--text-primary);">
+                    <i class="fa-solid fa-code mr-1"></i> 简码输入
+                </label>
+                <button type="button" class="text-sm hover:underline" id="shortcode-help" style="color: var(--accent-primary);">
+                    格式说明
+                </button>
+            </div>
+            <div class="relative">
+                <textarea id="shortcode" class="form-input" placeholder="/时刻表 <车站名/车站ID>;<路线1>[;路线2;...]"></textarea>
+            </div>
+            <div id="shortcode-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                <div class="bg-white p-6 rounded-lg max-w-lg w-full mx-4" style="background-color: var(--card-bg); color: var(--text-primary);">
+                    <h3 class="text-xl font-bold mb-4" style="color: var(--text-primary);">简码格式说明</h3>
+                    <div class="space-y-4 max-h-[250px] md:max-h-[350px] lg:max-h-[400px] overflow-y-auto pr-2">
+                        <div>
+                            <h4 class="font-semibold mb-2" style="color: var(--text-primary);">调用格式：</h4>
+                            <ul class="list-disc pl-5 space-y-2" style="color: var(--text-secondary);">
+                                <li><strong style="color: var(--text-primary);">/时刻表 &lt;车站名/车站ID&gt;;&lt;路线1&gt;[;路线2;...]</strong> -> 查询指定车站和路线</li>
+                                <li><strong style="color: var(--text-primary);">/时刻表 &lt;车站名/车站ID&gt;</strong> -> 查询指定车站所有路线</li>
+                                <li><strong style="color: var(--text-primary);">/时刻表 &lt;车站名/车站ID&gt;;&lt;出发方向编号&gt;</strong> -> 查询指定车站和方向</li>
+                                <li><strong style="color: var(--text-primary);">/时刻表 文字;&lt;车站名/车站ID&gt;[;时间 (如14:05:25)]</strong> -> 文字模式查询</li>
+                            </ul>
+                        </div>
+                        <div>
+                            <h4 class="font-semibold mb-2" style="color: var(--text-primary);">参数说明：</h4>
+                            <ul class="list-disc pl-5 space-y-2" style="color: var(--text-secondary);">
+                                <li><strong style="color: var(--text-primary);">车站名/车站ID</strong> -> 车站名称（如"香港"）或短ID（如"1"）</li>
+                                <li><strong style="color: var(--text-primary);">路线</strong> -> 路线名称（如"东铁线"）或路线编号</li>
+                                <li><strong style="color: var(--text-primary);">出发方向编号</strong> -> 方向编号（0起）</li>
+                                <li><strong style="color: var(--text-primary);">时间</strong> -> 可选，指定查询时间（格式如14:05:25）</li>
+                            </ul>
+                        </div>
+                        <div>
+                            <h4 class="font-semibold mb-2" style="color: var(--text-primary);">注意事项：</h4>
+                            <ul class="list-disc pl-5 space-y-2" style="color: var(--text-secondary);">
+                                <li>&lt;&gt; 必填，[] 选填</li>
+                                <li>全角和半角分号都可以使用</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="mt-6 flex justify-end">
+                        <button type="button" id="close-modal" class="btn-primary">关闭</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2 class="text-2xl font-bold mb-6">时刻表查询</h2>
+            <form id="timetable-form">
+                <div class="mb-4">
+                    <label class="block text-gray-700 font-medium mb-2" for="station-input">
+                        <i class="fa-solid fa-map-marker-alt mr-1"></i> 车站
+                    </label>
+                    <input type="text" id="station-input" class="form-input" placeholder="输入车站名称或ID">
+                </div>
+
+                <div class="mb-4">
+                    <label class="block text-gray-700 font-medium mb-2" for="route-input">
+                        <i class="fa-solid fa-route mr-1"></i> 路线（可选）
+                    </label>
+                    <input type="text" id="route-input" class="form-input" placeholder="输入路线名称或编号，多个用分号分隔">
+                </div>
+
+                <div class="mb-4">
+                    <label class="block text-gray-700 font-medium mb-2" for="direction-input">
+                        <i class="fa-solid fa-arrows-alt-h mr-1"></i> 方向编号（可选）
+                    </label>
+                    <input type="number" id="direction-input" class="form-input" placeholder="输入方向编号（0起）" min="0">
+                </div>
+
+                <div class="mb-4">
+                    <label class="block text-gray-700 font-medium mb-2" for="time-input">
+                        <i class="fa-solid fa-clock mr-1"></i> 时间（可选）
+                    </label>
+                    <input type="time" id="time-input" class="form-input" placeholder="选择时间" step="1">
+                </div>
+
+                <div class="mb-6">
+                    <label class="flex items-center p-2 rounded-md cursor-pointer transition-colors" style="background-color: var(--bg-tertiary);">
+                        <input type="checkbox" id="text-mode" class="form-checkbox" style="accent-color: var(--accent-primary);">
+                        <span class="ml-2" style="color: var(--text-primary);">文字模式</span>
+                    </label>
+                </div>
+
+                <div class="flex space-x-3">
+                    <button type="submit" class="btn-primary flex-1">
+                        <i class="fa-solid fa-search mr-2"></i> 查询
+                    </button>
+                    <button type="reset" class="btn-secondary">
+                        <i class="fa-solid fa-rotate-right mr-2"></i> 重置
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="lg:col-span-2">
+        <div class="card">
+            <h2 class="text-2xl font-bold mb-6">查询结果</h2>
+
+            <div id="initial-prompt" class="text-center py-16">
+                <i class="fa-regular fa-clock text-5xl mb-4" style="color: var(--text-tertiary);"></i>
+                <h3 class="text-xl font-semibold mb-2" style="color: var(--text-secondary);">请输入查询条件</h3>
+                <p style="color: var(--text-tertiary);">在左侧填写车站信息或输入简码，点击"查询"开始查询</p>
+            </div>
+
+            <div id="loading" class="hidden py-12">
+                <div class="max-w-md mx-auto text-center">
+                    <i class="fa-solid fa-spinner fa-spin text-4xl mb-4" style="color: var(--accent-primary);"></i>
+                    <h3 class="text-lg font-semibold mb-2" style="color: var(--text-primary);">正在查询...</h3>
+                </div>
+            </div>
+
+            <div id="error" class="hidden px-4 py-3 rounded mb-4" style="background-color: var(--error-bg); border: 1px solid var(--error-border); color: var(--error-text);"></div>
+
+            <div id="result" class="hidden">
+                <iframe id="timetable-iframe" sandbox="allow-same-origin" style="width: 100%; border: none; display: block;" scrolling="no" onload="this.style.height=this.contentDocument.body.scrollHeight + 'px'"></iframe>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const shortcodeHelpBtn = document.getElementById('shortcode-help');
+    const shortcodeModal = document.getElementById('shortcode-modal');
+    const closeModalBtn = document.getElementById('close-modal');
+    const shortcodeInput = document.getElementById('shortcode');
+    const timetableForm = document.getElementById('timetable-form');
+
+    shortcodeHelpBtn.addEventListener('click', function() {
+        shortcodeModal.classList.remove('hidden');
+    });
+
+    closeModalBtn.addEventListener('click', function() {
+        shortcodeModal.classList.add('hidden');
+    });
+
+    shortcodeModal.addEventListener('click', function(e) {
+        if (e.target === shortcodeModal) {
+            shortcodeModal.classList.add('hidden');
+        }
+    });
+
+    const stationInput = document.getElementById('station-input');
+    const routeInput = document.getElementById('route-input');
+    const directionInput = document.getElementById('direction-input');
+    const timeInput = document.getElementById('time-input');
+    const textModeCheckbox = document.getElementById('text-mode');
+
+    function parseShortcode(shortcode) {
+        stationInput.value = '';
+        routeInput.value = '';
+        directionInput.value = '';
+        timeInput.value = '';
+        textModeCheckbox.checked = false;
+
+        if (!shortcode.startsWith('/时刻表')) {
+            return;
+        }
+
+        const content = shortcode.replace(/^\/时刻表\s*/, '');
+        const parts = content.split(/[；;]/).map(part => part.trim()).filter(Boolean);
+
+        if (parts.length === 0) {
+            return;
+        }
+
+        if (parts[0] === '文字') {
+            textModeCheckbox.checked = true;
+            if (parts.length >= 2) {
+                stationInput.value = parts[1];
+            }
+            if (parts.length >= 3) {
+                timeInput.value = parts[2];
+            }
+        } else {
+            stationInput.value = parts[0];
+            if (parts.length >= 2) {
+                const secondPart = parts[1];
+                if (!isNaN(secondPart) && secondPart.trim() !== '') {
+                    directionInput.value = secondPart;
+                } else {
+                    routeInput.value = secondPart;
+                }
+            }
+            if (parts.length >= 3) {
+                const thirdPart = parts[2];
+                if (!isNaN(thirdPart) && thirdPart.trim() !== '') {
+                    directionInput.value = thirdPart;
+                } else {
+                    routeInput.value = thirdPart;
+                }
+            }
+        }
+    }
+
+    shortcodeInput.addEventListener('input', function() {
+        parseShortcode(shortcodeInput.value);
+    });
+
+    timetableForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        document.getElementById('loading').classList.remove('hidden');
+        document.getElementById('initial-prompt').classList.add('hidden');
+        document.getElementById('error').classList.add('hidden');
+        document.getElementById('result').classList.add('hidden');
+
+        const text_mode = textModeCheckbox.checked;
+
+        let requestData = {
+            'text_mode': text_mode
+        };
+
+        if (shortcodeInput.value.startsWith('/时刻表')) {
+            requestData['shortcode'] = shortcodeInput.value;
+        } else {
+            requestData['station'] = stationInput.value;
+            if (routeInput.value) {
+                requestData['route'] = routeInput.value;
+            }
+            if (directionInput.value) {
+                requestData['direction'] = parseInt(directionInput.value);
+            }
+            if (timeInput.value) {
+                requestData['time'] = timeInput.value;
+            }
+        }
+
+        try {
+            const response = await fetch('/api/timetable', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(requestData)
+            });
+
+            const data = await response.json();
+
+            document.getElementById('loading').classList.add('hidden');
+
+            if (data.error) {
+                document.getElementById('error').textContent = data.error;
+                document.getElementById('error').classList.remove('hidden');
+            } else {
+                const iframe = document.getElementById('timetable-iframe');
+                if (text_mode) {
+                    iframe.srcdoc = `<!DOCTYPE html><html><head></head><body><pre style="white-space: pre-wrap; color: #333; font-family: inherit;">${data.result}</pre></body></html>`;
+                } else {
+                    let htmlContent = data.result;
+                    htmlContent = htmlContent.replace(/\{\{\s*url_for\('static',\s*filename='([^']+)'\s*\)\s*\}\}/g, '/static/$1');
+                    htmlContent = htmlContent.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
+                    iframe.srcdoc = htmlContent;
+                }
+                setTimeout(() => {
+                    document.getElementById('result').classList.remove('hidden');
+                }, 100);
+            }
+        } catch (error) {
+            document.getElementById('loading').classList.add('hidden');
+            document.getElementById('error').textContent = '请求失败: ' + error.message;
+            document.getElementById('error').classList.remove('hidden');
+        }
+    });
+
+    timetableForm.addEventListener('reset', function() {
+        stationInput.value = '';
+        routeInput.value = '';
+        directionInput.value = '';
+        timeInput.value = '';
+        textModeCheckbox.checked = false;
+        shortcodeInput.value = '';
+        document.getElementById('result').classList.add('hidden');
+        document.getElementById('error').classList.add('hidden');
+        document.getElementById('loading').classList.add('hidden');
+        document.getElementById('initial-prompt').classList.remove('hidden');
+    });
+});
+</script>
+{% endblock %}

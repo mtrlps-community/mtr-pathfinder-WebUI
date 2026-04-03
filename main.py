@@ -1266,6 +1266,131 @@ def train_timetable(station_short_id=None, train_id=None):
 
     return render_template_string(html[0])
 
+@app.route('/timetable', methods=['GET'])
+def timetable_page():
+    return render_template('timetable.html')
+
+@app.route('/api/timetable', methods=['POST'])
+def api_timetable():
+    import re
+    data = request.json
+
+    text_mode = data.get('text_mode', False)
+
+    if data.get('shortcode'):
+        shortcode = data['shortcode']
+        content = re.sub(r'^/时刻表\s*', '', shortcode)
+        parts = [p.strip() for p in re.split(r'[；;]', content) if p.strip()]
+
+        if parts[0] == '文字':
+            text_mode = True
+            station = parts[1] if len(parts) >= 2 else ''
+            time_str = parts[2] if len(parts) >= 3 else None
+            route = None
+            direction = None
+        else:
+            station = parts[0]
+            route = parts[1] if len(parts) >= 2 else None
+            direction = int(parts[1]) if len(parts) >= 2 and parts[1].isdigit() else None
+            time_str = parts[2] if len(parts) >= 3 else None
+    else:
+        station = data.get('station', '')
+        route = data.get('route', None)
+        direction = data.get('direction', None)
+        time_str = data.get('time', None)
+
+    if not station:
+        return jsonify({'error': '请输入车站名称或ID'})
+
+    with open(config['LOCAL_FILE_PATH_V4'], encoding='utf-8') as f:
+        data_v4 = json.load(f)
+
+    with open(config['LOCAL_FILE_PATH_V3'], encoding='utf-8') as f:
+        data_v3 = json.load(f)
+
+    if station.isdigit():
+        sta_id = station_short_id_to_id(data_v4, int(station))
+        if sta_id is None:
+            return jsonify({'error': '车站ID错误'})
+        station_name = data_v4['stations'][sta_id]['name']
+    else:
+        station_name = station
+        sta_id = station_name_to_id(data_v4, station_name)
+        if sta_id is None:
+            return jsonify({'error': '未找到该车站'})
+
+    def parse_time_to_seconds(time_str):
+        if not time_str:
+            return None
+        try:
+            parts = time_str.split(':')
+            return int(parts[0]) * 3600 + int(parts[1]) * 60 + int(parts[2])
+        except:
+            return None
+
+    if text_mode:
+        departure_time = parse_time_to_seconds(time_str)
+        if departure_time is None:
+            departure_time = 0
+
+        if route:
+            result_text = main_text_timetable(
+                config['LOCAL_FILE_PATH_V4'],
+                '',
+                departure_time,
+                station_name)
+        else:
+            result_text = main_text_timetable(
+                config['LOCAL_FILE_PATH_V4'],
+                '',
+                departure_time,
+                station_name)
+
+        if result_text is None:
+            return jsonify({'error': '未找到该车站信息'})
+        return jsonify({'result': result_text, 'text_mode': True})
+
+    else:
+        if route:
+            if isinstance(route, str) and route.isdigit():
+                route = int(route)
+            html = main_sta_timetable(
+                config['LOCAL_FILE_PATH_V3'],
+                config['LOCAL_FILE_PATH_V4'],
+                os.path.join('templates', 'station_template.htm'),
+                '',
+                station_name, route if isinstance(route, str) else None)
+            if html is None or html is False:
+                return jsonify({'error': '未找到该车站信息'})
+        elif direction is not None:
+            html = main_get_sta_directions(
+                config['LOCAL_FILE_PATH_V4'],
+                station_name,
+                os.path.join('templates', 'directions_template.htm'))
+            if html is None:
+                return jsonify({'error': '未找到该车站信息'})
+            try:
+                route_names = html[2][direction]
+                html = main_sta_timetable(
+                    config['LOCAL_FILE_PATH_V3'],
+                    config['LOCAL_FILE_PATH_V4'],
+                    os.path.join('templates', 'station_template.htm'),
+                    '',
+                    station_name, route_names)
+            except (IndexError, KeyError):
+                return jsonify({'error': '方向编号错误'})
+            if html is None or html is False:
+                return jsonify({'error': '未找到该车站信息'})
+        else:
+            html = main_get_sta_directions(
+                config['LOCAL_FILE_PATH_V4'],
+                station_name,
+                os.path.join('templates', 'directions_template.htm'))
+            if html is None:
+                return jsonify({'error': '未找到该车站信息'})
+
+        return jsonify({'result': html[0], 'text_mode': False})
+
 @app.route('/api/find_route', methods=['POST'])
 def api_find_route():
     # 开始计时
