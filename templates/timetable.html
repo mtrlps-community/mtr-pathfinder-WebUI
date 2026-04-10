@@ -159,6 +159,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const textModeCheckbox = document.getElementById('text-mode');
 
     function parseShortcode(shortcode) {
+        console.log('Parsing shortcode:', shortcode);
         stationInput.value = '';
         routeInput.value = '';
         directionInput.value = '';
@@ -166,40 +167,52 @@ document.addEventListener('DOMContentLoaded', function() {
         textModeCheckbox.checked = false;
 
         if (!shortcode.startsWith('/时刻表')) {
+            console.log('Shortcode does not start with /时刻表');
             return;
         }
 
         const content = shortcode.replace(/^\/时刻表\s*/, '');
+        console.log('Content after removing prefix:', content);
         const parts = content.split(/[；;]/).map(part => part.trim()).filter(Boolean);
+        console.log('Parsed parts:', parts);
 
         if (parts.length === 0) {
+            console.log('No parts after parsing');
             return;
         }
 
         if (parts[0] === '文字') {
             textModeCheckbox.checked = true;
+            console.log('Text mode enabled');
             if (parts.length >= 2) {
                 stationInput.value = parts[1];
+                console.log('Station set to:', parts[1]);
             }
             if (parts.length >= 3) {
                 timeInput.value = parts[2];
+                console.log('Time set to:', parts[2]);
             }
         } else {
             stationInput.value = parts[0];
+            console.log('Station set to:', parts[0]);
             if (parts.length >= 2) {
                 const secondPart = parts[1];
                 if (!isNaN(secondPart) && secondPart.trim() !== '') {
                     directionInput.value = secondPart;
+                    console.log('Direction set to:', secondPart);
                 } else {
                     routeInput.value = secondPart;
+                    console.log('Route set to:', secondPart);
                 }
             }
             if (parts.length >= 3) {
                 const thirdPart = parts[2];
                 if (!isNaN(thirdPart) && thirdPart.trim() !== '') {
                     directionInput.value = thirdPart;
+                    console.log('Direction set to:', thirdPart);
                 } else {
                     routeInput.value = thirdPart;
+                    console.log('Route set to:', thirdPart);
                 }
             }
         }
@@ -208,6 +221,46 @@ document.addEventListener('DOMContentLoaded', function() {
     shortcodeInput.addEventListener('input', function() {
         parseShortcode(shortcodeInput.value);
     });
+
+    // 从URL参数中获取简码并自动填充
+    function checkUrlForShortcode() {
+        console.log('Checking URL for shortcode...');
+        console.log('Current URL:', window.location.href);
+        // 检查是否有shortcode参数
+        const urlParams = new URLSearchParams(window.location.search);
+        console.log('All URL params:', Object.fromEntries(urlParams.entries()));
+        const shortcodeParam = urlParams.get('shortcode');
+        
+        console.log('Shortcode param:', shortcodeParam);
+        
+        if (shortcodeParam) {
+            // 解码URL编码的字符
+            const decodedShortcode = decodeURIComponent(shortcodeParam);
+            console.log('Decoded shortcode:', decodedShortcode);
+            // 填充到简码输入框
+            shortcodeInput.value = decodedShortcode;
+            console.log('Shortcode input value set to:', shortcodeInput.value);
+            // 解析简码
+            parseShortcode(decodedShortcode);
+            // 移除URL中的shortcode参数，使地址栏变为干净的主界面链接
+            history.replaceState({}, document.title, window.location.pathname);
+            console.log('URL updated to:', window.location.pathname);
+            // 自动提交表单
+            if (timetableForm) {
+                console.log('Submitting form...');
+                // 延迟提交，确保DOM已经更新
+                setTimeout(() => {
+                    timetableForm.dispatchEvent(new Event('submit'));
+                }, 100);
+            }
+        } else {
+            console.log('No shortcode param found in URL');
+        }
+    }
+
+    // 检查URL参数
+    console.log('Calling checkUrlForShortcode...');
+    checkUrlForShortcode();
 
     timetableForm.addEventListener('submit', async (e) => {
         e.preventDefault();

@@ -617,6 +617,32 @@
                 }, 0);
             });
         });
+        
+        // 从URL参数中获取简码并自动填充
+        function checkUrlForShortcode() {
+            // 检查是否有shortcode参数
+            const urlParams = new URLSearchParams(window.location.search);
+            const shortcodeParam = urlParams.get('shortcode');
+            
+            if (shortcodeParam) {
+                // 解码URL编码的字符
+                const decodedShortcode = decodeURIComponent(shortcodeParam);
+                // 填充到简码输入框
+                shortcodeInput.value = decodedShortcode;
+                // 解析简码
+                parseShortcode(decodedShortcode);
+                // 移除URL中的shortcode参数，使地址栏变为干净的主界面链接
+                history.replaceState({}, document.title, window.location.pathname);
+                // 自动提交表单
+                const routeForm = document.getElementById('route-form');
+                if (routeForm) {
+                    routeForm.dispatchEvent(new Event('submit'));
+                }
+            }
+        }
+        
+        // 检查URL参数
+        checkUrlForShortcode();
     });
     
     // 算法选项卡处理
@@ -684,7 +710,8 @@
                     data.forEach(station => {
                         const div = document.createElement('div');
                         div.className = 'station-suggestion-item';
-                        div.textContent = station;
+                        // 显示时将竖线替换为空格
+                        div.textContent = station.replace('|', ' ');
                         div.style.padding = '6px 8px';
                         div.style.cursor = 'pointer';
                         div.style.borderBottom = '1px solid var(--border-color)';
@@ -699,7 +726,9 @@
                             this.style.backgroundColor = 'transparent';
                         };
                         div.addEventListener('click', () => {
-                            input.value = station;
+                            // 只使用第一语言（|前的部分）
+                            const stationName = station.split('|')[0];
+                            input.value = stationName;
                             suggestions.classList.add('hidden');
                             // 更新简码
                             if (window.generateShortcode) {

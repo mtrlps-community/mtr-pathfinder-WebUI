@@ -353,6 +353,49 @@ check_and_generate_data()
 def index():
     return render_template('index.html')
 
+@app.route('/路线/<path:shortcode>')
+def route_shortcode(shortcode):
+    # 解码URL编码的字符
+    from urllib.parse import unquote
+    shortcode = unquote(shortcode)
+    # 渲染index.html模板，并将简码作为查询参数传递
+    from flask import redirect, url_for
+    # 直接传递简码，不进行额外编码
+    return redirect(url_for('index', shortcode='/路线 ' + shortcode))
+
+@app.route('/时刻表/<path:shortcode>')
+def timetable_shortcode(shortcode):
+    # 解码URL编码的字符
+    from urllib.parse import unquote
+    shortcode = unquote(shortcode)
+    print(f"Received shortcode: {shortcode}")
+    # 渲染timetable.html模板，并将简码作为查询参数传递
+    from flask import redirect, url_for
+    # 直接传递简码，不进行额外编码
+    redirect_url = url_for('timetable_page', shortcode='/时刻表 ' + shortcode)
+    print(f"Redirecting to: {redirect_url}")
+    return redirect(redirect_url)
+
+@app.route('/timetable/<path:shortcode>')
+def timetable_shortcode_v2(shortcode):
+    # 解码URL编码的字符
+    from urllib.parse import unquote
+    shortcode = unquote(shortcode)
+    print(f"Received timetable shortcode: {shortcode}")
+    # 检查是否以"时刻表 "开头
+    if shortcode.startswith('时刻表 '):
+        # 提取后面的部分
+        shortcode_part = shortcode[4:].strip()
+        # 渲染timetable.html模板，并将简码作为查询参数传递
+        from flask import redirect, url_for
+        # 直接传递简码，不进行额外编码
+        redirect_url = url_for('timetable_page', shortcode='/时刻表 ' + shortcode_part)
+        print(f"Redirecting to: {redirect_url}")
+        return redirect(redirect_url)
+    # 如果不是以"时刻表 "开头，返回404
+    from flask import abort
+    abort(404)
+
 @app.route('/stations')
 def stations():
     # 读取车站数据和线路数据
@@ -1966,9 +2009,8 @@ def api_search_stations():
     results = set()
     for station in stations:
         if query in station['name'].lower():
-            # 将车站名称中的竖线替换为空格
-            formatted_name = station['name'].replace('|', ' ')
-            results.add(formatted_name)
+            # 保留原始的竖线分隔符
+            results.add(station['name'])
     
     return jsonify(sorted(list(results)))
 
