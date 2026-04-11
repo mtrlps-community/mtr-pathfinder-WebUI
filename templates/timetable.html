@@ -1,5 +1,147 @@
 {% extends 'base.html' %}
 
+{% block head %}
+{{ super() }}
+<style>
+    /* 时刻表结果样式 */
+    #timetable-result {
+        padding: 16px;
+    }
+    
+    #timetable-result .route-card {
+        margin-bottom: 8px;
+        border-radius: 8px;
+        background-color: var(--card-bg);
+        box-shadow: var(--card-shadow);
+        border-left: 4px solid #4a90e2;
+        padding: 12px;
+    }
+    
+    #timetable-result .route-info {
+        border-left-color: #4a90e2;
+    }
+    
+    #timetable-result .route-tag {
+        background-color: transparent;
+        color: var(--text-primary);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 8px;
+    }
+    
+    #timetable-result .route-name {
+        font-weight: 600;
+        font-size: 16px;
+        color: var(--text-primary);
+    }
+    
+    #timetable-result .route-destination {
+        font-size: 14px;
+        color: var(--text-secondary);
+        margin-bottom: 4px;
+    }
+    
+    #timetable-result .route-direction {
+        font-size: 14px;
+        color: var(--text-secondary);
+        margin-bottom: 4px;
+    }
+    
+    #timetable-result .route-time {
+        font-size: 14px;
+        color: var(--accent-primary);
+        font-weight: 500;
+        margin-top: 8px;
+    }
+    
+    #timetable-result .direction-indicator {
+        display: inline-block;
+        margin-left: 8px;
+        white-space: normal;
+        flex: 1 1 0%;
+        min-width: 0px;
+        font-size: 14px;
+        color: var(--text-secondary);
+    }
+    
+    #timetable-result .time-detail {
+        margin-top: 8px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    
+    #timetable-result .time-value {
+        font-weight: 500;
+        color: var(--text-primary);
+    }
+    
+    #timetable-result .no-result {
+        text-align: center;
+        padding: 40px 0;
+        color: var(--text-tertiary);
+    }
+    
+    #timetable-result .platform-info {
+        display: flex;
+        align-items: center;
+        flex-wrap: nowrap;
+        margin-bottom: 8px;
+    }
+    
+    #timetable-result .platform-tag {
+        margin-left: 8px;
+        opacity: 0.8;
+        padding: 1px 6px;
+        background-color: var(--bg-tertiary);
+        color: var(--text-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: 4px;
+        font-size: 12px;
+        font-weight: bold;
+        white-space: nowrap;
+    }
+    
+    #timetable-result .icon-span {
+        margin-right: 8px;
+    }
+    
+    #timetable-result .route-type {
+        margin-left: 8px;
+        opacity: 0.8;
+        padding: 1px 6px;
+        background-color: var(--bg-tertiary);
+        color: var(--text-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: 4px;
+        font-size: 12px;
+        font-weight: bold;
+        white-space: nowrap;
+    }
+    
+    #timetable-result .right-buttons {
+        display: flex;
+        align-items: center;
+        gap: 0;
+        margin-left: auto;
+    }
+    
+    #timetable-result .detail-btn, #timetable-result .close-btn {
+        background: none;
+        border: none;
+        cursor: pointer;
+        padding: 4px 8px;
+        border-radius: 4px;
+        transition: background-color 0.2s;
+    }
+    
+    #timetable-result .detail-btn:hover, #timetable-result .close-btn:hover {
+        background-color: var(--hover-bg);
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
     <div class="lg:col-span-1">
@@ -54,41 +196,53 @@
 
         <div class="card">
             <h2 class="text-2xl font-bold mb-6">时刻表查询</h2>
+            
+            <!-- 时刻表类型选择器 -->
+            <div class="mb-6">
+                <h3 class="text-lg font-semibold mb-3">时刻表类型</h3>
+                
+                <div class="algorithm-tabs">
+                    <div class="flex overflow-x-auto no-scrollbar">
+                        <div class="algorithm-tab active" data-index="0" data-value="timetable">列车时刻表</div>
+                        <div class="algorithm-tab" data-index="1" data-value="station-screen">车站大屏</div>
+                    </div>
+                    <div class="mt-2 text-center font-medium text-blue-500" id="timetable-type-display">显示列车时刻表</div>
+                    <input type="hidden" id="timetable-type" value="timetable">
+                </div>
+            </div>
+            
             <form id="timetable-form">
                 <div class="mb-4">
                     <label class="block text-gray-700 font-medium mb-2" for="station-input">
                         <i class="fa-solid fa-map-marker-alt mr-1"></i> 车站
                     </label>
-                    <input type="text" id="station-input" class="form-input" placeholder="输入车站名称或ID">
+                    <div class="relative">
+                        <input type="text" id="station-input" class="form-input" placeholder="输入车站名称或ID">
+                        <div id="station-suggestions" class="absolute z-10 w-full rounded-md shadow-lg mt-1 hidden" style="background-color: var(--card-bg); border: 1px solid var(--border-color); max-height: 200px; overflow-y: auto; box-shadow: var(--card-shadow);"></div>
+                    </div>
                 </div>
 
-                <div class="mb-4">
-                    <label class="block text-gray-700 font-medium mb-2" for="route-input">
-                        <i class="fa-solid fa-route mr-1"></i> 路线（可选）
-                    </label>
-                    <input type="text" id="route-input" class="form-input" placeholder="输入路线名称或编号，多个用分号分隔">
+                <!-- 列车时刻表特有输入框 -->
+                <div id="timetable-specific" class="block">
+                    <div class="mb-4">
+                        <label class="block text-gray-700 font-medium mb-2" for="route-input">
+                            <i class="fa-solid fa-route mr-1"></i> 路线名或方向编号（可选）
+                        </label>
+                        <input type="text" id="route-input" class="form-input" placeholder="输入路线名称或编号，多个用分号分隔">
+                    </div>
                 </div>
 
-                <div class="mb-4">
-                    <label class="block text-gray-700 font-medium mb-2" for="direction-input">
-                        <i class="fa-solid fa-arrows-alt-h mr-1"></i> 方向编号（可选）
-                    </label>
-                    <input type="number" id="direction-input" class="form-input" placeholder="输入方向编号（0起）" min="0">
+                <!-- 车站大屏特有输入框 -->
+                <div id="station-screen-specific" class="hidden">
+                    <div class="mb-4">
+                        <label class="block text-gray-700 font-medium mb-2" for="time-input">
+                            <i class="fa-solid fa-clock mr-1"></i> 时间（可选）
+                        </label>
+                        <input type="time" id="time-input" class="form-input" placeholder="选择时间" step="1">
+                    </div>
                 </div>
 
-                <div class="mb-4">
-                    <label class="block text-gray-700 font-medium mb-2" for="time-input">
-                        <i class="fa-solid fa-clock mr-1"></i> 时间（可选）
-                    </label>
-                    <input type="time" id="time-input" class="form-input" placeholder="选择时间" step="1">
-                </div>
-
-                <div class="mb-6">
-                    <label class="flex items-center p-2 rounded-md cursor-pointer transition-colors" style="background-color: var(--bg-tertiary);">
-                        <input type="checkbox" id="text-mode" class="form-checkbox" style="accent-color: var(--accent-primary);">
-                        <span class="ml-2" style="color: var(--text-primary);">文字模式</span>
-                    </label>
-                </div>
+                <input type="hidden" id="text-mode" value="false">
 
                 <div class="flex space-x-3">
                     <button type="submit" class="btn-primary flex-1">
@@ -122,7 +276,7 @@
             <div id="error" class="hidden px-4 py-3 rounded mb-4" style="background-color: var(--error-bg); border: 1px solid var(--error-border); color: var(--error-text);"></div>
 
             <div id="result" class="hidden">
-                <iframe id="timetable-iframe" sandbox="allow-same-origin" style="width: 100%; border: none; display: block;" scrolling="no" onload="this.style.height=this.contentDocument.body.scrollHeight + 'px'"></iframe>
+                <div id="timetable-result" style="width: 100%;"></div>
             </div>
         </div>
     </div>
@@ -154,17 +308,75 @@ document.addEventListener('DOMContentLoaded', function() {
 
     const stationInput = document.getElementById('station-input');
     const routeInput = document.getElementById('route-input');
-    const directionInput = document.getElementById('direction-input');
     const timeInput = document.getElementById('time-input');
-    const textModeCheckbox = document.getElementById('text-mode');
+    const textModeInput = document.getElementById('text-mode');
+    
+    // 时刻表类型选择器
+    const timetableTypeTabs = document.querySelectorAll('.algorithm-tab');
+    const timetableTypeDisplay = document.getElementById('timetable-type-display');
+    const timetableTypeInput = document.getElementById('timetable-type');
+    const timetableSpecific = document.getElementById('timetable-specific');
+    const stationScreenSpecific = document.getElementById('station-screen-specific');
+
+    // 生成简码
+    function generateShortcode() {
+        let shortcode = '/时刻表 ';
+        
+        if (timetableTypeInput.value === 'station-screen') {
+            shortcode += '文字';
+            if (stationInput.value) {
+                shortcode += `;${stationInput.value}`;
+                if (timeInput.value) {
+                    shortcode += `;${timeInput.value}`;
+                }
+            }
+        } else {
+            if (stationInput.value) {
+                shortcode += stationInput.value;
+                if (routeInput.value) {
+                    shortcode += `;${routeInput.value}`;
+                }
+            }
+        }
+        
+        return shortcode;
+    }
+
+    // 将generateShortcode函数暴露到全局
+    window.generateShortcode = generateShortcode;
+
+    // 更新简码函数
+    function updateShortcode() {
+        const shortcode = generateShortcode();
+        shortcodeInput.value = shortcode;
+        // 调整简码输入框高度
+        if (window.autoResizeTextarea) {
+            window.autoResizeTextarea(shortcodeInput);
+        }
+    }
+
+    // 将updateShortcode函数暴露到全局
+    window.updateShortcode = updateShortcode;
 
     function parseShortcode(shortcode) {
         console.log('Parsing shortcode:', shortcode);
         stationInput.value = '';
         routeInput.value = '';
-        directionInput.value = '';
         timeInput.value = '';
-        textModeCheckbox.checked = false;
+        textModeInput.value = 'false';
+        timetableTypeInput.value = 'timetable';
+        timetableSpecific.classList.remove('hidden');
+        stationScreenSpecific.classList.add('hidden');
+        timetableTypeDisplay.textContent = '显示列车时刻表';
+        
+        // 更新选项卡状态
+        timetableTypeTabs.forEach((tab, index) => {
+            if (index === 0) {
+                tab.classList.add('active');
+            } else {
+                tab.classList.remove('active');
+            }
+        });
 
         if (!shortcode.startsWith('/时刻表')) {
             console.log('Shortcode does not start with /时刻表');
@@ -182,8 +394,22 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         if (parts[0] === '文字') {
-            textModeCheckbox.checked = true;
-            console.log('Text mode enabled');
+            textModeInput.value = 'true';
+            timetableTypeInput.value = 'station-screen';
+            timetableSpecific.classList.add('hidden');
+            stationScreenSpecific.classList.remove('hidden');
+            timetableTypeDisplay.textContent = '显示车站大屏';
+            
+            // 更新选项卡状态
+            timetableTypeTabs.forEach((tab, index) => {
+                if (index === 1) {
+                    tab.classList.add('active');
+                } else {
+                    tab.classList.remove('active');
+                }
+            });
+            
+            console.log('Station screen mode enabled');
             if (parts.length >= 2) {
                 stationInput.value = parts[1];
                 console.log('Station set to:', parts[1]);
@@ -196,30 +422,73 @@ document.addEventListener('DOMContentLoaded', function() {
             stationInput.value = parts[0];
             console.log('Station set to:', parts[0]);
             if (parts.length >= 2) {
-                const secondPart = parts[1];
-                if (!isNaN(secondPart) && secondPart.trim() !== '') {
-                    directionInput.value = secondPart;
-                    console.log('Direction set to:', secondPart);
-                } else {
-                    routeInput.value = secondPart;
-                    console.log('Route set to:', secondPart);
-                }
-            }
-            if (parts.length >= 3) {
-                const thirdPart = parts[2];
-                if (!isNaN(thirdPart) && thirdPart.trim() !== '') {
-                    directionInput.value = thirdPart;
-                    console.log('Direction set to:', thirdPart);
-                } else {
-                    routeInput.value = thirdPart;
-                    console.log('Route set to:', thirdPart);
-                }
+                routeInput.value = parts[1];
+                console.log('Route set to:', parts[1]);
             }
         }
     }
 
     shortcodeInput.addEventListener('input', function() {
         parseShortcode(shortcodeInput.value);
+        // 调整自身高度
+        if (window.autoResizeTextarea) {
+            window.autoResizeTextarea(this);
+        }
+    });
+
+    // 表单元素变化时，生成简码
+    const formElements = [
+        stationInput,
+        routeInput,
+        timeInput
+    ];
+
+    formElements.forEach(element => {
+        element.addEventListener('input', function() {
+            shortcodeInput.value = generateShortcode();
+            // 调整简码输入框高度
+            if (window.autoResizeTextarea) {
+                window.autoResizeTextarea(shortcodeInput);
+            }
+            // 调整自身高度
+            if (window.autoResizeTextarea) {
+                window.autoResizeTextarea(this);
+            }
+        });
+    });
+
+    // 时刻表类型选择器变化时，更新显示和简码
+    timetableTypeTabs.forEach((tab, index) => {
+        tab.addEventListener('click', function() {
+            // 移除所有选项卡的active类
+            timetableTypeTabs.forEach(t => t.classList.remove('active'));
+            
+            // 添加当前选项卡的active类
+            this.classList.add('active');
+            
+            // 更新类型值和显示
+            const type = this.dataset.value;
+            timetableTypeInput.value = type;
+            
+            if (type === 'station-screen') {
+                timetableTypeDisplay.textContent = '显示车站大屏';
+                textModeInput.value = 'true';
+                timetableSpecific.classList.add('hidden');
+                stationScreenSpecific.classList.remove('hidden');
+            } else {
+                timetableTypeDisplay.textContent = '显示列车时刻表';
+                textModeInput.value = 'false';
+                timetableSpecific.classList.remove('hidden');
+                stationScreenSpecific.classList.add('hidden');
+            }
+            
+            // 更新简码
+            shortcodeInput.value = generateShortcode();
+            // 调整简码输入框高度
+            if (window.autoResizeTextarea) {
+                window.autoResizeTextarea(shortcodeInput);
+            }
+        });
     });
 
     // 从URL参数中获取简码并自动填充
@@ -262,6 +531,81 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log('Calling checkUrlForShortcode...');
     checkUrlForShortcode();
 
+    // 车站模糊搜索
+    function setupStationSearch(inputId, suggestionsId) {
+        const input = document.getElementById(inputId);
+        const suggestions = document.getElementById(suggestionsId);
+        
+        input.addEventListener('input', async function() {
+            const query = this.value.trim();
+            if (query.length < 1) {
+                suggestions.classList.add('hidden');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/search_stations?q=${encodeURIComponent(query)}`);
+                const data = await response.json();
+                
+                suggestions.innerHTML = '';
+                if (data.length > 0) {
+                    data.forEach(station => {
+                        const div = document.createElement('div');
+                        div.className = 'station-suggestion-item';
+                        // 显示时将竖线替换为空格
+                        div.textContent = station.replace('|', ' ');
+                        div.style.padding = '6px 8px';
+                        div.style.cursor = 'pointer';
+                        div.style.borderBottom = '1px solid var(--border-color)';
+                        div.style.display = 'flex';
+                        div.style.alignItems = 'center';
+                        div.style.transition = 'background-color 0.2s';
+                        div.style.color = 'var(--text-primary)';
+                        div.onmouseenter = function() {
+                            this.style.backgroundColor = 'var(--hover-bg)';
+                        };
+                        div.onmouseleave = function() {
+                            this.style.backgroundColor = 'transparent';
+                        };
+                        div.addEventListener('click', () => {
+                            // 只使用第一语言（|前的部分）
+                            const stationName = station.split('|')[0];
+                            input.value = stationName;
+                            suggestions.classList.add('hidden');
+                            // 更新简码
+                            if (window.generateShortcode) {
+                                const shortcodeInput = document.getElementById('shortcode');
+                                if (shortcodeInput) {
+                                    shortcodeInput.value = window.generateShortcode();
+                                    // 调整简码输入框高度
+                                    if (window.autoResizeTextarea) {
+                                        window.autoResizeTextarea(shortcodeInput);
+                                    }
+                                }
+                            }
+                        });
+                        suggestions.appendChild(div);
+                    });
+                    suggestions.classList.remove('hidden');
+                } else {
+                    suggestions.classList.add('hidden');
+                }
+            } catch (error) {
+                console.error('搜索失败:', error);
+                suggestions.classList.add('hidden');
+            }
+        });
+        
+        // 点击外部关闭建议列表
+        document.addEventListener('click', (e) => {
+            if (!input.contains(e.target) && !suggestions.contains(e.target)) {
+                suggestions.classList.add('hidden');
+            }
+        });
+    }
+    
+    setupStationSearch('station-input', 'station-suggestions');
+
     timetableForm.addEventListener('submit', async (e) => {
         e.preventDefault();
 
@@ -270,7 +614,7 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('error').classList.add('hidden');
         document.getElementById('result').classList.add('hidden');
 
-        const text_mode = textModeCheckbox.checked;
+        const text_mode = textModeInput.value === 'true';
 
         let requestData = {
             'text_mode': text_mode
@@ -282,9 +626,6 @@ document.addEventListener('DOMContentLoaded', function() {
             requestData['station'] = stationInput.value;
             if (routeInput.value) {
                 requestData['route'] = routeInput.value;
-            }
-            if (directionInput.value) {
-                requestData['direction'] = parseInt(directionInput.value);
             }
             if (timeInput.value) {
                 requestData['time'] = timeInput.value;
@@ -308,14 +649,25 @@ document.addEventListener('DOMContentLoaded', function() {
                 document.getElementById('error').textContent = data.error;
                 document.getElementById('error').classList.remove('hidden');
             } else {
-                const iframe = document.getElementById('timetable-iframe');
+                const resultContainer = document.getElementById('timetable-result');
                 if (text_mode) {
-                    iframe.srcdoc = `<!DOCTYPE html><html><head></head><body><pre style="white-space: pre-wrap; color: #333; font-family: inherit;">${data.result}</pre></body></html>`;
+                    let processedResult;
+                    if (data.structured_result && data.structured_result.length > 0) {
+                        // 使用结构化数据渲染卡片
+                        processedResult = renderStructuredResult(data.structured_result);
+                    } else {
+                        // 回退到文字结果解析
+                        processedResult = processStationScreenResult(data.result);
+                    }
+                    
+                    // 直接将结果插入到容器中
+                    resultContainer.innerHTML = processedResult;
                 } else {
                     let htmlContent = data.result;
                     htmlContent = htmlContent.replace(/\{\{\s*url_for\('static',\s*filename='([^']+)'\s*\)\s*\}\}/g, '/static/$1');
                     htmlContent = htmlContent.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
-                    iframe.srcdoc = htmlContent;
+                    // 直接将结果插入到容器中
+                    resultContainer.innerHTML = htmlContent;
                 }
                 setTimeout(() => {
                     document.getElementById('result').classList.remove('hidden');
@@ -331,15 +683,195 @@ document.addEventListener('DOMContentLoaded', function() {
     timetableForm.addEventListener('reset', function() {
         stationInput.value = '';
         routeInput.value = '';
-        directionInput.value = '';
         timeInput.value = '';
-        textModeCheckbox.checked = false;
+        textModeInput.value = 'false';
+        timetableTypeInput.value = 'timetable';
         shortcodeInput.value = '';
+        
+        // 重置显示状态
+        timetableSpecific.classList.remove('hidden');
+        stationScreenSpecific.classList.add('hidden');
+        timetableTypeDisplay.textContent = '显示列车时刻表';
+        
+        // 重置选项卡状态
+        timetableTypeTabs.forEach((tab, index) => {
+            if (index === 0) {
+                tab.classList.add('active');
+            } else {
+                tab.classList.remove('active');
+            }
+        });
+        
         document.getElementById('result').classList.add('hidden');
         document.getElementById('error').classList.add('hidden');
         document.getElementById('loading').classList.add('hidden');
         document.getElementById('initial-prompt').classList.remove('hidden');
     });
+
+    // 渲染结构化的时刻表数据
+    function renderStructuredResult(structuredResult) {
+        if (!structuredResult || structuredResult.length === 0) {
+            return '<div class="no-result">暂无数据</div>';
+        }
+        
+        let cards = [];
+        for (const item of structuredResult) {
+            // 提取线路类型图标
+            let transportIcon = '<i class="fa-solid fa-train-subway"></i>';
+            let transportName = '地铁';
+            
+            // 根据线路名称判断交通类型
+            const routeNameLower = item.route_name.toLowerCase();
+            if (routeNameLower.includes('bus') || routeNameLower.includes('巴士')) {
+                transportIcon = '<i class="fa-solid fa-bus"></i>';
+                transportName = '巴士';
+            } else if (routeNameLower.includes('tram') || routeNameLower.includes('轻铁')) {
+                transportIcon = '<i class="fa-solid fa-train-tram"></i>';
+                transportName = '轻铁';
+            } else if (routeNameLower.includes('ferry') || routeNameLower.includes('船')) {
+                transportIcon = '<i class="fa-solid fa-ship"></i>';
+                transportName = '船';
+            } else if (routeNameLower.includes('high speed') || routeNameLower.includes('高铁')) {
+                transportIcon = '<i class="fa-solid fa-train"></i>';
+                transportName = '高铁';
+            }
+            
+            cards.push(`
+                <div class="route-card" style="border-left-color: ${item.route_color};">
+                    <div class="route-info" style="border-left-color: ${item.route_color};">
+                        <div class="route-tag">
+                            <div style="display: flex; align-items: center;">
+                                <span class="icon-span">${transportIcon}</span>
+                                <span class="route-name">${item.route_name.replace('||', '').replace('|', ' ')}</span>
+                                <span class="route-type">${transportName}</span>
+                            </div>
+                            <div class="right-buttons">
+                                <button class="detail-btn"><i class="fa-solid fa-circle-info"></i></button>
+                            </div>
+                        </div>
+                        ${(item.destination_name || item.direction) ? `
+                            <div class="platform-info">
+                                ${item.direction ? `<span class="platform-tag">方向 ${item.direction}</span>` : ''}
+                                <div class="direction-indicator">
+                                    ${item.destination_name ? `终点站: ${item.destination_name}` : ''}
+                                </div>
+                            </div>
+                        ` : ''}
+                        <div class="time-detail">
+                            <span><i class="fa-regular fa-clock mr-1"></i> 到站时间</span>
+                            <span class="time-value">${item.arrival_time}</span>
+                        </div>
+                    </div>
+                </div>
+            `);
+        }
+        
+        return cards.join('');
+    }
+
+    // 处理车站大屏模式的文字结果，转换为卡片形式
+    function processStationScreenResult(textResult) {
+        if (!textResult || typeof textResult !== 'string') {
+            return '<div class="no-result">暂无数据</div>';
+        }
+        
+        const lines = textResult.split('\n').filter(line => line.trim() !== '');
+        if (lines.length === 0) {
+            return '<div class="no-result">暂无数据</div>';
+        }
+        
+        // 线路颜色映射（示例）
+        const routeColors = {
+            '东铁线': '#1e3a8a',
+            '西铁线': '#10b981',
+            '南铁线': '#f59e0b',
+            '北铁线': '#ef4444',
+            '机场快线': '#8b5cf6',
+            '迪士尼线': '#ec4899',
+            '东涌线': '#6366f1',
+            '将军澳线': '#14b8a6',
+            '观塘线': '#f97316',
+            '荃湾线': '#06b6d4',
+            '港岛线': '#3b82f6',
+            '南港岛线': '#8b5cf6',
+            '屯马线': '#10b981',
+            '轻铁': '#f59e0b',
+            '港铁巴士': '#ef4444'
+        };
+        
+        let cards = [];
+        
+        // 跳过第一行（车站信息），从第二行开始处理线路信息
+        for (let i = 1; i < lines.length; i++) {
+            const line = lines[i].trim();
+            if (!line) continue;
+            
+            // 匹配线路名称和时间信息
+            const routeMatch = line.match(/^(.*?):\s*(.*)$/);
+            if (routeMatch) {
+                const routeName = routeMatch[1].trim();
+                const timesStr = routeMatch[2].trim();
+                
+                // 解析时间信息
+                const timeMatches = timesStr.match(/(\d+:\d+:\d+)(?:\([^)]+\))?/g);
+                if (timeMatches) {
+                    timeMatches.forEach(timeMatch => {
+                        // 提取时间部分
+                        const timeOnly = timeMatch.match(/(\d+:\d+:\d+)/)[1];
+                        const color = routeColors[routeName] || '#4a90e2'; // 默认颜色
+                        
+                        // 提取线路类型图标
+                        let transportIcon = '<i class="fa-solid fa-train-subway"></i>';
+                        let transportName = '地铁';
+                        
+                        // 根据线路名称判断交通类型
+                        const routeNameLower = routeName.toLowerCase();
+                        if (routeNameLower.includes('bus') || routeNameLower.includes('巴士')) {
+                            transportIcon = '<i class="fa-solid fa-bus"></i>';
+                            transportName = '巴士';
+                        } else if (routeNameLower.includes('tram') || routeNameLower.includes('轻铁')) {
+                            transportIcon = '<i class="fa-solid fa-train-tram"></i>';
+                            transportName = '轻铁';
+                        } else if (routeNameLower.includes('ferry') || routeNameLower.includes('船')) {
+                            transportIcon = '<i class="fa-solid fa-ship"></i>';
+                            transportName = '船';
+                        } else if (routeNameLower.includes('high speed') || routeNameLower.includes('高铁')) {
+                            transportIcon = '<i class="fa-solid fa-train"></i>';
+                            transportName = '高铁';
+                        }
+                        
+                        cards.push(`
+                            <div class="route-card" style="border-left-color: ${color};">
+                                <div class="route-info" style="border-left-color: ${color};">
+                                    <div class="route-tag">
+                                        <div style="display: flex; align-items: center;">
+                                            <span class="icon-span">${transportIcon}</span>
+                                            <span class="route-name">${routeName.replace('||', '').replace('|', ' ')}</span>
+                                            <span class="route-type">${transportName}</span>
+                                        </div>
+                                        <div class="right-buttons">
+                                            <button class="detail-btn"><i class="fa-solid fa-circle-info"></i></button>
+                                        </div>
+                                    </div>
+                                    <div class="time-detail">
+                                        <span><i class="fa-regular fa-clock mr-1"></i> 到站时间</span>
+                                        <span class="time-value">${timeOnly}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        `);
+                    });
+                }
+            }
+        }
+        
+        // 如果没有匹配到卡片，显示原始文本（用于调试）
+        if (cards.length === 0) {
+            return `<div style="white-space: pre-wrap; color: var(--text-primary);">${textResult}</div>`;
+        }
+        
+        return cards.join('');
+    }
 });
 </script>
 {% endblock %}

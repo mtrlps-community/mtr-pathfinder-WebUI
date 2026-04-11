@@ -1417,27 +1417,157 @@ def api_timetable():
         except:
             return None
 
+    def get_structured_timetable(data_v3, data_v4, station_name, departure_time):
+        """获取结构化的时刻表数据"""
+        import re
+        
+        # 先获取文字结果，用于解析线路信息
+        text_result = main_text_timetable(
+            config['LOCAL_FILE_PATH_V4'],
+            '',
+            departure_time,
+            station_name)
+        
+        if not text_result:
+            return None
+        
+        # 解析文字结果，提取线路和时间信息
+        lines = text_result.split('\n')[1:]  # 跳过第一行（车站信息）
+        structured_data = []
+        
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+            
+            # 匹配线路名称和时间信息
+            route_match = re.match(r'^(.*?):\s*(.*)$', line)
+            if not route_match:
+                continue
+            
+            route_full_name = route_match.group(1).strip()
+            times_str = route_match.group(2).strip()
+            
+            # 提取方向信息（从线路名称中）
+            direction = None
+            direction_match = re.search(r'\b(North|South|East|West|Up|Down|Clockwise|Anticlockwise|顺时针|逆时针)\b', route_full_name)
+            if direction_match:
+                direction = direction_match.group(0)
+            
+            # 在v3数据中查找线路信息
+            route_info = None
+            
+            # 标准化线路名称，用于匹配
+            def normalize_route_name(name):
+                # 替换|为空格，去除||后的内容
+                name = name.replace('|', ' ').split('||')[0].strip()
+                # 去除[WIP]等前缀
+                name = re.sub(r'^\[WIP\]', '', name).strip()
+                return name
+            
+            # 标准化当前线路名称
+            normalized_full_name = normalize_route_name(route_full_name)
+            
+            # 尝试匹配线路
+            for route in data_v3['routes']:
+                route_name = route['name']
+                normalized_route_name = normalize_route_name(route_name)
+                
+                # 直接匹配标准化后的名称
+                if normalized_route_name == normalized_full_name:
+                    route_info = route
+                    break
+                # 尝试部分匹配
+                elif normalized_full_name in normalized_route_name or normalized_route_name in normalized_full_name:
+                    route_info = route
+                    break
+            
+            # 如果仍然没有找到，尝试更宽松的匹配
+            if not route_info:
+                for route in data_v3['routes']:
+                    route_name = route['name']
+                    # 检查线路名称是否包含当前线路的关键词
+                    if any(keyword in route_name for keyword in route_full_name.split()):
+                        route_info = route
+                        break
+            
+            # 获取线路颜色
+            color_hex = '#4a90e2'  # 默认颜色
+            if route_info:
+                color_int = route_info.get('color', 0)
+                # 转换为十六进制颜色字符串
+                color_hex = '#{:06x}'.format(color_int)
+            
+            # 获取终点站信息
+            destination_id = None
+            if route_info and route_info.get('stations') and len(route_info['stations']) > 0:
+                destination_id = route_info['stations'][-1]['id']
+            
+            # 获取终点站名称
+            destination_name = None
+            if destination_id and destination_id in data_v4['stations']:
+                destination_name = data_v4['stations'][destination_id]['name'].split('|')[0]
+            
+            # 解析时间信息
+            time_matches = re.findall(r'(\d+:\d+:\d+)(?:\([^)]+\))?', times_str)
+            if not time_matches:
+                continue
+            
+            for time_match in time_matches:
+                time_only = time_match
+                
+                structured_data.append({
+                    'route_name': route_full_name,
+                    'route_color': color_hex,
+                    'destination_name': destination_name,
+                    'direction': direction,
+                    'arrival_time': time_only
+                })
+        
+        return structured_data, text_result
+
     if text_mode:
         departure_time = parse_time_to_seconds(time_str)
         if departure_time is None:
             departure_time = 0
 
-        if route:
-            result_text = main_text_timetable(
-                config['LOCAL_FILE_PATH_V4'],
-                '',
-                departure_time,
-                station_name)
-        else:
-            result_text = main_text_timetable(
-                config['LOCAL_FILE_PATH_V4'],
-                '',
-                departure_time,
-                station_name)
+        # 加载v3和v4数据
+        with open(config['LOCAL_FILE_PATH_V3'], encoding='utf-8') as f:
+            data_v3 = json.load(f)
+        with open(config['LOCAL_FILE_PATH_V4'], encoding='utf-8') as f:
+            data_v4 = json.load(f)
+        
+        # 获取结构化数据
+        try:
+            structured_result, text_result = get_structured_timetable(
+                data_v3, data_v4, station_name, departure_time)
+            
+            if not text_result:
+                return jsonify({'error': '未找到该车站信息'})
+            
+            return jsonify({
+                'result': text_result,
+                'structured_result': structured_result,
+                'text_mode': True
+            })
+        except Exception as e:
+            # 如果结构化数据获取失败，回退到纯文本模式
+            if route:
+                result_text = main_text_timetable(
+                    config['LOCAL_FILE_PATH_V4'],
+                    '',
+                    departure_time,
+                    station_name)
+            else:
+                result_text = main_text_timetable(
+                    config['LOCAL_FILE_PATH_V4'],
+                    '',
+                    departure_time,
+                    station_name)
 
-        if result_text is None:
-            return jsonify({'error': '未找到该车站信息'})
-        return jsonify({'result': result_text, 'text_mode': True})
+            if result_text is None:
+                return jsonify({'error': '未找到该车站信息'})
+            return jsonify({'result': result_text, 'text_mode': True})
 
     else:
         if route:

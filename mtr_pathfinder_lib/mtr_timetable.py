@@ -43,6 +43,7 @@ tt_opencc4 = OpenCC('jp2t')
 EXPRESS_TABLE = {'CFR||MED': '快速',
                  'CFR||FAST': '急行',
                  'CFR||NIGHT': '卧铺特急',
+                 'CFR||IC': '特急',
                  'CTG Intercity Southwest': '特急',
                  'CTG Intercity Southwest': '特急',
                  'Grand Central': '快速特急',
@@ -56,13 +57,13 @@ EXPRESS_TABLE = {'CFR||MED': '快速',
                  'CrossCountry||Airport - Seowonju 12': '快速',
                  'CrossCountry||Liskeard Intl - Portsmouth Express 01': '快速特急',
                  'CrossCountry||Portsmouth - Liskeard Intl Express 01': '快速特急',
-                 'First Great Western||Brighton > Seoul Express': '特急',
-                 'First Great Western||Seoul>Brighton Express': '特急',
-                 'First Great Western||Portsmouth>Yongsan Semifast': '急行',
-                 'First Great Western||Yongsan>Portsmouth Semifast': '急行',
-                 'ITX 청춘|ITX Cheongchun': '特急',
-                 'KTX-이음|KTX-EUM': '快速特急',
-                 'CTX-공월|CTX-Welkin': '快速特急',
+                 'First Great Western||FGW|Brighton > Seoul Express': '特急',
+                 'First Great Western||FGW|Seoul>Brighton Express': '特急',
+                 'First Great Western||FGW|Portsmouth>Yongsan Semifast': '急行',
+                 'First Great Western||FGW|Yongsan>Portsmouth Semifast': '急行',
+                 'ITX-청춘|ITX-Cheongchun': '急行',
+                #  'KTX-이음|KTX-EUM': '快速特急',
+                 'CTX-공월|CTX-Welkin': '特急',
                  'Moszyan Railways Intercity Direct': '快速特急',
                  'Nightjet': '卧铺快特',
                  'Moszyan Railways Intercity': '特急',
@@ -93,12 +94,14 @@ EXPRESS_TABLE = {'CFR||MED': '快速',
                  'KTT': '特急',
                  '六花西鐵|Rikka West Rail||Mimatsu -> Rikkashi <EXPRESS>': '急行',
                  '六花西鐵|Rikka West Rail||Rikkashi -> Mimatsu <EXPRESS>': '急行',
-                 '西米德蘭鐵路|West Midlands Railway||Krestona -> Worcester Semifast': '急行',
-                 '西米德蘭鐵路|West Midlands Railway||Worcester -> Krestona Semifast': '急行',
-                 '六花西鐵|Rikka West Rail||Cheongnyangni -> Pungyang': '区间快速',
-                 '六花西鐵|Rikka West Rail||Pungyang -> Cheongnyangni': '区间快速',
+                 '西米德蘭鐵路|WMR West Midlands Railway||Krestona -> Worcester Semifast': '急行',
+                 '西米德蘭鐵路|WMR West Midlands Railway||Worcester -> Krestona Semifast': '急行',
+                 '六花西鐵|Rikka West Rail||Cheongnyangni -> Pungyang': '特急',
+                 '六花西鐵|Rikka West Rail||Pungyang -> Cheongnyangni': '特急',
                  '六花西鐵|Rikka West Rail||Pungyang -> Seoul': '区间急行',
-                 '六花西鐵|Rikka West Rail||Seoul -> Pungyang': '区间急行'}
+                 '六花西鐵|Rikka West Rail||Seoul -> Pungyang': '区间急行',
+                 '高地線|Highlands Line||On Hau Express|[HLL/RA/DB]': '急行',
+                 '高地線|Highlands Line||Daimon Island Express|[HLL/RA/UB]': '急行'}
 
 COLOR_TABLE = {'区间快速': '#00CCFF',
                '快速': '#0F4E8C',
@@ -710,7 +713,6 @@ def get_text_timetable(data, station, departure_time: int,
         x.sort()
         route_data = data['routes'][route_id]
         route_name: str = route_data['name']
-        route_name = route_name.replace('||', ' ').replace('|', ' ')
         count = 1
         template = f'{route_name}: '
         for y in x:
