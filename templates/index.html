@@ -863,7 +863,7 @@
                     const calcTime = resultData.calc_time;
                     const dataVersions = resultData.data_versions;
                     const usedCache = resultData.used_cache;
-                    const imageId = resultData.image_id;
+                    const imageBase64 = resultData.image_base64;
                     const departureTime = resultData.departure_time; // 从API响应中获取实际使用的出发时间
                     
                     // 检查是否需要重试（仅实时模式）
@@ -880,7 +880,7 @@
                     }
                     
                     // 显示结果，传递实际使用的出发时间
-                displayResultInternal(routeResult, algorithm, calcTime, dataVersions, usedCache, data.detail, imageId, departureTime);
+                displayResultInternal(routeResult, algorithm, calcTime, dataVersions, usedCache, data.detail, imageBase64, departureTime);
                 } else {
                     // 无结果
                     noResult.classList.remove('hidden');
@@ -990,7 +990,7 @@
     }
     
     // 显示结果
-    function displayResultInternal(routeResult, algorithm, calcTime, dataVersions, usedCache, detail, imageId, departureTime) {
+    function displayResultInternal(routeResult, algorithm, calcTime, dataVersions, usedCache, detail, imageBase64, departureTime) {
         result.classList.remove('hidden');
         
         // 解析routeresult数组，添加默认值处理
@@ -1012,18 +1012,19 @@
         const viewImageBtn = document.getElementById('view-image-btn');
         const downloadImageBtn = document.getElementById('download-image-btn');
         
-        // 更新全局图片ID变量
-        latestImageId = imageId;
+        // 更新全局图片Base64变量
+        latestImageBase64 = imageBase64;
         
-        // 显示加载提示，隐藏图片按钮
-        imageLoading.classList.remove('hidden');
-        viewImageBtn.classList.add('hidden');
-        downloadImageBtn.classList.add('hidden');
+        // 隐藏加载提示
+        imageLoading.classList.add('hidden');
         
-        // 如果有imageId，开始异步加载图片
-        if (imageId) {
-            // 调用异步函数加载图片
-            loadImageAsync(imageId);
+        // 如果有imageBase64，显示图片按钮
+        if (imageBase64) {
+            viewImageBtn.classList.remove('hidden');
+            downloadImageBtn.classList.remove('hidden');
+        } else {
+            viewImageBtn.classList.add('hidden');
+            downloadImageBtn.classList.add('hidden');
         }
         
         // 清空现有内容
@@ -2498,75 +2499,10 @@
         console.warn('generateResultImage函数已废弃');
     }
     
-    // 异步加载图片函数
-    async function loadImageAsync(imageId) {
-        const imageLoading = document.getElementById('image-loading');
-        const viewImageBtn = document.getElementById('view-image-btn');
-        const downloadImageBtn = document.getElementById('download-image-btn');
-        
-        // 最大重试次数
-        const maxRetries = 30;
-        // 重试间隔（毫秒）
-        const retryInterval = 1000;
-        
-        try {
-            // 首先调用api_generate_image路由触发图片生成
-            const generateResponse = await fetch('/api/generate_image', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ image_id: imageId })
-            });
-            
-            if (!generateResponse.ok) {
-                const generateResult = await generateResponse.json();
-                console.error('触发图片生成失败:', generateResult.error);
-                imageLoading.classList.add('hidden');
-                return;
-            }
-        } catch (error) {
-            console.error('触发图片生成失败:', error);
-            imageLoading.classList.add('hidden');
-            return;
-        }
-        
-        // 定期检查图片生成状态
-        for (let retry = 0; retry < maxRetries; retry++) {
-            try {
-                // 检查图片生成状态
-                const response = await fetch(`/api/get_image?image_id=${imageId}`);
-                
-                if (response.status === 202) {
-                    // 图片还在生成中，等待一段时间后重试
-                    await new Promise(resolve => setTimeout(resolve, retryInterval));
-                    continue;
-                } else if (response.ok) {
-                    // 图片生成成功，隐藏加载提示，显示图片按钮
-                    imageLoading.classList.add('hidden');
-                    viewImageBtn.classList.remove('hidden');
-                    downloadImageBtn.classList.remove('hidden');
-                    return;
-                } else {
-                    // 其他错误，隐藏加载提示，显示错误信息
-                    const result = await response.json();
-                    console.error('图片生成失败:', result.error);
-                    imageLoading.classList.add('hidden');
-                    return;
-                }
-            } catch (error) {
-                console.error('检查图片状态失败:', error);
-                await new Promise(resolve => setTimeout(resolve, retryInterval));
-            }
-        }
-        
-        // 重试次数超过最大值，隐藏加载提示，显示错误信息
-        console.error('图片生成超时');
-        imageLoading.classList.add('hidden');
-    }
+
     
-    // 全局变量，用于存储最新的图片ID
-    let latestImageId = null;
+    // 全局变量，用于存储最新的Base64图片数据
+    let latestImageBase64 = null;
     
     // 图片查看和下载功能
     document.addEventListener('DOMContentLoaded', function() {
@@ -2580,38 +2516,110 @@
 
         
         // 查看图片按钮点击事件
-        viewImageBtn.addEventListener('click', async function() {
+        viewImageBtn.addEventListener('click', function() {
             // 设置图片源
-            if (latestImageId) {
-                resultImage.src = `/api/get_image?image_id=${latestImageId}&timestamp=${new Date().getTime()}`;
-                // 显示模态框
-                imageModal.classList.remove('hidden');
+            if (latestImageBase64) {
+                // 将Base64转换为Blob对象
+                const blob = base64ToBlob(latestImageBase64);
+                if (blob) {
+                    const url = URL.createObjectURL(blob);
+                    resultImage.src = url;
+                    // 显示模态框
+                    imageModal.classList.remove('hidden');
+                } else {
+                    console.error('Failed to convert base64 to blob');
+                    alert('图片加载失败，请尝试重新寻路');
+                }
             }
         });
         
         // 下载图片按钮点击事件
         downloadImageBtn.addEventListener('click', function() {
-            if (latestImageId) {
-                // 创建下载链接
-                const link = document.createElement('a');
-                link.href = `/api/get_image?image_id=${latestImageId}`;
-                link.download = `mtr-path-${new Date().getTime()}.png`;
-                link.click();
+            if (latestImageBase64) {
+                // 将Base64转换为Blob对象
+                const blob = base64ToBlob(latestImageBase64);
+                if (blob) {
+                    const url = URL.createObjectURL(blob);
+                    // 创建下载链接
+                    const link = document.createElement('a');
+                    link.href = url;
+                    // 生成年月日时分秒格式的时间字符串
+                    const now = new Date();
+                    const year = now.getFullYear();
+                    const month = String(now.getMonth() + 1).padStart(2, '0');
+                    const day = String(now.getDate()).padStart(2, '0');
+                    const hours = String(now.getHours()).padStart(2, '0');
+                    const minutes = String(now.getMinutes()).padStart(2, '0');
+                    const seconds = String(now.getSeconds()).padStart(2, '0');
+                    const timestamp = `${year}${month}${day}${hours}${minutes}${seconds}`;
+                    link.download = `MTRPathResult-${timestamp}.png`;
+                    link.click();
+                    // 释放URL对象
+                    setTimeout(() => URL.revokeObjectURL(url), 100);
+                } else {
+                    console.error('Failed to convert base64 to blob');
+                    alert('图片下载失败，请尝试重新寻路');
+                }
             }
         });
+        
+        // Base64转Blob函数
+        function base64ToBlob(base64) {
+            try {
+                // 检查base64是否为空或无效
+                if (!base64 || typeof base64 !== 'string') {
+                    console.error('Invalid base64 string');
+                    return null;
+                }
+                
+                // 检查base64字符串是否已经包含data URL前缀
+                let base64Data = base64;
+                let contentType = 'image/png';
+                
+                if (base64.startsWith('data:')) {
+                    // 有data URL前缀
+                    const parts = base64.split(';base64,');
+                    if (parts.length === 2) {
+                        contentType = parts[0].split(':')[1] || 'image/png';
+                        base64Data = parts[1];
+                    }
+                }
+                
+                // 解码Base64字符串
+                const raw = window.atob(base64Data);
+                const rawLength = raw.length;
+                const uInt8Array = new Uint8Array(rawLength);
+                
+                for (let i = 0; i < rawLength; ++i) {
+                    uInt8Array[i] = raw.charCodeAt(i);
+                }
+                
+                return new Blob([uInt8Array], { type: contentType });
+            } catch (error) {
+                console.error('Error converting base64 to blob:', error);
+                return null;
+            }
+        }
         
         // 关闭图片模态框
         closeImageModal.addEventListener('click', function() {
             imageModal.classList.add('hidden');
             // 清空图片源以释放内存
-            resultImage.src = '';
+            if (resultImage.src) {
+                URL.revokeObjectURL(resultImage.src);
+                resultImage.src = '';
+            }
         });
         
         // 点击模态框背景关闭
         imageModal.addEventListener('click', function(e) {
             if (e.target === imageModal) {
                 imageModal.classList.add('hidden');
-                resultImage.src = '';
+                // 清空图片源以释放内存
+                if (resultImage.src) {
+                    URL.revokeObjectURL(resultImage.src);
+                    resultImage.src = '';
+                }
             }
         });
         

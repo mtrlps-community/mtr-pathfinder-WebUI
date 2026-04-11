@@ -1527,6 +1527,9 @@ def api_find_route():
             return jsonify({'error': '间隔数据不存在，请先更新数据'}), 400
     
     try:
+        # 初始化图片Base64变量
+        image_base64 = None
+        
         # 根据算法选择不同的寻路实现
         if algorithm == 'real':
             # 使用v4版程序的寻路功能
@@ -1629,11 +1632,7 @@ def api_find_route():
                 waiting_time  # 等车时间 (元素4)
             ]
             
-            # 3. 将寻路结果和生成图片所需数据存储在缓存中，供后续图片生成使用
-            # 生成唯一标识符
-            import uuid
-            image_id = str(uuid.uuid4())
-            
+            # 3. 直接生成图片并返回Base64数据
             # 获取数据版本信息
             version1 = ''
             version2 = ''
@@ -1646,19 +1645,30 @@ def api_find_route():
                     os.path.getmtime(config['DEP_PATH_V4'])
                 ).strftime('%Y%m%d-%H%M')
             
-            # 存储寻路结果和生成图片所需数据
-            image_cache[image_id] = {
-                'status': 'ready',
-                'algorithm': algorithm,
-                'data': {
-                    'every_route_time': every_route_time,
-                    'version1': version1,
-                    'version2': version2,
-                    'dep_time_seconds': dep_time_seconds
-                },
-                'image_path': None,
-                'image_base64': None
-            }
+            # 直接生成图片
+            try:
+                # 使用v4版程序生成图片
+                from mtr_pathfinder_lib.mtr_pathfinder_v4 import RouteType as RouteTypeV4
+                image_result = save_image_v4(
+                    route_type=RouteTypeV4.REAL_TIME,
+                    every_route_time=every_route_time,
+                    BASE_PATH=BASE_PATH,
+                    version1=version1,
+                    version2=version2,
+                    PNG_PATH=PNG_PATH,
+                    departure_time=dep_time_seconds,
+                    show=False
+                )
+                
+                # 处理图片生成结果
+                if image_result and image_result not in [False, None]:
+                    if isinstance(image_result, tuple) and len(image_result) == 2:
+                        # v3版和v4版save_image函数返回的图片格式：(image object, base64 str)
+                        _, image_base64 = image_result
+                        # 添加data URL前缀
+                        image_base64 = f'data:image/png;base64,{image_base64}'
+            except Exception as e:
+                print(f"生成图片错误: {str(e)}")
             
             # 初始化缓存使用状态
             used_cache = False
@@ -1914,29 +1924,33 @@ def api_find_route():
                 waiting_time  # 等车时间 (元素4) - 每个路线组的等待时间之和
             ]
 
-            # 3. 将寻路结果和生成图片所需数据存储在缓存中，供后续图片生成使用
-            # 生成唯一标识符
-            import uuid
-            image_id = str(uuid.uuid4())
-            
-            # 存储寻路结果和生成图片所需数据
-            # 注意：图片生成需要所有线路信息，所以使用processed_ert
-            image_cache[image_id] = {
-                'status': 'ready',
-                'algorithm': algorithm,
-                'data': {
-                    'every_route_time': processed_ert,
-                    'version1': version1,
-                    'version2': version2,
-                    'route_type': route_type,
-                    'shortest_distance': shortest_distance,
-                    'riding_time': riding_time,
-                    'waiting_time': waiting_time,
-                    'DETAIL': DETAIL
-                },
-                'image_path': None,
-                'image_base64': None
-            }
+            # 3. 直接生成图片并返回Base64数据
+            # 直接生成图片
+            try:
+                # 使用v3版程序生成图片
+                image_result = save_image_v3(
+                    route_type=route_type,
+                    every_route_time=processed_ert,
+                    shortest_distance=shortest_distance,
+                    riding_time=riding_time,
+                    waiting_time=waiting_time,
+                    BASE_PATH=BASE_PATH,
+                    version1=version1,
+                    version2=version2,
+                    DETAIL=DETAIL,
+                    PNG_PATH=PNG_PATH,
+                    show=False
+                )
+                
+                # 处理图片生成结果
+                if image_result and image_result not in [False, None]:
+                    if isinstance(image_result, tuple) and len(image_result) == 2:
+                        # v3版和v4版save_image函数返回的图片格式：(image object, base64 str)
+                        _, image_base64 = image_result
+                        # 添加data URL前缀
+                        image_base64 = f'data:image/png;base64,{image_base64}'
+            except Exception as e:
+                print(f"生成图片错误: {str(e)}")
         
         # 更新进度为100%
         search_progress.update({
@@ -1971,9 +1985,6 @@ def api_find_route():
                 os.path.getmtime(config['INTERVAL_PATH_V3'])
             ).strftime('%Y%m%d-%H%M')
         
-        # 图片将由/api/generate_image路由生成，这里只需要将状态设置为ready
-        image_cache[image_id]['status'] = 'ready'
-        
         # 构建响应数据
         response_data = {
             'result': formatted_result, 
@@ -1986,7 +1997,7 @@ def api_find_route():
                 'route_version_v4': route_version_v4,
                 'interval_version': interval_version
             },
-            'image_id': image_id  # 返回图片的唯一标识符
+            'image_base64': image_base64  # 直接返回Base64图片数据
         }
         
         # 仅实时模式返回实际使用的出发时间
