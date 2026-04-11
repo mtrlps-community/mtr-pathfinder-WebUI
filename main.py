@@ -27,6 +27,36 @@ from mtr_pathfinder_lib.mtr_timetable import *
 app = Flask(__name__)
 app.secret_key = 'your-secret-key'
 
+# 添加一个全局的 before_request 处理函数，用于处理带有空格和特殊字符的URL
+@app.before_request
+def handle_shortcode_urls():
+    from urllib.parse import unquote
+    full_path = request.full_path
+    # 检查 URL 是否以 /路线 开头
+    if full_path.startswith('/路线'):
+        # 提取 /路线 后面的部分
+        shortcode_part = full_path[3:].split('?')[0]  # 去除查询参数
+        if shortcode_part:
+            # 解码URL编码的字符
+            shortcode = unquote(shortcode_part)
+            # 去除开头的空格，避免重复添加空格
+            shortcode = shortcode.lstrip()
+            # 重定向到主页面，并将简码作为查询参数传递
+            from flask import redirect, url_for
+            return redirect(url_for('index', shortcode='/路线 ' + shortcode))
+    # 检查 URL 是否以 /时刻表 开头
+    elif full_path.startswith('/时刻表'):
+        # 提取 /时刻表 后面的部分
+        shortcode_part = full_path[4:].split('?')[0]  # 去除查询参数
+        if shortcode_part:
+            # 解码URL编码的字符
+            shortcode = unquote(shortcode_part)
+            # 去除开头的空格，避免重复添加空格
+            shortcode = shortcode.lstrip()
+            # 重定向到时刻表页面，并将简码作为查询参数传递
+            from flask import redirect, url_for
+            return redirect(url_for('timetable_page', shortcode='/时刻表 ' + shortcode))
+
 # 全局进度跟踪变量
 search_progress = {
     'percentage': 0,
@@ -362,6 +392,22 @@ def route_shortcode(shortcode):
     from flask import redirect, url_for
     # 直接传递简码，不进行额外编码
     return redirect(url_for('index', shortcode='/路线 ' + shortcode))
+
+# 添加一个更灵活的路由，处理带有空格和特殊字符的URL
+@app.route('/路线', defaults={'path': ''})
+@app.route('/路线/<path:path>')
+def route_shortcode_alt(path):
+    # 从完整URL中提取简码部分
+    from urllib.parse import unquote
+    # 组合完整的简码部分
+    if path:
+        # 解码URL编码的字符
+        shortcode = unquote(path)
+        # 渲染index.html模板，并将简码作为查询参数传递
+        from flask import redirect, url_for
+        return redirect(url_for('index', shortcode='/路线 ' + shortcode))
+    # 如果没有简码，重定向到主页面
+    return redirect(url_for('index'))
 
 @app.route('/时刻表/<path:shortcode>')
 def timetable_shortcode(shortcode):
